@@ -513,6 +513,156 @@ export class Keys {
     ): Uint8Array {
         // Try to use the argon2 package if available
         try {
+            // Check if we're in a browser environment first
+            if (typeof window !== "undefined") {
+                try {
+                    // Try to use argon2-browser in browser environments
+                    const argon2Browser = require("argon2-browser");
+
+                    // Create a synchronous wrapper for browser environments
+                    const argon2BrowserSync = (
+                        pwd: Uint8Array,
+                        slt: Uint8Array,
+                        iter: number,
+                        len: number
+                    ): Uint8Array => {
+                        try {
+                            // Use the synchronous version if available
+                            if (typeof argon2Browser.hashSync === "function") {
+                                const result = argon2Browser.hashSync({
+                                    pass: pwd,
+                                    salt: slt,
+                                    time: iter,
+                                    mem: 4096,
+                                    parallelism: 1,
+                                    hashLen: len,
+                                    type: argon2Browser.ArgonType.Argon2id,
+                                });
+                                return new Uint8Array(result.hash);
+                            }
+
+                            // If no sync version, use a synchronous XMLHttpRequest to wait for the result
+                            let result: Uint8Array | null = null;
+                            let error: Error | null = null;
+
+                            // Create a worker to run argon2 in a separate thread
+                            const worker = new Worker(
+                                URL.createObjectURL(
+                                    new Blob(
+                                        [
+                                            `
+                                        importScripts('https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2.min.js');
+                                        onmessage = function(e) {
+                                            const { pwd, salt, time, mem, hashLen } = e.data;
+                                            argon2.hash({
+                                                pass: pwd,
+                                                salt: salt,
+                                                time: time,
+                                                mem: mem,
+                                                parallelism: 1,
+                                                hashLen: hashLen,
+                                                type: argon2.ArgonType.Argon2id
+                                            })
+                                            .then(result => {
+                                                postMessage({ success: true, hash: result.hash });
+                                            })
+                                            .catch(err => {
+                                                postMessage({ success: false, error: err.message });
+                                            });
+                                        }
+                                    `,
+                                        ],
+                                        { type: "application/javascript" }
+                                    )
+                                )
+                            );
+
+                            // Send the data to the worker
+                            worker.postMessage({
+                                pwd: Array.from(pwd),
+                                salt: Array.from(slt),
+                                time: iter,
+                                mem: 4096,
+                                hashLen: len,
+                            });
+
+                            // Set up the message handler
+                            worker.onmessage = (e) => {
+                                if (e.data.success) {
+                                    result = new Uint8Array(e.data.hash);
+                                } else {
+                                    error = new Error(e.data.error);
+                                }
+                            };
+
+                            // Use a synchronous XMLHttpRequest to block until we have a result
+                            const xhr = new XMLHttpRequest();
+                            xhr.open(
+                                "GET",
+                                "data:text/plain;charset=utf-8,",
+                                false
+                            );
+
+                            const startTime = Date.now();
+                            const maxWaitTime = 30000; // 30 seconds timeout
+
+                            while (result === null && error === null) {
+                                // Check for timeout
+                                if (Date.now() - startTime > maxWaitTime) {
+                                    worker.terminate();
+                                    throw new Error(
+                                        "Argon2 operation timed out"
+                                    );
+                                }
+
+                                // Poll every 100ms
+                                try {
+                                    xhr.send(null);
+                                } catch (e) {
+                                    // Ignore errors from the XHR
+                                }
+                            }
+
+                            // Clean up
+                            worker.terminate();
+
+                            // Check for errors
+                            if (error) {
+                                throw error;
+                            }
+
+                            // Return the result
+                            if (result) {
+                                return result;
+                            }
+
+                            throw new Error(
+                                "Argon2 operation failed with no result"
+                            );
+                        } catch (err: unknown) {
+                            const errorMessage =
+                                err instanceof Error
+                                    ? err.message
+                                    : "Unknown error";
+                            throw new Error(
+                                `Browser Argon2 operation failed: ${errorMessage}`
+                            );
+                        }
+                    };
+
+                    // Call our browser synchronous wrapper
+                    return argon2BrowserSync(
+                        password,
+                        salt,
+                        iterations,
+                        keyLength
+                    );
+                } catch (e) {
+                    console.warn("argon2-browser not available:", e);
+                    // Fall back to Node.js implementation or other fallbacks
+                }
+            }
+
             // Check if we're in a Node.js environment
             if (typeof require === "function") {
                 try {
@@ -522,65 +672,89 @@ export class Keys {
                     // Since argon2 is async and our API is sync, we need to use a workaround
                     // This is not ideal but allows us to maintain compatibility
 
-                    // Create a synchronous wrapper around the async argon2 function
+                    // Create a proper synchronous wrapper around the async argon2 function
                     const argon2Sync = (
                         pwd: Uint8Array,
                         slt: Uint8Array,
                         iter: number,
                         len: number
                     ): Uint8Array => {
-                        // Note: In a real implementation, we would use a unique ID for tracking
-
-                        // Store for the result
-                        let result: Uint8Array | null = null;
-                        let error: Error | null = null;
-
-                        // Call the async function
-                        argon2
-                            .hash(Buffer.from(pwd), {
-                                type: argon2.argon2id,
-                                timeCost: iter,
-                                memoryCost: 4096, // 4 MB
-                                parallelism: 1,
-                                salt: Buffer.from(slt),
-                                hashLength: len,
-                                raw: true,
-                            })
-                            .then((hash: Buffer) => {
-                                result = new Uint8Array(hash);
-                            })
-                            .catch((err: Error) => {
-                                error = err;
-                            });
-
-                        // Wait for the result (blocking)
-                        // This is not ideal but necessary for our sync API
-                        const maxWaitTime = Date.now() + 10000; // 10 second timeout
-                        while (result === null && error === null) {
-                            // Check for timeout
-                            if (Date.now() > maxWaitTime) {
-                                throw new Error("Argon2 operation timed out");
+                        try {
+                            // Use the argon2 package's sync method if available
+                            if (typeof argon2.hashSync === "function") {
+                                // Some versions of argon2 provide a sync method
+                                const hash = argon2.hashSync(Buffer.from(pwd), {
+                                    type: argon2.argon2id,
+                                    timeCost: iter,
+                                    memoryCost: 4096, // 4 MB
+                                    parallelism: 1,
+                                    salt: Buffer.from(slt),
+                                    hashLength: len,
+                                    raw: true,
+                                });
+                                return new Uint8Array(hash);
                             }
 
-                            // Small delay to prevent CPU hogging
-                            for (let i = 0; i < 1000000; i++) {
-                                // Busy wait
+                            // If sync method is not available, use child_process to run in a separate process
+                            // This is a proper way to make async operations synchronous in Node.js
+                            const childProcess = require("child_process");
+
+                            // Create a small script to run argon2 in a separate process
+                            const script = `
+                                const argon2 = require('argon2');
+                                const pwd = Buffer.from(${JSON.stringify(
+                                    Array.from(pwd)
+                                )});
+                                const salt = Buffer.from(${JSON.stringify(
+                                    Array.from(slt)
+                                )});
+
+                                argon2.hash(pwd, {
+                                    type: argon2.argon2id,
+                                    timeCost: ${iter},
+                                    memoryCost: 4096,
+                                    parallelism: 1,
+                                    salt: salt,
+                                    hashLength: ${len},
+                                    raw: true,
+                                })
+                                .then(hash => {
+                                    process.stdout.write(Buffer.from(hash).toString('hex'));
+                                    process.exit(0);
+                                })
+                                .catch(err => {
+                                    process.stderr.write(err.message);
+                                    process.exit(1);
+                                });
+                            `;
+
+                            // Execute the script synchronously
+                            const result = childProcess.execSync(
+                                `node -e "${script.replace(/\n/g, " ")}"`,
+                                { timeout: 30000 } // 30 second timeout
+                            );
+
+                            // Convert the hex output back to Uint8Array
+                            const hexOutput = result.toString().trim();
+                            const bytes = new Uint8Array(len);
+                            for (let i = 0; i < len; i++) {
+                                bytes[i] = parseInt(
+                                    hexOutput.substr(i * 2, 2),
+                                    16
+                                );
                             }
-                        }
 
-                        // Check for errors
-                        if (error) {
-                            throw error;
+                            return bytes;
+                        } catch (err: unknown) {
+                            // If child_process approach fails, throw a clear error
+                            const errorMessage =
+                                err instanceof Error
+                                    ? err.message
+                                    : "Unknown error";
+                            throw new Error(
+                                `Argon2 operation failed: ${errorMessage}`
+                            );
                         }
-
-                        // Return the result
-                        if (result) {
-                            return result;
-                        }
-
-                        throw new Error(
-                            "Argon2 operation failed with no result"
-                        );
                     };
 
                     // Call our synchronous wrapper
