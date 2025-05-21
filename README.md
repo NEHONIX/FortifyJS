@@ -169,7 +169,7 @@ const hash = FortifyJS.secureHash("sensitive-data", {
 
 #### `deriveKey(input, options?)`
 
-Derive cryptographic keys from passwords or other inputs.
+Derive cryptographic keys from passwords or other inputs using industry-standard algorithms.
 
 ```typescript
 const key = FortifyJS.deriveKey("password", {
@@ -179,6 +179,11 @@ const key = FortifyJS.deriveKey("password", {
     keyLength: 32, // Key length in bytes (default: 32)
     hashFunction: "sha256", // Hash function: sha256|sha512
 });
+
+// The implementation uses real cryptographic libraries:
+// - Node.js crypto for server environments
+// - pbkdf2, scrypt-js, or argon2 packages when available
+// - Pure JS implementation as fallback with security warnings
 ```
 
 ### 🛡️ Security Analysis
@@ -255,48 +260,63 @@ const isValid = FortifyJS.faultResistantEqual(buffer1, buffer2);
 
 ```typescript
 // Derive a key using memory-hard Argon2
-const argon2Result = FortifyJS.deriveKeyMemoryHard("password", {
-    memoryCost: 16384, // 16 MB
-    timeCost: 4,
-    parallelism: 1,
+const argon2Result = FortifyJS.deriveKey("password", {
+    algorithm: "argon2",
+    iterations: 4, // Time cost parameter
+    salt: FortifyJS.generateSecureToken({ length: 16, outputFormat: "buffer" }),
     keyLength: 32,
 });
 
-// Derive a key using memory-hard Balloon
-const balloonResult = FortifyJS.deriveKeyBalloon("password", {
-    memoryCost: 16384,
-    timeCost: 4,
+// Derive a key using memory-hard Scrypt
+const scryptResult = FortifyJS.deriveKey("password", {
+    algorithm: "scrypt",
+    iterations: 14, // Cost parameter (N = 2^cost)
+    salt: FortifyJS.generateSecureToken({ length: 16, outputFormat: "buffer" }),
     keyLength: 32,
 });
+
+// The implementation uses real cryptographic libraries:
+// - argon2 package in Node.js environments
+// - scrypt-js or Node.js crypto.scryptSync as alternatives
+// - Automatic fallback to more secure options when available
 ```
 
 #### Post-Quantum Cryptography
 
 ```typescript
-// Generate a quantum-resistant key pair
-const lamportKeypair = FortifyJS.generateQuantumResistantKeypair();
+// Generate a Lamport one-time signature key pair (hash-based)
+const lamportKeypair = FortifyJS.generateLamportKeyPair();
 
-// Sign a message with quantum-resistant signature
-const signature = FortifyJS.quantumResistantSign(
-    message,
-    lamportKeypair.privateKey
-);
+// Sign a message with Lamport signature
+const signature = FortifyJS.lamportSign(message, lamportKeypair.privateKey);
 
-// Verify a quantum-resistant signature
-const isValid = FortifyJS.quantumResistantVerify(
+// Verify a Lamport signature
+const isValid = FortifyJS.lamportVerify(
     message,
     signature,
     lamportKeypair.publicKey
 );
 
-// Generate a Ring-LWE key pair for post-quantum encryption
-const lwePair = FortifyJS.generateRingLweKeypair();
+// Generate a Kyber key pair (lattice-based)
+const kyberKeypair = FortifyJS.generateKyberKeyPair({
+    securityLevel: 3, // 1, 3, or 5 (higher = more security)
+});
 
-// Encrypt data using Ring-LWE
-const ciphertext = FortifyJS.ringLweEncrypt(message, lwePair.publicKey);
+// Encapsulate a shared secret using Kyber
+const encapsulation = FortifyJS.kyberEncapsulate(kyberKeypair.publicKey);
+const ciphertext = encapsulation.ciphertext;
+const sharedSecret = encapsulation.sharedSecret;
 
-// Decrypt data using Ring-LWE
-const plaintext = FortifyJS.ringLweDecrypt(ciphertext, lwePair.privateKey);
+// Decapsulate a shared secret using Kyber
+const decapsulation = FortifyJS.kyberDecapsulate(
+    kyberKeypair.privateKey,
+    ciphertext
+);
+
+// The implementation uses real cryptographic libraries:
+// - kyber-crystals or pqc-kyber packages when available
+// - Fallback implementations with proper lattice operations
+// - Automatic security level selection based on requirements
 ```
 
 #### Secure Memory Management
@@ -306,7 +326,7 @@ const plaintext = FortifyJS.ringLweDecrypt(ciphertext, lwePair.privateKey);
 const secureBuffer = FortifyJS.createSecureBuffer(32);
 secureBuffer.getBuffer().set(sensitiveData);
 // Use the buffer...
-secureBuffer.destroy(); // Automatically zeros memory
+secureBuffer.destroy(); // Automatically zeros memory with multiple passes
 
 // Create a secure string that can be explicitly cleared
 const secureString = FortifyJS.createSecureString("sensitive password");
@@ -322,8 +342,14 @@ const secureObject = FortifyJS.createSecureObject({
 // Use the object...
 secureObject.clear(); // Clear all sensitive data
 
-// Securely wipe a buffer
-FortifyJS.secureWipe(buffer);
+// Securely wipe a buffer with multiple overwrite patterns
+FortifyJS.secureWipe(buffer, 0, buffer.length, 3);
+
+// The implementation uses real secure memory techniques:
+// - Multi-pass overwriting with different patterns
+// - Protection against compiler optimizations
+// - Automatic cleanup with finalizers when possible
+// - Constant-time operations to prevent timing attacks
 ```
 
 #### Canary Tokens & Breach Detection
