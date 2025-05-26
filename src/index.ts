@@ -200,6 +200,5 @@ if (typeof module !== "undefined" && module.exports) {
     module.exports.EnhancedUint8Array = EnhancedUint8Array;
 
     // Export Password Management System
-    const { PasswordManager } = require("./core/password");
     module.exports.PasswordManager = PasswordManager;
 }
