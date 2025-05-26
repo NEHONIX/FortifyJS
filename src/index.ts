@@ -167,6 +167,7 @@ if (typeof module !== "undefined" && module.exports) {
     module.exports.FortifyJS = FortifyJS;
     module.exports.ftfy = FortifyJS;
     module.exports.Fortify = FortifyJS;
+    module.exports.pm = pm;
 
     // Export SecureRandom class and methods
     module.exports.SecureRandom = SecureRandom;
@@ -201,4 +202,33 @@ if (typeof module !== "undefined" && module.exports) {
 
     // Export Password Management System
     module.exports.PasswordManager = PasswordManager;
+
+    // Export Password Management Types and Enums
+    const passwordTypes = require("./core/password/password-types");
+    module.exports.PasswordAlgorithm = passwordTypes.PasswordAlgorithm;
+    module.exports.PasswordSecurityLevel = passwordTypes.PasswordSecurityLevel;
+
+    // Export String and Object functions
+    module.exports.String = String;
+    module.exports.Object = Object;
+
+    // Export Security Features
+    const security = require("./security");
+    globalThis.Object.keys(security).forEach((key: string) => {
+        if (key !== "default") {
+            module.exports[key] = security[key];
+        }
+    });
+
+    // Export Utils/Encoding
+    const encoding = require("./utils/encoding");
+    globalThis.Object.keys(encoding).forEach((key: string) => {
+        if (key !== "default") {
+            module.exports[key] = encoding[key];
+        }
+    });
+
+    // Export SecureString and SecureObject classes
+    module.exports.SecureString = SecureString;
+    module.exports.SecureObject = SecureObject;
 }
