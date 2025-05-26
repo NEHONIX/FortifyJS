@@ -488,7 +488,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 -   **GitHub**: [https://github.com/nehonix/fortifyjs](https://github.com/nehonix/fortifyjs)
 -   **NPM**: [https://www.npmjs.com/package/fortify2-js](https://www.npmjs.com/package/fortify2-js)
--   **Documentation**: [https://docs.fortifyjs.dev](https://docs.fortifyjs.dev)
+-   **Documentation**: [https://lab.nehonix.space](https://lab.nehonix.space)
 -   **Security**: [SECURITY.md](SECURITY.md)
 
 ---
