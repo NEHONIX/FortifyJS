@@ -1,0 +1,205 @@
+/* ---------------------------------------------------------------------------------------------
+ *  Copyright (c) NEHONIX INC. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE in the project root for license information.
+ * -------------------------------------------------------------------------------------------
+ */
+
+/**
+ * FortifyJS Main Module
+ *
+ * This is the main entry point for the FortifyJS library. It provides
+ * access to all the core and advanced security features of the library.
+ *
+ * FortifyJS is designed to be a comprehensive cryptographic security library
+ * that provides secure token generation, advanced hashing, key derivation,
+ * password utilities, and more.
+ *
+ * It is built with TypeScript and designed for maximum security, performance,
+ * and developer experience.
+ *
+ * @NEHONIX
+ * @augments FortifyJS
+ * @exports FortifyJS
+ * @author Nehonix
+ * @see https://lab.nehonix.space
+ * @name FortifyJS
+ * @example
+ * ```typescript
+ * import { FortifyJS } from "fortify-js";
+ *
+ * // Generate a secure token
+ * const token = FortifyJS.generateSecureToken({
+ *     length: 32,
+ *     entropy: "maximum",
+ * });
+ * console.log(token);
+ * // Output: "aK7mN9pQ2rS8tU3vW6xY1zB4cD5eF7gH"
+ * ```
+ */
+
+import { FortifyJS } from "./core/crypto";
+import { SecureString } from "./security/secureString";
+import { SecureObject } from "./security/secureOb";
+
+// Type exports
+export type {
+    SecureTokenOptions,
+    HashOptions,
+    KeyDerivationOptions,
+    APIKeyOptions,
+    SessionTokenOptions,
+    MiddlewareOptions,
+    CryptoStats,
+    SecurityTestResult,
+    PasswordStrengthResult,
+} from "./types";
+
+// Password Management Types
+export type {
+    PasswordHashOptions,
+    PasswordVerificationResult,
+    PasswordGenerationOptions,
+    PasswordStrengthAnalysis,
+    PasswordMigrationResult,
+    PasswordPolicy,
+    PasswordValidationResult,
+} from "./core/password/password-types";
+
+// Password Management Enums
+export {
+    PasswordAlgorithm,
+    PasswordSecurityLevel,
+} from "./core/password/password-types";
+// Enum exports
+export {
+    EntropySource,
+    SecurityLevel,
+    TokenType,
+    HashAlgorithm,
+    KeyDerivationAlgorithm,
+} from "./types";
+export { HashStrength } from "./core";
+
+// Core exports
+import { SecureRandom, RandomCrypto, RandomTokens } from "./core/random";
+import { Keys } from "./core/keys";
+import { Validators } from "./core/validators";
+import { SecureBuffer } from "./security";
+import { EnhancedUint8Array } from "./helpers/Uint8Array";
+import { Hash } from "./core";
+import { PasswordManager } from "./core/password";
+
+export { SecureRandom } from "./core/random";
+export { SecureRandom as Random } from "./core/random";
+export { Keys } from "./core/keys";
+export { Validators } from "./core/validators";
+export { SecureBuffer } from "./security";
+export { SecureBuffer as Buffer } from "./security";
+export { EnhancedUint8Array } from "./helpers/Uint8Array";
+export type { EncodingType } from "./types/random";
+export * from "./generators/rsaKeyCalculator";
+
+// Crypto compatibility exports for easy migration from crypto module
+// Export individual methods to ensure they're available
+export const createSecureCipheriv = RandomCrypto.createSecureCipheriv;
+export const createSecureDecipheriv = RandomCrypto.createSecureDecipheriv;
+export const generateSecureIV = RandomCrypto.generateSecureIV;
+export const generateSecureIVBatch = RandomCrypto.generateSecureIVBatch;
+export const generateSecureIVForAlgorithm =
+    RandomCrypto.generateSecureIVForAlgorithm;
+export const generateSecureIVBatchForAlgorithm =
+    RandomCrypto.generateSecureIVBatchForAlgorithm;
+export const validateIV = RandomCrypto.validateIV;
+export const getRandomBytes = SecureRandom.getRandomBytes;
+export const generateSessionToken = RandomTokens.generateSessionToken;
+export const generateSecureUUID = SecureRandom.generateSecureUUID;
+
+// Hash methods from Hash class
+export const createSecureHash = Hash.createSecureHash;
+export const createSecureHMAC = Hash.createSecureHMAC;
+export const verifyHash = Hash.verifyHash;
+
+// Core classes (Hash was missing from earlier exports)
+export { Hash };
+export { PasswordManager } from "./core/password";
+
+// Main class
+export { FortifyJS as Fortify };
+export { FortifyJS as ftfy };
+
+// Advanced Security Features
+export * from "./security";
+
+// Utils
+export * from "./utils/encoding";
+// alias for password manager (useful for legacy code)
+/**
+ * Fast password manager access but use default configuration
+ * for custom config, use PasswordManager.create() or PasswordManager.getInstance()
+ */
+export const pm = PasswordManager.getInstance();
+
+/**
+ * @author iDevo
+ * @description Creates a secure string that can be explicitly cleared from memory
+ * @param str - The string to be converted to a secure string
+ * @returns A new SecureString instance
+ */
+export function String(str: string) {
+    const secureString = new SecureString(str);
+    return secureString;
+}
+
+/**
+ * @author iDevo
+ * @description Creates a secure object that can be explicitly cleared from memory
+ * @param initialData - The initial data to be stored in the secure object
+ * @returns A new SecureObject instance
+ */
+export function Object<T extends Record<string, any>>(initialData?: T) {
+    return new SecureObject<T>(initialData);
+}
+
+// For CommonJS compatibility
+if (typeof module !== "undefined" && module.exports) {
+    module.exports = FortifyJS;
+    module.exports.default = FortifyJS;
+    module.exports.FortifyJS = FortifyJS;
+    module.exports.ftfy = FortifyJS;
+    module.exports.Fortify = FortifyJS;
+
+    // Export SecureRandom class and methods
+    module.exports.SecureRandom = SecureRandom;
+    module.exports.Random = SecureRandom;
+
+    // Export individual methods for direct access (using correct modular classes)
+    module.exports.createSecureCipheriv = RandomCrypto.createSecureCipheriv;
+    module.exports.createSecureDecipheriv = RandomCrypto.createSecureDecipheriv;
+    module.exports.generateSecureIV = RandomCrypto.generateSecureIV;
+    module.exports.generateSecureIVBatch = RandomCrypto.generateSecureIVBatch;
+    module.exports.generateSecureIVForAlgorithm =
+        RandomCrypto.generateSecureIVForAlgorithm;
+    module.exports.generateSecureIVBatchForAlgorithm =
+        RandomCrypto.generateSecureIVBatchForAlgorithm;
+    module.exports.validateIV = RandomCrypto.validateIV;
+    module.exports.getRandomBytes = SecureRandom.getRandomBytes;
+    module.exports.generateSessionToken = RandomTokens.generateSessionToken;
+    module.exports.generateSecureUUID = SecureRandom.generateSecureUUID;
+
+    // Export Hash methods (consolidated from SecureRandom)
+    module.exports.createSecureHash = Hash.createSecureHash;
+    module.exports.createSecureHMAC = Hash.createSecureHMAC;
+    module.exports.verifyHash = Hash.verifyHash;
+
+    // Export other core classes
+    module.exports.Hash = Hash;
+    module.exports.Keys = Keys;
+    module.exports.Validators = Validators;
+    module.exports.SecureBuffer = SecureBuffer;
+    module.exports.Buffer = SecureBuffer;
+    module.exports.EnhancedUint8Array = EnhancedUint8Array;
+
+    // Export Password Management System
+    const { PasswordManager } = require("./core/password");
+    module.exports.PasswordManager = PasswordManager;
+}
