@@ -1,6 +1,6 @@
 {
     "name": "fortify2-js",
-    "version": "3.0.2",
+    "version": "3.0.5",
     "description": "Nehonix Fortify is a comprehensive, military-grade cryptographic security library designed for maximum security, performance, and developer experience. Built with TypeScript and featuring quantum-resistant algorithms, advanced memory protection, and enterprise-grade security features.",
     "main": "./dist/index.cjs",
     "module": "./dist/index.esm.js",
@@ -82,8 +82,8 @@
     },
     "contributors": [
         {
-            "name": "iDevo",
-            "url": "https://github.com/iDevo-1"
+            "name": "suppercoder",
+            "url": "https://github.com/suppercoder"
         },
         {
             "name": "Nehonix",
@@ -158,6 +158,7 @@
         "fortify2-js": "3.0.1",
         "kyber-crystals": "^1.0.7",
         "libsodium-wrappers": "^0.7.15",
+        "nehoid": "^2.0.0",
         "nehonix-uri-processor": "^2.3.19",
         "noble": "^1.9.1",
         "node-forge": "^1.3.1",

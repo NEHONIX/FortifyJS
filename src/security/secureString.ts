@@ -16,6 +16,7 @@ import type {
 } from "../types/string";
 import { CryptoAlgorithmUtils } from "../utils/CryptoAlgorithmUtils";
 import { SecureBuffer } from "./secure-memory";
+import crypto from "crypto";
 
 /**
  * Creates a secure string that can be explicitly cleared from memory

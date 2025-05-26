@@ -92,6 +92,7 @@ import { PasswordManager } from "./core/password";
 // Import password types and enums for CommonJS export
 import {
     PasswordAlgorithm,
+    PasswordHashOptions,
     PasswordSecurityLevel,
 } from "./core/password/password-types";
 
@@ -172,10 +173,114 @@ export function Object<T extends Record<string, any>>(initialData?: T) {
     return new SecureObject<T>(initialData);
 }
 
+
+/**
+ * Encrypt a password with pepper and military-grade hashing
+ *
+ * This function provides an additional layer of security by applying a pepper (secret)
+ * before hashing the password with Argon2ID. This protects against rainbow table attacks
+ * even if the database is compromised.
+ *
+ * @author suppercodercodelover
+ * @param password - The plain text password to encrypt
+ * @param PEPPER - A secret pepper value (should be stored securely, not in database)
+ * @returns Promise<string> - The peppered and hashed password ready for database storage
+ * @throws Error if PEPPER is not provided
+ *
+ * @example
+ * ```typescript
+ * // Create pepper using Random
+ * console.log("PASSWORD_PEPPER: ", Random.getRandomBytes(16))  // replace "16" with desired length then store securely (example in a .env file)
+ * const pepper = process.env.PASSWORD_PEPPER; // Store securely!
+ * const hashedPassword = await encryptSecurePass("userPassword123", pepper);
+ * // Store hashedPassword in database
+ * ```
+ *
+ * @security
+ * - Uses HMAC-SHA256 for pepper application
+ * - Uses Argon2ID for final password hashing
+ * - Timing-safe operations prevent side-channel attacks
+ */
+export async function encryptSecurePass(
+    password: string,
+    PEPPER: string,
+    options: PasswordHashOptions = {}
+): Promise<string> {
+    if (!PEPPER) {
+        throw new Error(
+            "PEPPER must be defined when running password master. Store it securely in environment variables."
+        );
+    }
+
+    // Apply pepper using HMAC-SHA256 for cryptographic security
+    const peppered = Hash.createSecureHMAC("sha256", PEPPER, password);
+
+    // Hash the peppered password with Argon2ID (military-grade)
+    return await pm.hash(peppered, options);
+}
+
+/**
+ * 🔍 Verify a password against a peppered hash with timing-safe comparison
+ *
+ * This function verifies a plain text password against a hash that was created
+ * using encryptSecurePass(). It applies the same pepper and uses constant-time
+ * verification to prevent timing attacks.
+ *
+ * @author suppercodercodelover
+ * @param password - The plain text password to verify
+ * @param hashedPassword - The peppered hash from database (created with encryptSecurePass)
+ * @param PEPPER - The same secret pepper value used during encryption
+ * @returns Promise<boolean> - true if password is valid, false otherwise
+ * @throws Error if PEPPER is not provided
+ *
+ * @example
+ * ```typescript
+ * const pepper = process.env.PASSWORD_PEPPER; // Same pepper as encryption
+ * const isValid = await verifyEncryptedPassword(
+ *     "userPassword123",
+ *     storedHashFromDB,
+ *     pepper
+ * );
+ *
+ * if (isValid) {
+ *     console.log("Login successful!");
+ * } else {
+ *     console.log("Invalid credentials");
+ * }
+ * ```
+ *
+ * @security
+ * - Uses timing-safe verification (constant-time comparison)
+ * - Applies same HMAC-SHA256 pepper as encryption
+ * - Resistant to timing attacks and side-channel analysis
+ * - Returns boolean only (no additional timing information leaked)
+ */
+export async function verifyEncryptedPassword(
+    password: string,
+    hashedPassword: string,
+    PEPPER: string,
+    options: PasswordHashOptions = {}
+): Promise<boolean> {
+    if (!PEPPER) {
+        throw new Error(
+            "PEPPER must be defined when running password master. Use the same pepper as encryptSecurePass()."
+        );
+    }
+
+    // Apply the same pepper transformation as during encryption
+    const peppered = Hash.createSecureHMAC("sha256", PEPPER, password);
+
+    // Perform timing-safe verification
+    const result = await pm.verify(peppered, hashedPassword, options);
+    return result.isValid;
+}
+
 // For CommonJS compatibility
 if (typeof module !== "undefined" && module.exports) {
-    module.exports = FortifyJS;
+    //default
     module.exports.default = FortifyJS;
+    //
+    module.exports = FortifyJS;
     module.exports.FortifyJS = FortifyJS;
     module.exports.ftfy = FortifyJS;
     module.exports.Fortify = FortifyJS;
@@ -240,4 +345,8 @@ if (typeof module !== "undefined" && module.exports) {
     // Export SecureString and SecureObject classes
     module.exports.SecureString = SecureString;
     module.exports.SecureObject = SecureObject;
+
+    // Export new password utility functions
+    module.exports.encryptSecurePass = encryptSecurePass;
+    module.exports.verifyEncryptedPassword = verifyEncryptedPassword;
 }

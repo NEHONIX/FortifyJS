@@ -1,3 +1,4 @@
+import { NehoID } from "nehoid";
 import { HashAlgorithm, HashOutputFormat } from "../types/string";
 import { SecureBuffer } from "./secure-memory";
 import { SecureString } from "./secureString";
@@ -113,9 +114,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
      * Generates a unique ID for this instance
      */
     private generateId(): string {
-        return `secure_obj_${Date.now()}_${Math.random()
-            .toString(36)
-            .substr(2, 9)}`;
+        return NehoID.generate({ prefix: "sobj" });
     }
 
     /**
