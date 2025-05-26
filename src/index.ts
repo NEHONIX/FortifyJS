@@ -89,6 +89,18 @@ import { EnhancedUint8Array } from "./helpers/Uint8Array";
 import { Hash } from "./core";
 import { PasswordManager } from "./core/password";
 
+// Import password types and enums for CommonJS export
+import {
+    PasswordAlgorithm,
+    PasswordSecurityLevel,
+} from "./core/password/password-types";
+
+// Import all security exports
+import * as SecurityExports from "./security";
+
+// Import all encoding exports
+import * as EncodingExports from "./utils/encoding";
+
 export { SecureRandom } from "./core/random";
 export { SecureRandom as Random } from "./core/random";
 export { Keys } from "./core/keys";
@@ -203,28 +215,25 @@ if (typeof module !== "undefined" && module.exports) {
     // Export Password Management System
     module.exports.PasswordManager = PasswordManager;
 
-    // Export Password Management Types and Enums
-    const passwordTypes = require("./core/password/password-types");
-    module.exports.PasswordAlgorithm = passwordTypes.PasswordAlgorithm;
-    module.exports.PasswordSecurityLevel = passwordTypes.PasswordSecurityLevel;
+    // Export Password Management Types and Enums (using imported modules)
+    module.exports.PasswordAlgorithm = PasswordAlgorithm;
+    module.exports.PasswordSecurityLevel = PasswordSecurityLevel;
 
     // Export String and Object functions
     module.exports.String = String;
     module.exports.Object = Object;
 
-    // Export Security Features
-    const security = require("./security");
-    globalThis.Object.keys(security).forEach((key: string) => {
+    // Export Security Features (using imported modules)
+    globalThis.Object.keys(SecurityExports).forEach((key: string) => {
         if (key !== "default") {
-            module.exports[key] = security[key];
+            module.exports[key] = (SecurityExports as any)[key];
         }
     });
 
-    // Export Utils/Encoding
-    const encoding = require("./utils/encoding");
-    globalThis.Object.keys(encoding).forEach((key: string) => {
+    // Export Utils/Encoding (using imported modules)
+    globalThis.Object.keys(EncodingExports).forEach((key: string) => {
         if (key !== "default") {
-            module.exports[key] = encoding[key];
+            module.exports[key] = (EncodingExports as any)[key];
         }
     });
 
