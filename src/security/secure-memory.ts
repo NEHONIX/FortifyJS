@@ -126,29 +126,43 @@ async function initializeSecurityLibraries(): Promise<void> {
 
     // Initialize @noble/ciphers using require for compatibility
     try {
-        const nobleCiphersLib = require("@noble/ciphers");
-        if (nobleCiphersLib) {
-            nobleCiphers = nobleCiphersLib as NobleCiphersInterface;
+        // Try importing specific submodules instead of root module
+        const chachaLib = require("@noble/ciphers/chacha");
+        const aesLib = require("@noble/ciphers/aes");
+        if (chachaLib && aesLib) {
+            nobleCiphers = {
+                chacha20poly1305: chachaLib.chacha20poly1305,
+                aes: aesLib,
+            } as NobleCiphersInterface;
             libraryStatus.nobleCiphers = true;
             // console.log(
             //     "✅ @noble/ciphers loaded successfully for SecureBuffer"
             // );
         }
     } catch (e) {
-        console.warn(
-            "⚠️ @noble/ciphers not available for SecureBuffer:",
-            (e as Error).message
-        );
+        // Silently fail - this is optional
+        // console.warn(
+        //     "⚠️ @noble/ciphers not available for SecureBuffer:",
+        //     (e as Error).message
+        // );
     }
 }
 
-// Initialize libraries immediately
-initializeSecurityLibraries().catch((error) => {
-    console.error(
-        "Failed to initialize security libraries for SecureBuffer:",
-        error
-    );
-});
+// Initialize libraries asynchronously and non-blocking
+let initializationPromise: Promise<void> | null = null;
+
+function ensureLibrariesInitialized(): Promise<void> {
+    if (!initializationPromise) {
+        initializationPromise = initializeSecurityLibraries().catch((error) => {
+            // Silently handle initialization errors - libraries are optional
+            // console.error(
+            //     "Failed to initialize security libraries for SecureBuffer:",
+            //     error
+            // );
+        });
+    }
+    return initializationPromise;
+}
 
 // Security constants for enhanced protection
 const SECURITY_CONSTANTS = {
@@ -193,19 +207,26 @@ export class SecureBuffer {
         this.options = {
             protectionLevel:
                 options.protectionLevel || MemoryProtectionLevel.ENHANCED,
-            enableEncryption: options.enableEncryption !== false,
-            enableFragmentation: options.enableFragmentation !== false,
-            enableCanaries: options.enableCanaries !== false,
-            enableObfuscation: options.enableObfuscation !== false,
-            autoLock: options.autoLock !== false,
+            enableEncryption: options.enableEncryption ?? true,
+            enableFragmentation: options.enableFragmentation ?? true,
+            enableCanaries: options.enableCanaries ?? true,
+            enableObfuscation: options.enableObfuscation ?? true,
+            autoLock: options.autoLock ?? true,
             lockTimeout: options.lockTimeout || 300000, // 5 minutes
             quantumSafe: options.quantumSafe || false,
         };
 
         this.protectionLevel = this.options.protectionLevel;
+
+        // Initialize synchronously without waiting for optional libraries
         this.initializeSecureBuffer(size, fill);
         this.registerFinalizer();
         this.setupAutoLock();
+
+        // Initialize libraries asynchronously in background (non-blocking)
+        ensureLibrariesInitialized().catch(() => {
+            // Ignore errors - libraries are optional
+        });
     }
 
     /**
@@ -618,6 +639,34 @@ export class SecureBuffer {
     }
 
     /**
+     * Sets data directly in fragments (private method for initialization)
+     *
+     * @param data - Data to set in the fragments
+     */
+    private setDataInFragments(data: Uint8Array): void {
+        if (this.fragments.length === 1) {
+            // Single fragment - copy data directly
+            this.fragments[0].set(data);
+        } else {
+            // Multiple fragments - distribute data across fragments
+            let offset = 0;
+            for (
+                let i = 0;
+                i < this.fragments.length && offset < data.length;
+                i++
+            ) {
+                const fragment = this.fragments[i];
+                const copyLength = Math.min(
+                    fragment.length,
+                    data.length - offset
+                );
+                fragment.set(data.subarray(offset, offset + copyLength));
+                offset += copyLength;
+            }
+        }
+    }
+
+    /**
      * Creates a secure buffer from existing data
      *
      * @param data - Data to store in the secure buffer
@@ -647,8 +696,9 @@ export class SecureBuffer {
             undefined,
             options
         );
-        const targetBuffer = secureBuffer.getBuffer();
-        targetBuffer.set(buffer);
+
+        // Set data directly in fragments instead of using getBuffer()
+        secureBuffer.setDataInFragments(buffer);
         secureBuffer.updateChecksum();
 
         return secureBuffer;

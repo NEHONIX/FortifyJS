@@ -62,6 +62,54 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     private _isDestroyed: boolean = false;
     private _isReadOnly: boolean = false;
     private readonly _id: string;
+    private sensitiveKeys: Set<string> = new Set([
+        // Default sensitive keys that are commonly used
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "token",
+        "key",
+        "apikey",
+        "api_key",
+        "accesstoken",
+        "access_token",
+        "refreshtoken",
+        "refresh_token",
+        "sessionid",
+        "session_id",
+        "auth",
+        "authorization",
+        "bearer",
+        "credential",
+        "credentials",
+        "pin",
+        "ssn",
+        "social_security",
+        "credit_card",
+        "creditcard",
+        "cvv",
+        "cvc",
+        "private_key",
+        "privatekey",
+        "signature",
+        "hash",
+        "salt",
+        "nonce",
+        "otp",
+        "passcode",
+        "passphrase",
+        "masterkey",
+        "master_key",
+        "encryption_key",
+        "decryption_key",
+        "jwt",
+        "cookie",
+        "session",
+        "csrf",
+        "xsrf",
+    ]);
+    private encryptionKey: string | null = null;
 
     /**
      * Creates a new secure object
@@ -71,11 +119,14 @@ export class SecureObject<T extends Record<string, SecureValue>> {
      */
     constructor(initialData?: Partial<T>, options?: { readOnly?: boolean }) {
         this._id = this.generateId();
-        this._isReadOnly = options?.readOnly ?? false;
+        this._isReadOnly = false; // Start as writable
 
         if (initialData) {
             this.setAll(initialData);
         }
+
+        // Set read-only status after initial data is set
+        this._isReadOnly = options?.readOnly ?? false;
     }
 
     /**
@@ -114,7 +165,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
      * Generates a unique ID for this instance
      */
     private generateId(): string {
-        return NehoID.generate({ prefix: "sobj" });
+        return NehoID.generate({ prefix: "sobj", size: 16 });
     }
 
     /**
@@ -194,6 +245,274 @@ export class SecureObject<T extends Record<string, SecureValue>> {
      */
     public get isReadOnly(): boolean {
         return this._isReadOnly;
+    }
+
+    /**
+     * Adds keys to the sensitive keys list
+     * These keys will be encrypted/masked when encryptSensitive option is used
+     *
+     * @param keys - Keys to mark as sensitive
+     */
+    public addSensitiveKeys(...keys: string[]): this {
+        this.ensureNotDestroyed();
+        keys.forEach((key) => this.sensitiveKeys.add(key));
+        return this;
+    }
+
+    /**
+     * Removes keys from the sensitive keys list
+     *
+     * @param keys - Keys to remove from sensitive list
+     */
+    public removeSensitiveKeys(...keys: string[]): this {
+        this.ensureNotDestroyed();
+        keys.forEach((key) => this.sensitiveKeys.delete(key));
+        return this;
+    }
+
+    /**
+     * Sets the complete list of sensitive keys (replaces existing list)
+     *
+     * @param keys - Complete list of sensitive keys
+     */
+    public setSensitiveKeys(keys: string[]): this {
+        this.ensureNotDestroyed();
+        this.sensitiveKeys.clear();
+        keys.forEach((key) => this.sensitiveKeys.add(key));
+        return this;
+    }
+
+    /**
+     * Gets the current list of sensitive keys
+     *
+     * @returns Array of sensitive keys
+     */
+    public getSensitiveKeys(): string[] {
+        this.ensureNotDestroyed();
+        return Array.from(this.sensitiveKeys);
+    }
+
+    /**
+     * Checks if a key is marked as sensitive
+     *
+     * @param key - Key to check
+     * @returns True if the key is sensitive
+     */
+    public isSensitiveKey(key: string): boolean {
+        return this.sensitiveKeys.has(key);
+    }
+
+    /**
+     * Clears all sensitive keys
+     */
+    public clearSensitiveKeys(): this {
+        this.ensureNotDestroyed();
+        this.sensitiveKeys.clear();
+        return this;
+    }
+
+    /**
+     * Gets the default sensitive keys that are automatically initialized
+     *
+     * @returns Array of default sensitive keys
+     */
+    public static get getDefaultSensitiveKeys(): string[] {
+        return [
+            "password",
+            "passwd",
+            "pwd",
+            "secret",
+            "token",
+            "key",
+            "apikey",
+            "api_key",
+            "accesstoken",
+            "access_token",
+            "refreshtoken",
+            "refresh_token",
+            "sessionid",
+            "session_id",
+            "auth",
+            "authorization",
+            "bearer",
+            "credential",
+            "credentials",
+            "pin",
+            "ssn",
+            "social_security",
+            "credit_card",
+            "creditcard",
+            "cvv",
+            "cvc",
+            "private_key",
+            "privatekey",
+            "signature",
+            "hash",
+            "salt",
+            "nonce",
+            "otp",
+            "passcode",
+            "passphrase",
+            "masterkey",
+            "master_key",
+            "encryption_key",
+            "decryption_key",
+            "jwt",
+            "cookie",
+            "session",
+            "csrf",
+            "xsrf",
+        ];
+    }
+
+    /**
+     * Resets sensitive keys to default values
+     */
+    public resetToDefaultSensitiveKeys(): this {
+        this.ensureNotDestroyed();
+        this.sensitiveKeys.clear();
+        SecureObject.getDefaultSensitiveKeys.forEach((key) =>
+            this.sensitiveKeys.add(key)
+        );
+        return this;
+    }
+
+    /**
+     * Sets the encryption key for sensitive data encryption
+     *
+     * @param key - Encryption key (if null, uses object ID as key)
+     */
+    public setEncryptionKey(key: string | null = null): this {
+        this.ensureNotDestroyed();
+        this.encryptionKey = key || this._id;
+        return this;
+    }
+
+    /**
+     * Gets the current encryption key
+     *
+     * @returns Current encryption key or null if not set
+     */
+    public get getEncryptionKey(): string | null {
+        return this.encryptionKey;
+    }
+
+    /**
+     * Encrypts a value using the encryption key
+     *
+     * @param value - Value to encrypt
+     * @returns Encrypted value with prefix
+     */
+    private encryptValue(value: any): string {
+        const key = this.encryptionKey || this._id;
+        const valueStr =
+            typeof value === "string" ? value : JSON.stringify(value);
+
+        // Simple XOR encryption (for demo - in production use proper encryption)
+        let encrypted = "";
+        for (let i = 0; i < valueStr.length; i++) {
+            const charCode =
+                valueStr.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+            encrypted += String.fromCharCode(charCode);
+        }
+
+        // Encode to base64 and add prefix to identify encrypted data
+        const base64 = btoa(encrypted);
+        return `[ENCRYPTED:${base64}]`;
+    }
+
+    /**
+     * Decrypts a value using the encryption key
+     *
+     * @param encryptedValue - Encrypted value with prefix
+     * @returns Decrypted value
+     */
+    public decryptValue(encryptedValue: string): any {
+        this.ensureNotDestroyed();
+
+        if (
+            !encryptedValue.startsWith("[ENCRYPTED:") ||
+            !encryptedValue.endsWith("]")
+        ) {
+            throw new Error("Invalid encrypted value format");
+        }
+
+        const key = this.encryptionKey || this._id;
+        const base64 = encryptedValue.slice(11, -1); // Remove [ENCRYPTED: and ]
+        const encrypted = atob(base64);
+
+        // XOR decryption
+        let decrypted = "";
+        for (let i = 0; i < encrypted.length; i++) {
+            const charCode =
+                encrypted.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+            decrypted += String.fromCharCode(charCode);
+        }
+
+        // Try to parse as JSON, if it fails return as string
+        try {
+            return JSON.parse(decrypted);
+        } catch {
+            return decrypted;
+        }
+    }
+
+    /**
+     * Decrypts all encrypted values in an object
+     *
+     * @param obj - Object that may contain encrypted values
+     * @returns Object with decrypted values
+     */
+    public decryptObject(obj: any): any {
+        this.ensureNotDestroyed();
+
+        if (typeof obj === "string" && obj.startsWith("[ENCRYPTED:")) {
+            return this.decryptValue(obj);
+        } else if (Array.isArray(obj)) {
+            return obj.map((item) => this.decryptObject(item));
+        } else if (typeof obj === "object" && obj !== null) {
+            const result: any = {};
+            for (const [key, value] of Object.entries(obj)) {
+                result[key] = this.decryptObject(value);
+            }
+            return result;
+        }
+
+        return obj;
+    }
+
+    /**
+     * Recursively processes nested objects to check for sensitive keys
+     *
+     * @param obj - The nested object to process
+     * @param options - Serialization options
+     * @returns Processed object with sensitive data masked if needed
+     */
+    private processNestedObject(obj: any, options: SerializationOptions): any {
+        if (Array.isArray(obj)) {
+            // Handle arrays
+            return obj.map((item) =>
+                typeof item === "object" && item !== null
+                    ? this.processNestedObject(item, options)
+                    : item
+            );
+        } else if (typeof obj === "object" && obj !== null) {
+            // Handle objects
+            const result: any = {};
+            for (const [key, value] of Object.entries(obj)) {
+                if (options.encryptSensitive && this.sensitiveKeys.has(key)) {
+                    // Encrypt sensitive keys in nested objects
+                    result[key] = this.encryptValue(value);
+                } else if (typeof value === "object" && value !== null) {
+                    // Recursively process nested objects/arrays
+                    result[key] = this.processNestedObject(value, options);
+                } else {
+                    result[key] = value;
+                }
+            }
+            return result;
+        }
+        return obj;
     }
 
     /**
@@ -340,18 +659,20 @@ export class SecureObject<T extends Record<string, SecureValue>> {
         }
 
         if (value instanceof SecureBuffer) {
-            // Convert SecureBuffer back to original type
+            // Convert SecureBuffer back to original type based on metadata
             const buffer = value.getBuffer();
-            try {
-                // Try to convert to string first
+            const metadata = this.metadata.get(stringKey);
+
+            if (metadata?.type === "Uint8Array") {
+                // Return as Uint8Array for binary data
+                const result = new Uint8Array(buffer) as unknown as T[K];
+                this.emit("get", stringKey, result);
+                return result;
+            } else {
+                // Return as string for text data
                 const result = new TextDecoder().decode(
                     buffer
                 ) as unknown as T[K];
-                this.emit("get", stringKey, result);
-                return result;
-            } catch (e) {
-                // If that fails, return as Uint8Array
-                const result = buffer as unknown as T[K];
                 this.emit("get", stringKey, result);
                 return result;
             }
@@ -602,6 +923,20 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
+     * Gets the full object as a regular JavaScript object
+     * Convenient alias for toObject() method
+     *
+     * @param options - Serialization options
+     * @returns Regular object with all data
+     * @throws Error if destroyed
+     */
+    public getAll(
+        options: SerializationOptions = {}
+    ): T & { _metadata?: Record<string, ValueMetadata> } {
+        return this.toObject(options);
+    }
+
+    /**
      * Converts to a regular object
      * Warning: This creates regular JavaScript objects that won't be automatically cleared
      *
@@ -617,21 +952,54 @@ export class SecureObject<T extends Record<string, SecureValue>> {
         const result = {} as T & { _metadata?: Record<string, ValueMetadata> };
 
         for (const [key, value] of this.data.entries()) {
-            if (value instanceof SecureBuffer) {
-                const buffer = value.getBuffer();
-                try {
-                    // Try to convert to string first
-                    (result as any)[key] = new TextDecoder().decode(buffer);
-                } catch (e) {
-                    // If that fails, return as Uint8Array
-                    (result as any)[key] = buffer;
+            const metadata = this.metadata.get(key);
+
+            // Check if this key is marked as sensitive by the user
+            const isUserDefinedSensitive = this.sensitiveKeys.has(key);
+
+            // Check if we should encrypt/mask sensitive data
+            if (options.encryptSensitive && isUserDefinedSensitive) {
+                // Encrypt user-defined sensitive data
+                let valueToEncrypt: any;
+                if (value instanceof SecureBuffer) {
+                    const buffer = value.getBuffer();
+                    if (metadata?.type === "Uint8Array") {
+                        valueToEncrypt = Array.from(new Uint8Array(buffer));
+                    } else {
+                        valueToEncrypt = new TextDecoder().decode(buffer);
+                    }
+                } else if (value instanceof SecureString) {
+                    valueToEncrypt = value.toString();
+                } else {
+                    valueToEncrypt = value;
                 }
-            } else if (value instanceof SecureString) {
-                (result as any)[key] = value.toString();
-            } else if (value instanceof SecureObject) {
-                (result as any)[key] = value.toObject(options);
+                (result as any)[key] = this.encryptValue(valueToEncrypt);
             } else {
-                (result as any)[key] = value;
+                // Normal processing - show actual values
+                if (value instanceof SecureBuffer) {
+                    const buffer = value.getBuffer();
+
+                    if (metadata?.type === "Uint8Array") {
+                        // Return as Uint8Array for binary data
+                        (result as any)[key] = new Uint8Array(buffer);
+                    } else {
+                        // Return as string for text data
+                        (result as any)[key] = new TextDecoder().decode(buffer);
+                    }
+                } else if (value instanceof SecureString) {
+                    (result as any)[key] = value.toString();
+                } else if (value instanceof SecureObject) {
+                    // For nested objects, recursively process with the same options
+                    (result as any)[key] = value.toObject(options);
+                } else if (typeof value === "object" && value !== null) {
+                    // For regular nested objects, recursively check for sensitive keys
+                    (result as any)[key] = this.processNestedObject(
+                        value,
+                        options
+                    );
+                } else {
+                    (result as any)[key] = value;
+                }
             }
         }
 
@@ -639,6 +1007,17 @@ export class SecureObject<T extends Record<string, SecureValue>> {
             result._metadata = Object.fromEntries(this.metadata.entries());
         }
 
+        // Handle format option
+        if (options.format === "binary") {
+            // Convert to binary format (Uint8Array)
+            const jsonString = JSON.stringify(result);
+            return new TextEncoder().encode(jsonString) as any;
+        } else if (options.format === "json") {
+            // Return as JSON string
+            return JSON.stringify(result) as any;
+        }
+
+        // Default: return as regular object
         return result;
     }
 

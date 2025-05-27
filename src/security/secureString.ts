@@ -32,7 +32,15 @@ export class SecureString {
      * @param value - Initial string value
      */
     constructor(value: string = "") {
-        this.buffer = SecureBuffer.from(value);
+        this.buffer = SecureBuffer.from(value, {
+            protectionLevel: "basic" as any,
+            enableEncryption: false,
+            enableFragmentation: false,
+            enableCanaries: false,
+            enableObfuscation: false,
+            autoLock: false,
+            quantumSafe: false,
+        });
     }
 
     /**
@@ -156,7 +164,15 @@ export class SecureString {
 
         // Create a new buffer with the combined content
         const newValue = currentValue + appendValue;
-        const newBuffer = SecureBuffer.from(newValue);
+        const newBuffer = SecureBuffer.from(newValue, {
+            protectionLevel: "basic" as any,
+            enableEncryption: false,
+            enableFragmentation: false,
+            enableCanaries: false,
+            enableObfuscation: false,
+            autoLock: false,
+            quantumSafe: false,
+        });
 
         // Destroy the old buffer
         this.buffer.destroy();
@@ -183,7 +199,15 @@ export class SecureString {
 
         // Create a new buffer with the combined content
         const newValue = prependValue + currentValue;
-        const newBuffer = SecureBuffer.from(newValue);
+        const newBuffer = SecureBuffer.from(newValue, {
+            protectionLevel: "basic" as any,
+            enableEncryption: false,
+            enableFragmentation: false,
+            enableCanaries: false,
+            enableObfuscation: false,
+            autoLock: false,
+            quantumSafe: false,
+        });
 
         // Destroy the old buffer
         this.buffer.destroy();
@@ -207,7 +231,15 @@ export class SecureString {
         const newValue =
             value instanceof SecureString ? value.toString() : value;
 
-        const newBuffer = SecureBuffer.from(newValue);
+        const newBuffer = SecureBuffer.from(newValue, {
+            protectionLevel: "basic" as any,
+            enableEncryption: false,
+            enableFragmentation: false,
+            enableCanaries: false,
+            enableObfuscation: false,
+            autoLock: false,
+            quantumSafe: false,
+        });
 
         // Destroy the old buffer
         this.buffer.destroy();
@@ -586,7 +618,15 @@ export class SecureString {
     public clear(): void {
         if (!this._isDestroyed) {
             this.buffer.destroy();
-            this.buffer = new SecureBuffer(0);
+            this.buffer = new SecureBuffer(0, undefined, {
+                protectionLevel: "basic" as any,
+                enableEncryption: false,
+                enableFragmentation: false,
+                enableCanaries: false,
+                enableObfuscation: false,
+                autoLock: false,
+                quantumSafe: false,
+            });
             this._isDestroyed = true;
         }
     }
