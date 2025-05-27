@@ -28,23 +28,28 @@ src/security/secure-string/
 The modular architecture separates concerns into focused modules:
 
 ### Core Module (`core/`)
-- **SecureString Core**: Main class that orchestrates all other modules
-- Provides the public API and integrates all functionality
+
+-   **SecureString Core**: Main class that orchestrates all other modules
+-   Provides the public API and integrates all functionality
 
 ### Buffer Module (`buffer/`)
-- **Buffer Manager**: Manages secure buffer operations with different protection levels
+
+-   **Buffer Manager**: Manages secure buffer operations with different protection levels
 
 ### Operations Module (`operations/`)
-- **String Operations**: Handles string manipulation (append, prepend, split, etc.)
-- **Comparison Operations**: Provides secure string comparison including constant-time operations
+
+-   **String Operations**: Handles string manipulation (append, prepend, split, etc.)
+-   **Comparison Operations**: Provides secure string comparison including constant-time operations
 
 ### Crypto Module (`crypto/`)
-- **Crypto Operations**: Handles hashing, HMAC, key derivation, and other cryptographic operations
+
+-   **Crypto Operations**: Handles hashing, HMAC, key derivation, and other cryptographic operations
 
 ### Validation Module (`validation/`)
-- **String Validator**: Provides validation for passwords, emails, URLs, and other formats
 
-## 🚀 Usage
+-   **String Validator**: Provides validation for passwords, emails, URLs, and other formats
+
+## support@nehonix.spaceUsage
 
 ### Basic Usage
 
@@ -76,10 +81,10 @@ str.destroy();
 ### Protection Levels
 
 ```typescript
-import { 
+import {
     createSecureString,
     createEnhancedSecureString,
-    createMaximumSecureString 
+    createMaximumSecureString,
 } from "./secure-string";
 
 // Basic protection
@@ -95,13 +100,13 @@ const maximum = createMaximumSecureString("top secret data");
 ### Advanced Usage
 
 ```typescript
-import { 
+import {
     SecureString,
     BufferManager,
     StringOperations,
     ComparisonOperations,
     CryptoOperations,
-    StringValidator 
+    StringValidator,
 } from "./secure-string";
 
 // Use individual modules
@@ -150,29 +155,34 @@ await runAllTests();
 ## 📊 Benefits of Modular Architecture
 
 ### 1. **Maintainability**
-- Each module has a single responsibility
-- Easier to locate and fix bugs
-- Cleaner code organization
+
+-   Each module has a single responsibility
+-   Easier to locate and fix bugs
+-   Cleaner code organization
 
 ### 2. **Testability**
-- Individual modules can be tested in isolation
-- Better test coverage
-- Easier to mock dependencies
+
+-   Individual modules can be tested in isolation
+-   Better test coverage
+-   Easier to mock dependencies
 
 ### 3. **Extensibility**
-- New features can be added as separate modules
-- Existing modules can be enhanced without affecting others
-- Plugin-like architecture for future extensions
+
+-   New features can be added as separate modules
+-   Existing modules can be enhanced without affecting others
+-   Plugin-like architecture for future extensions
 
 ### 4. **Performance**
-- Lazy loading of modules when needed
-- Better memory management
-- Optimized for specific use cases
+
+-   Lazy loading of modules when needed
+-   Better memory management
+-   Optimized for specific use cases
 
 ### 5. **Security**
-- Multiple protection levels
-- Constant-time operations
-- Advanced cryptographic features
+
+-   Multiple protection levels
+-   Constant-time operations
+-   Advanced cryptographic features
 
 ## 🔄 Migration from Monolithic Version
 
@@ -191,55 +201,62 @@ All existing APIs remain the same, but now benefit from the modular architecture
 ## 🛡️ Protection Levels
 
 ### Basic Protection
-- Secure buffer storage
-- Memory clearing on destruction
-- Basic obfuscation
+
+-   Secure buffer storage
+-   Memory clearing on destruction
+-   Basic obfuscation
 
 ### Enhanced Protection
-- Encryption of buffer content
-- Canary values for tampering detection
-- Advanced obfuscation techniques
+
+-   Encryption of buffer content
+-   Canary values for tampering detection
+-   Advanced obfuscation techniques
 
 ### Maximum Protection
-- Quantum-safe encryption
-- Buffer fragmentation
-- Auto-locking mechanisms
-- All security features enabled
+
+-   Quantum-safe encryption
+-   Buffer fragmentation
+-   Auto-locking mechanisms
+-   All security features enabled
 
 ## 🔐 Security Features
 
 ### Constant-Time Operations
-- Prevents timing attacks
-- Secure string comparison
-- Hash verification
+
+-   Prevents timing attacks
+-   Secure string comparison
+-   Hash verification
 
 ### Cryptographic Operations
-- Multiple hash algorithms (SHA-1, SHA-256, SHA-384, SHA-512)
-- HMAC support
-- PBKDF2 key derivation
-- Scrypt support (Node.js)
+
+-   Multiple hash algorithms (SHA-1, SHA-256, SHA-384, SHA-512)
+-   HMAC support
+-   PBKDF2 key derivation
+-   Scrypt support (Node.js)
 
 ### Validation
-- Password strength analysis
-- Email format validation
-- URL validation
-- Credit card validation (Luhn algorithm)
-- Custom validation rules
+
+-   Password strength analysis
+-   Email format validation
+-   URL validation
+-   Credit card validation (Luhn algorithm)
+-   Custom validation rules
 
 ### Memory Protection
-- Secure buffer management
-- Automatic memory clearing
-- Protection against memory dumps
-- Fragmentation for sensitive data
+
+-   Secure buffer management
+-   Automatic memory clearing
+-   Protection against memory dumps
+-   Fragmentation for sensitive data
 
 ## 📈 Performance Considerations
 
 The modular architecture provides several performance benefits:
 
-- **Memory Efficiency**: Only load modules when needed
-- **Faster Operations**: Optimized algorithms for each operation type
-- **Better Caching**: Module-level caching strategies
-- **Reduced Overhead**: Minimal memory footprint for basic operations
+-   **Memory Efficiency**: Only load modules when needed
+-   **Faster Operations**: Optimized algorithms for each operation type
+-   **Better Caching**: Module-level caching strategies
+-   **Reduced Overhead**: Minimal memory footprint for basic operations
 
 ## 🔮 Future Enhancements
 
@@ -253,5 +270,6 @@ Planned improvements for the modular architecture:
 
 ## 📝 Version History
 
-- **v2.0.0-modular**: Initial modular architecture implementation
-- **v1.x**: Monolithic implementation (deprecated but supported)
+-   **v2.0.0-modular**: Initial modular architecture implementation
+-   **v1.x**: Monolithic implementation (deprecated but supported)
+

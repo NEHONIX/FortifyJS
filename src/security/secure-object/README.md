@@ -31,27 +31,33 @@ src/security/secure-object/
 The modular architecture separates concerns into focused modules:
 
 ### Core Module (`core/`)
-- **SecureObject Core**: Main class that orchestrates all other modules
-- Provides the public API and integrates all functionality
+
+-   **SecureObject Core**: Main class that orchestrates all other modules
+-   Provides the public API and integrates all functionality
 
 ### Encryption Module (`encryption/`)
-- **Sensitive Keys Manager**: Manages which keys should be treated as sensitive
-- **Crypto Handler**: Handles encryption/decryption of sensitive data
+
+-   **Sensitive Keys Manager**: Manages which keys should be treated as sensitive
+-   **Crypto Handler**: Handles encryption/decryption of sensitive data
 
 ### Metadata Module (`metadata/`)
-- **Metadata Manager**: Tracks access patterns, types, and statistics for stored values
+
+-   **Metadata Manager**: Tracks access patterns, types, and statistics for stored values
 
 ### Events Module (`events/`)
-- **Event Manager**: Provides event system for monitoring SecureObject operations
+
+-   **Event Manager**: Provides event system for monitoring SecureObject operations
 
 ### Serialization Module (`serialization/`)
-- **Serialization Handler**: Converts SecureObject to various formats (JSON, binary, etc.)
+
+-   **Serialization Handler**: Converts SecureObject to various formats (JSON, binary, etc.)
 
 ### Utilities (`utils/`)
-- **ID Generator**: Generates unique IDs for SecureObject instances
-- **Validation Utils**: Common validation functions
 
-## 🚀 Usage
+-   **ID Generator**: Generates unique IDs for SecureObject instances
+-   **Validation Utils**: Common validation functions
+
+## Usage
 
 ### Basic Usage
 
@@ -81,10 +87,10 @@ const encrypted = obj.toObject({ encryptSensitive: true });
 ### Advanced Usage
 
 ```typescript
-import { 
-    SecureObject, 
-    SensitiveKeysManager, 
-    EventManager 
+import {
+    SecureObject,
+    SensitiveKeysManager,
+    EventManager,
 } from "./secure-object";
 
 // Create with custom sensitive keys
@@ -132,29 +138,34 @@ await runAllTests();
 ## 📊 Benefits of Modular Architecture
 
 ### 1. **Maintainability**
-- Each module has a single responsibility
-- Easier to locate and fix bugs
-- Cleaner code organization
+
+-   Each module has a single responsibility
+-   Easier to locate and fix bugs
+-   Cleaner code organization
 
 ### 2. **Testability**
-- Individual modules can be tested in isolation
-- Better test coverage
-- Easier to mock dependencies
+
+-   Individual modules can be tested in isolation
+-   Better test coverage
+-   Easier to mock dependencies
 
 ### 3. **Extensibility**
-- New features can be added as separate modules
-- Existing modules can be enhanced without affecting others
-- Plugin-like architecture for future extensions
+
+-   New features can be added as separate modules
+-   Existing modules can be enhanced without affecting others
+-   Plugin-like architecture for future extensions
 
 ### 4. **Performance**
-- Lazy loading of modules when needed
-- Better memory management
-- Optimized for specific use cases
+
+-   Lazy loading of modules when needed
+-   Better memory management
+-   Optimized for specific use cases
 
 ### 5. **Type Safety**
-- Strong TypeScript typing throughout
-- Better IDE support and autocomplete
-- Compile-time error detection
+
+-   Strong TypeScript typing throughout
+-   Better IDE support and autocomplete
+-   Compile-time error detection
 
 ## 🔄 Migration from Monolithic Version
 
@@ -184,10 +195,10 @@ When extending the modular SecureObject:
 
 The modular architecture provides several performance benefits:
 
-- **Memory Efficiency**: Only load modules when needed
-- **Faster Initialization**: Lazy loading of heavy components
-- **Better Caching**: Module-level caching strategies
-- **Optimized Serialization**: Specialized handlers for different formats
+-   **Memory Efficiency**: Only load modules when needed
+-   **Faster Initialization**: Lazy loading of heavy components
+-   **Better Caching**: Module-level caching strategies
+-   **Optimized Serialization**: Specialized handlers for different formats
 
 ## 🔮 Future Enhancements
 
@@ -201,5 +212,6 @@ Planned improvements for the modular architecture:
 
 ## 📝 Version History
 
-- **v2.0.0-modular**: Initial modular architecture implementation
-- **v1.x**: Monolithic implementation (deprecated but supported)
+-   **v2.0.0-modular**: Initial modular architecture implementation
+-   **v1.x**: Monolithic implementation (deprecated but supported)
+

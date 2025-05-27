@@ -1,6 +1,6 @@
 import { Hash, HashStrength, SecureRandom } from "../src/core";
 
-console.log("🚀 COMPREHENSIVE PERFORMANCE BENCHMARKS 🚀");
+console.log("COMPREHENSIVE PERFORMANCE BENCHMARKS 🚀");
 console.log("Measuring modular architecture performance improvements");
 
 interface BenchmarkResult {
@@ -55,7 +55,7 @@ function benchmark(
 
     console.log(`   ⏱️  Total: ${totalTime.toFixed(2)}ms`);
     console.log(`   📊 Avg: ${avgTime.toFixed(4)}ms/op`);
-    console.log(`   🚀 Rate: ${opsPerSecond.toFixed(0)} ops/sec`);
+    console.log(`   Rate: ${opsPerSecond.toFixed(0)} ops/sec`);
     console.log(`   💾 Memory: ${(memoryUsed / 1024).toFixed(2)} KB`);
 
     return result;
@@ -253,7 +253,7 @@ Promise.all(concurrentPromises).then(() => {
     console.log(`   ⏱️  Total: ${concurrentTime.toFixed(2)}ms`);
     console.log(`   📊 Avg: ${(concurrentTime / 100).toFixed(4)}ms/op`);
     console.log(
-        `   🚀 Rate: ${((100 / concurrentTime) * 1000).toFixed(0)} ops/sec`
+        `   Rate: ${((100 / concurrentTime) * 1000).toFixed(0)} ops/sec`
     );
 
     // ============================================================================
@@ -300,7 +300,7 @@ Promise.all(concurrentPromises).then(() => {
         );
 
         console.log(
-            `   🚀 Fastest: ${fastest.name} (${fastest.opsPerSecond.toFixed(
+            `   Fastest: ${fastest.name} (${fastest.opsPerSecond.toFixed(
                 0
             )} ops/sec)`
         );

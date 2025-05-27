@@ -200,7 +200,7 @@ Framework-specific integrations:
 }
 ```
 
-## 🚀 Export Strategy
+## Export Strategy
 
 ### **Main Index (`src/index.ts`)**
 

@@ -886,7 +886,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     // ===== AMAZING NEW FEATURES =====
 
     /**
-     * 🚀 AMAZING: Transform values with a mapper function (like Array.map but returns SecureObject)
+     * AMAZING: Transform values with a mapper function (like Array.map but returns SecureObject)
      * Returns a new SecureObject with transformed values
      */
     public transform<U>(
@@ -913,7 +913,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Group entries by a classifier function
+     * AMAZING: Group entries by a classifier function
      * Returns a Map where keys are group identifiers and values are SecureObjects
      */
     public groupBy<K extends string | number>(
@@ -946,7 +946,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Partition entries into two groups based on a predicate
+     * AMAZING: Partition entries into two groups based on a predicate
      * Returns [matching, notMatching] SecureObjects
      */
     public partition(
@@ -978,7 +978,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Pick specific keys (like Lodash pick but type-safe)
+     * AMAZING: Pick specific keys (like Lodash pick but type-safe)
      * Returns a new SecureObject with only the specified keys
      */
     public pick<K extends keyof T>(...keys: K[]): SecureObject<Pick<T, K>> {
@@ -986,7 +986,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Omit specific keys (opposite of pick)
+     * AMAZING: Omit specific keys (opposite of pick)
      * Returns a new SecureObject without the specified keys
      */
     public omit<K extends keyof T>(...keys: K[]): SecureObject<Omit<T, K>> {
@@ -1012,7 +1012,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Flatten nested objects (one level deep)
+     * AMAZING: Flatten nested objects (one level deep)
      * Converts { user: { name: "John" } } to { "user.name": "John" }
      */
     public flatten(separator: string = "."): SecureObject<Record<string, any>> {
@@ -1049,7 +1049,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Compact - removes null, undefined, and empty values
+     * AMAZING: Compact - removes null, undefined, and empty values
      * Returns a new SecureObject with only truthy values
      */
     public compact(): SecureObject<Partial<T>> {
@@ -1064,7 +1064,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Invert - swap keys and values
+     * AMAZING: Invert - swap keys and values
      * Returns a new SecureObject with keys and values swapped
      */
     public invert(): SecureObject<Record<string, string>> {
@@ -1088,7 +1088,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Defaults - merge with default values (only for missing keys)
+     * AMAZING: Defaults - merge with default values (only for missing keys)
      * Returns a new SecureObject with defaults applied
      */
     public defaults(defaultValues: Partial<T>): SecureObject<T> {
@@ -1118,7 +1118,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Tap - execute a function with the object and return the object (for chaining)
+     * AMAZING: Tap - execute a function with the object and return the object (for chaining)
      * Useful for debugging or side effects in method chains
      */
     public tap(fn: (obj: this) => void): this {
@@ -1130,7 +1130,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Pipe - transform the object through a series of functions
+     * AMAZING: Pipe - transform the object through a series of functions
      * Each function receives the result of the previous function
      */
     public pipe<U>(fn: (obj: this) => U): U;
@@ -1150,7 +1150,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Sample - get random entries from the object
+     * AMAZING: Sample - get random entries from the object
      * Returns a new SecureObject with randomly selected entries
      */
     public sample(count: number = 1): SecureObject<Partial<T>> {
@@ -1190,7 +1190,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Shuffle - return a new SecureObject with keys in random order
+     * AMAZING: Shuffle - return a new SecureObject with keys in random order
      * Returns a new SecureObject with the same data but shuffled key order
      */
     public shuffle(): SecureObject<T> {
@@ -1223,7 +1223,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * 🚀 AMAZING: Chunk - split object into chunks of specified size
+     * AMAZING: Chunk - split object into chunks of specified size
      * Returns an array of SecureObjects, each containing up to 'size' entries
      */
     public chunk(size: number): SecureObject<Partial<T>>[] {

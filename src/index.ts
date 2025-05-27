@@ -308,6 +308,9 @@ export async function verifyEncryptedPassword(
     return result.isValid;
 }
 
+// Export modular SecureObject utilities
+export * from "./security/secure-object";
+
 // For CommonJS compatibility
 if (typeof module !== "undefined" && module.exports) {
     //default
