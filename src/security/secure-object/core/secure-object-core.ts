@@ -1,0 +1,755 @@
+/* ---------------------------------------------------------------------------------------------
+ *  Copyright (c) NEHONIX INC. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE in the project root for license information.
+ * -------------------------------------------------------------------------------------------
+ */
+
+/**
+ * @license MIT
+ * @see https://lab.nehonix.space
+ * @description SecureObject Core Module
+ *
+ * Main SecureObject class 
+ */
+
+import { HashAlgorithm, HashOutputFormat } from "../../../types/string";
+import { SecureBuffer } from "../../secure-memory";
+
+import {
+    SecureValue,
+    SerializationOptions,
+    ValueMetadata,
+    SecureObjectEvent,
+    EventListener,
+    SecureObjectOptions,
+} from "../types";
+import { SensitiveKeysManager } from "../encryption/sensitive-keys";
+import { CryptoHandler } from "../encryption/crypto-handler";
+import { MetadataManager } from "../metadata/metadata-manager";
+import { EventManager } from "../events/event-manager";
+import { SerializationHandler } from "../serialization/serialization-handler";
+import { IdGenerator } from "../utils/id-generator";
+import { ValidationUtils } from "../utils/validation";
+import SecureString from "../../secure-string";
+
+/**
+ * A secure object that can store sensitive data 
+ */
+export class SecureObject<T extends Record<string, SecureValue>> {
+    // Core data storage
+    private data: Map<string, any> = new Map();
+    private secureBuffers: Map<string, SecureBuffer> = new Map();
+
+    // Modular components
+    private sensitiveKeysManager: SensitiveKeysManager;
+    private cryptoHandler: CryptoHandler;
+    private metadataManager: MetadataManager;
+    private eventManager: EventManager;
+    private serializationHandler: SerializationHandler;
+
+    // State management
+    private _isDestroyed: boolean = false;
+    private _isReadOnly: boolean = false;
+    private readonly _id: string;
+
+    /**
+     * Creates a new secure object
+     */
+    constructor(initialData?: Partial<T>, options?: SecureObjectOptions) {
+        this._id = IdGenerator.generate();
+        this._isReadOnly = false; // Start as writable
+
+        // Initialize modular components
+        this.sensitiveKeysManager = new SensitiveKeysManager();
+        this.cryptoHandler = new CryptoHandler(this._id);
+        this.metadataManager = new MetadataManager();
+        this.eventManager = new EventManager();
+        this.serializationHandler = new SerializationHandler(
+            this.cryptoHandler,
+            this.metadataManager
+        );
+
+        // Set encryption key if provided
+        if (options?.encryptionKey) {
+            this.cryptoHandler.setEncryptionKey(options.encryptionKey);
+        }
+
+        // Set initial data
+        if (initialData) {
+            this.setAll(initialData);
+        }
+
+        // Set read-only status after initial data is set
+        this._isReadOnly = options?.readOnly ?? false;
+    }
+
+    /**
+     * Creates a SecureObject from another SecureObject (deep copy)
+     */
+    public static from<T extends Record<string, SecureValue>>(
+        other: SecureObject<T>
+    ): SecureObject<T> {
+        other.ensureNotDestroyed();
+        const copy = new SecureObject<T>();
+
+        for (const key of other.keys()) {
+            const value = other.get(key);
+            copy.set(key, value);
+        }
+
+        return copy;
+    }
+
+    /**
+     * Creates a read-only SecureObject
+     */
+    public static readOnly<T extends Record<string, SecureValue>>(
+        data: Partial<T>
+    ): SecureObject<T> {
+        return new SecureObject(data, { readOnly: true });
+    }
+
+    // ===== PROPERTY ACCESSORS =====
+
+    /**
+     * Gets the unique ID of this SecureObject
+     */
+    public get id(): string {
+        return this._id;
+    }
+
+    /**
+     * Checks if the SecureObject is read-only
+     */
+    public get isReadOnly(): boolean {
+        return this._isReadOnly;
+    }
+
+    /**
+     * Checks if the SecureObject has been destroyed
+     */
+    public get isDestroyed(): boolean {
+        return this._isDestroyed;
+    }
+
+    /**
+     * Gets the number of stored values
+     */
+    public get size(): number {
+        this.ensureNotDestroyed();
+        return this.data.size;
+    }
+
+    /**
+     * Checks if the object is empty
+     */
+    public get isEmpty(): boolean {
+        this.ensureNotDestroyed();
+        return this.data.size === 0;
+    }
+
+    // ===== VALIDATION METHODS =====
+
+    /**
+     * Ensures the SecureObject hasn't been destroyed
+     */
+    private ensureNotDestroyed(): void {
+        if (this._isDestroyed) {
+            throw new Error(
+                "SecureObject has been destroyed and cannot be used"
+            );
+        }
+    }
+
+    /**
+     * Ensures the SecureObject is not read-only for write operations
+     */
+    private ensureNotReadOnly(): void {
+        if (this._isReadOnly) {
+            throw new Error("SecureObject is read-only");
+        }
+    }
+
+    // ===== SENSITIVE KEYS MANAGEMENT =====
+
+    /**
+     * Adds keys to the sensitive keys list
+     */
+    public addSensitiveKeys(...keys: string[]): this {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateKeys(keys);
+        this.sensitiveKeysManager.add(...keys);
+        return this;
+    }
+
+    /**
+     * Removes keys from the sensitive keys list
+     */
+    public removeSensitiveKeys(...keys: string[]): this {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateKeys(keys);
+        this.sensitiveKeysManager.remove(...keys);
+        return this;
+    }
+
+    /**
+     * Sets the complete list of sensitive keys (replaces existing list)
+     */
+    public setSensitiveKeys(keys: string[]): this {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateKeys(keys);
+        this.sensitiveKeysManager.set(keys);
+        return this;
+    }
+
+    /**
+     * Gets the current list of sensitive keys
+     */
+    public getSensitiveKeys(): string[] {
+        this.ensureNotDestroyed();
+        return this.sensitiveKeysManager.getAll();
+    }
+
+    /**
+     * Checks if a key is marked as sensitive
+     */
+    public isSensitiveKey(key: string): boolean {
+        ValidationUtils.validateKey(key);
+        return this.sensitiveKeysManager.isSensitive(key);
+    }
+
+    /**
+     * Clears all sensitive keys
+     */
+    public clearSensitiveKeys(): this {
+        this.ensureNotDestroyed();
+        this.sensitiveKeysManager.clear();
+        return this;
+    }
+
+    /**
+     * Resets sensitive keys to default values
+     */
+    public resetToDefaultSensitiveKeys(): this {
+        this.ensureNotDestroyed();
+        this.sensitiveKeysManager.resetToDefault();
+        return this;
+    }
+
+    /**
+     * Gets the default sensitive keys that are automatically initialized
+     */
+    public static get getDefaultSensitiveKeys(): string[] {
+        return SensitiveKeysManager.getDefaultKeys();
+    }
+
+    // ===== ENCRYPTION MANAGEMENT =====
+
+    /**
+     * Sets the encryption key for sensitive data encryption
+     */
+    public setEncryptionKey(key: string | null = null): this {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateEncryptionKey(key);
+        this.cryptoHandler.setEncryptionKey(key);
+        return this;
+    }
+
+    /**
+     * Gets the current encryption key
+     */
+    public get getEncryptionKey(): string | null {
+        return this.cryptoHandler.getEncryptionKey();
+    }
+
+    /**
+     * Decrypts a value using the encryption key
+     */
+    public decryptValue(encryptedValue: string): any {
+        this.ensureNotDestroyed();
+        return this.cryptoHandler.decryptValue(encryptedValue);
+    }
+
+    /**
+     * Decrypts all encrypted values in an object
+     */
+    public decryptObject(obj: any): any {
+        this.ensureNotDestroyed();
+        return this.cryptoHandler.decryptObject(obj);
+    }
+
+    // ===== EVENT MANAGEMENT =====
+
+    /**
+     * Adds an event listener
+     */
+    public addEventListener(
+        event: SecureObjectEvent,
+        listener: EventListener
+    ): void {
+        ValidationUtils.validateEventType(event);
+        ValidationUtils.validateEventListener(listener);
+        this.eventManager.addEventListener(event, listener);
+    }
+
+    /**
+     * Removes an event listener
+     */
+    public removeEventListener(
+        event: SecureObjectEvent,
+        listener: EventListener
+    ): void {
+        ValidationUtils.validateEventType(event);
+        ValidationUtils.validateEventListener(listener);
+        this.eventManager.removeEventListener(event, listener);
+    }
+
+    /**
+     * Creates a one-time event listener
+     */
+    public once(event: SecureObjectEvent, listener: EventListener): void {
+        ValidationUtils.validateEventType(event);
+        ValidationUtils.validateEventListener(listener);
+        this.eventManager.once(event, listener);
+    }
+
+    /**
+     * Waits for a specific event to be emitted
+     */
+    public waitFor(
+        event: SecureObjectEvent,
+        timeout?: number
+    ): Promise<{ key?: string; value?: any }> {
+        ValidationUtils.validateEventType(event);
+        if (timeout !== undefined) {
+            ValidationUtils.validateTimeout(timeout);
+        }
+        return this.eventManager.waitFor(event, timeout);
+    }
+
+    // ===== CORE DATA OPERATIONS =====
+
+    /**
+     * Sets a value
+     */
+    public set<K extends keyof T>(key: K, value: T[K]): this {
+        this.ensureNotDestroyed();
+        this.ensureNotReadOnly();
+
+        const stringKey = ValidationUtils.sanitizeKey(key);
+        ValidationUtils.isValidSecureValue(value);
+
+        // Clean up any existing secure buffer for this key
+        this.cleanupKey(stringKey);
+
+        // Handle different types of values
+        if (value && typeof value === "object" && value.constructor.name === "Uint8Array") {
+            // Store Uint8Array in a secure buffer
+            const secureBuffer = SecureBuffer.from(value as Uint8Array);
+            this.secureBuffers.set(stringKey, secureBuffer);
+            this.data.set(stringKey, secureBuffer);
+            this.metadataManager.update(stringKey, "Uint8Array", true);
+        } else if (typeof value === "string") {
+            // Store strings in secure buffers
+            const secureBuffer = SecureBuffer.from(value);
+            this.secureBuffers.set(stringKey, secureBuffer);
+            this.data.set(stringKey, secureBuffer);
+            this.metadataManager.update(stringKey, "string", true);
+        } else if (ValidationUtils.isSecureString(value)) {
+            // Store SecureString reference
+            this.data.set(stringKey, value);
+            this.metadataManager.update(stringKey, "SecureString", true);
+        } else if (ValidationUtils.isSecureObject(value)) {
+            // Store SecureObject reference
+            this.data.set(stringKey, value);
+            this.metadataManager.update(stringKey, "SecureObject", true);
+        } else {
+            // Store other values directly (numbers, booleans, null, undefined)
+            this.data.set(stringKey, value);
+            this.metadataManager.update(stringKey, typeof value, false);
+        }
+
+        this.eventManager.emit("set", stringKey, value);
+        return this;
+    }
+
+    /**
+     * Sets multiple values at once
+     */
+    public setAll(values: Partial<T>): this {
+        this.ensureNotDestroyed();
+        this.ensureNotReadOnly();
+
+        for (const key in values) {
+            if (Object.prototype.hasOwnProperty.call(values, key)) {
+                this.set(key as keyof T, values[key] as T[keyof T]);
+            }
+        }
+        return this;
+    }
+
+    /**
+     * Gets a value
+     */
+    public get<K extends keyof T>(key: K): T[K] {
+        this.ensureNotDestroyed();
+
+        const stringKey = ValidationUtils.sanitizeKey(key);
+        const value = this.data.get(stringKey);
+
+        // Update access metadata
+        if (this.metadataManager.has(stringKey)) {
+            const metadata = this.metadataManager.get(stringKey)!;
+            this.metadataManager.update(
+                stringKey,
+                metadata.type,
+                metadata.isSecure,
+                true
+            );
+        }
+
+        if (value instanceof SecureBuffer) {
+            // Convert SecureBuffer back to original type based on metadata
+            const buffer = value.getBuffer();
+            const metadata = this.metadataManager.get(stringKey);
+
+            if (metadata?.type === "Uint8Array") {
+                // Return as Uint8Array for binary data
+                const result = new Uint8Array(buffer) as unknown as T[K];
+                this.eventManager.emit("get", stringKey, result);
+                return result;
+            } else {
+                // Return as string for text data
+                const result = new TextDecoder().decode(
+                    buffer
+                ) as unknown as T[K];
+                this.eventManager.emit("get", stringKey, result);
+                return result;
+            }
+        }
+
+        this.eventManager.emit("get", stringKey, value);
+        return value as T[K];
+    }
+
+    /**
+     * Gets a value safely, returning undefined if key doesn't exist
+     */
+    public getSafe<K extends keyof T>(key: K): T[K] | undefined {
+        try {
+            return this.has(key) ? this.get(key) : undefined;
+        } catch {
+            return undefined;
+        }
+    }
+
+    /**
+     * Gets a value with a default fallback
+     */
+    public getWithDefault<K extends keyof T>(key: K, defaultValue: T[K]): T[K] {
+        return this.has(key) ? this.get(key) : defaultValue;
+    }
+
+    /**
+     * Checks if a key exists
+     */
+    public has<K extends keyof T>(key: K): boolean {
+        this.ensureNotDestroyed();
+        const stringKey = ValidationUtils.sanitizeKey(key);
+        return this.data.has(stringKey);
+    }
+
+    /**
+     * Deletes a key
+     */
+    public delete<K extends keyof T>(key: K): boolean {
+        this.ensureNotDestroyed();
+        this.ensureNotReadOnly();
+
+        const stringKey = ValidationUtils.sanitizeKey(key);
+
+        if (!this.data.has(stringKey)) {
+            return false;
+        }
+
+        // Clean up any secure buffer
+        this.cleanupKey(stringKey);
+
+        const deleted = this.data.delete(stringKey);
+        this.metadataManager.delete(stringKey);
+
+        this.eventManager.emit("delete", stringKey);
+        return deleted;
+    }
+
+    /**
+     * Cleans up resources associated with a key
+     */
+    private cleanupKey(key: string): void {
+        if (this.secureBuffers.has(key)) {
+            this.secureBuffers.get(key)?.destroy();
+            this.secureBuffers.delete(key);
+        }
+        // Note: We don't destroy SecureString or SecureObject instances
+        // as they might be used elsewhere
+    }
+
+    /**
+     * Clears all data
+     */
+    public clear(): void {
+        this.ensureNotDestroyed();
+        this.ensureNotReadOnly();
+
+        // Destroy all secure buffers
+        for (const buffer of this.secureBuffers.values()) {
+            buffer.destroy();
+        }
+
+        this.secureBuffers.clear();
+        this.data.clear();
+        this.metadataManager.clear();
+
+        this.eventManager.emit("clear");
+    }
+
+    // ===== ITERATION AND COLLECTION METHODS =====
+
+    /**
+     * Gets all keys
+     */
+    public keys(): Array<keyof T> {
+        this.ensureNotDestroyed();
+        return Array.from(this.data.keys()) as Array<keyof T>;
+    }
+
+    /**
+     * Gets all values
+     */
+    public values(): Array<T[keyof T]> {
+        this.ensureNotDestroyed();
+        return this.keys().map((key) => this.get(key));
+    }
+
+    /**
+     * Gets all entries as [key, value] pairs
+     */
+    public entries(): Array<[keyof T, T[keyof T]]> {
+        this.ensureNotDestroyed();
+        return this.keys().map(
+            (key) => [key, this.get(key)] as [keyof T, T[keyof T]]
+        );
+    }
+
+    /**
+     * Iterates over each key-value pair
+     */
+    public forEach(
+        callback: (value: T[keyof T], key: keyof T, obj: this) => void
+    ): void {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateCallback(callback, "forEach callback");
+
+        for (const key of this.keys()) {
+            callback(this.get(key), key, this);
+        }
+    }
+
+    /**
+     * Maps over values and returns a new array
+     */
+    public map<U>(
+        callback: (value: T[keyof T], key: keyof T, obj: this) => U
+    ): U[] {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateMapper(callback);
+
+        return this.keys().map((key) => callback(this.get(key), key, this));
+    }
+
+    /**
+     * Filters entries based on a predicate
+     */
+    public filter(
+        predicate: (value: T[keyof T], key: keyof T, obj: this) => boolean
+    ): SecureObject<Partial<T>> {
+        this.ensureNotDestroyed();
+        ValidationUtils.validatePredicate(predicate);
+
+        const filtered = new SecureObject<Partial<T>>();
+
+        for (const key of this.keys()) {
+            const value = this.get(key);
+            if (predicate(value, key, this)) {
+                filtered.set(key, value);
+            }
+        }
+
+        return filtered;
+    }
+
+    // ===== METADATA OPERATIONS =====
+
+    /**
+     * Gets metadata for a specific key
+     */
+    public getMetadata<K extends keyof T>(key: K): ValueMetadata | undefined {
+        this.ensureNotDestroyed();
+        const stringKey = ValidationUtils.sanitizeKey(key);
+        return this.metadataManager.get(stringKey);
+    }
+
+    /**
+     * Gets metadata for all keys
+     */
+    public getAllMetadata(): Map<string, ValueMetadata> {
+        this.ensureNotDestroyed();
+        return this.metadataManager.getAll();
+    }
+
+    // ===== SERIALIZATION METHODS =====
+
+    /**
+     * Gets the full object as a regular JavaScript object
+     */
+    public getAll(
+        options: SerializationOptions = {}
+    ): T & { _metadata?: Record<string, ValueMetadata> } {
+        return this.toObject(options);
+    }
+
+    /**
+     * Converts to a regular object
+     */
+    public toObject(
+        options: SerializationOptions = {}
+    ): T & { _metadata?: Record<string, ValueMetadata> } {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateSerializationOptions(options);
+
+        const sensitiveKeys = new Set(this.sensitiveKeysManager.getAll());
+        return this.serializationHandler.toObject<T>(
+            this.data,
+            sensitiveKeys,
+            options
+        );
+    }
+
+    /**
+     * Converts to JSON string
+     */
+    public toJSON(options: SerializationOptions = {}): string {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateSerializationOptions(options);
+
+        const sensitiveKeys = new Set(this.sensitiveKeysManager.getAll());
+        return this.serializationHandler.toJSON<T>(
+            this.data,
+            sensitiveKeys,
+            options
+        );
+    }
+
+    // ===== UTILITY METHODS =====
+
+    /**
+     * Creates a hash of the entire object content
+     */
+    public async hash(
+        algorithm: HashAlgorithm = "SHA-256",
+        format: HashOutputFormat = "hex"
+    ): Promise<string | Uint8Array> {
+        this.ensureNotDestroyed();
+
+        const serialized =
+            this.serializationHandler.createHashableRepresentation(
+                this.entries()
+            );
+        const secureString = new SecureString(serialized);
+
+        try {
+            return await secureString.hash(algorithm, format);
+        } finally {
+            secureString.destroy();
+        }
+    }
+
+    /**
+     * Executes a function with the object data and optionally clears it afterward
+     */
+    public use<U>(fn: (obj: this) => U, autoClear: boolean = false): U {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateCallback(fn, "use function");
+
+        try {
+            return fn(this);
+        } finally {
+            if (autoClear) {
+                this.destroy();
+            }
+        }
+    }
+
+    /**
+     * Creates a shallow copy of the SecureObject
+     */
+    public clone(): SecureObject<T> {
+        this.ensureNotDestroyed();
+        return SecureObject.from(this);
+    }
+
+    /**
+     * Merges another object into this one
+     */
+    public merge(
+        other: Partial<T> | SecureObject<Partial<T>>,
+        overwrite: boolean = true
+    ): this {
+        this.ensureNotDestroyed();
+        this.ensureNotReadOnly();
+
+        if (other instanceof SecureObject) {
+            for (const key of other.keys()) {
+                if (overwrite || !this.has(key as keyof T)) {
+                    this.set(key as keyof T, other.get(key) as T[keyof T]);
+                }
+            }
+        } else {
+            for (const key in other) {
+                if (Object.prototype.hasOwnProperty.call(other, key)) {
+                    if (overwrite || !this.has(key as keyof T)) {
+                        this.set(key as keyof T, other[key] as T[keyof T]);
+                    }
+                }
+            }
+        }
+
+        return this;
+    }
+
+    /**
+     * Destroys the SecureObject and clears all data
+     */
+    public destroy(): void {
+        if (!this._isDestroyed) {
+            this.clear();
+            this.eventManager.clear();
+            this._isDestroyed = true;
+            this.eventManager.emit("destroy");
+        }
+    }
+
+    /**
+     * Custom inspection for debugging (masks sensitive data)
+     */
+    public [Symbol.for("nodejs.util.inspect.custom")](): string {
+        if (this._isDestroyed) {
+            return "SecureObject [DESTROYED]";
+        }
+
+        const stats = this.metadataManager.getStats();
+        return `SecureObject [${this.size} items, ${
+            stats.secureEntries
+        } secure] ${this._isReadOnly ? "[READ-ONLY]" : ""}`;
+    }
+}

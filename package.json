@@ -1,6 +1,6 @@
 {
     "name": "fortify2-js",
-    "version": "3.0.6",
+    "version": "3.0.7",
     "description": "Nehonix Fortify is a comprehensive, military-grade cryptographic security library designed for maximum security, performance, and developer experience. Built with TypeScript and featuring quantum-resistant algorithms, advanced memory protection, and enterprise-grade security features.",
     "main": "./dist/index.cjs",
     "module": "./dist/index.esm.js",

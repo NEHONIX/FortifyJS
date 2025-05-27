@@ -153,7 +153,7 @@ let initializationPromise: Promise<void> | null = null;
 
 function ensureLibrariesInitialized(): Promise<void> {
     if (!initializationPromise) {
-        initializationPromise = initializeSecurityLibraries().catch((error) => {
+        initializationPromise = initializeSecurityLibraries().catch((_error) => {
             // Silently handle initialization errors - libraries are optional
             // console.error(
             //     "Failed to initialize security libraries for SecureBuffer:",

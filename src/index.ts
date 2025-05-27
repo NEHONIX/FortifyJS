@@ -38,8 +38,35 @@
  */
 
 import { FortifyJS } from "./core/crypto";
-import { SecureString } from "./security/secureString";
-import { SecureObject } from "./security/secureOb";
+// Use the new modular SecureString
+import { SecureString } from "./security/secure-string";
+// Use the new modular SecureObject
+import { SecureObject } from "./security/secure-object";
+
+// Export modular SecureObject utilities
+export {
+    SecureObject,
+    createSecureObject,
+    createReadOnlySecureObject,
+    createSecureObjectWithSensitiveKeys,
+    cloneSecureObject,
+} from "./security/secure-object";
+
+// Export modular SecureString utilities
+export {
+    SecureString,
+    createSecureString,
+    createEnhancedSecureString,
+    createMaximumSecureString,
+    createSecureStringFromBuffer,
+    cloneSecureString,
+    constantTimeCompare,
+    calculateStringSimilarity,
+    validatePassword as validatePasswordString,
+    validateEmail as validateEmailString,
+    generateSalt,
+    hashString,
+} from "./security/secure-string";
 
 // Type exports
 export type {
@@ -53,6 +80,29 @@ export type {
     SecurityTestResult,
     PasswordStrengthResult,
 } from "./types";
+
+// Modular SecureObject types
+export type {
+    SecureValue,
+    SerializationOptions,
+    ValueMetadata,
+    SecureObjectEvent,
+    EventListener,
+    SecureObjectOptions,
+} from "./security/secure-object";
+
+// Modular SecureString types
+export type {
+    SecureStringOptions,
+    SecureStringEvent,
+    SecureStringEventListener,
+    ComparisonResult,
+    SearchOptions,
+    SplitOptions,
+    ValidationResult,
+    StringStatistics,
+    MemoryUsage,
+} from "./security/secure-string";
 
 // Password Management Types
 export type {
@@ -172,7 +222,6 @@ export function fString(str: string) {
 export function fObject<T extends Record<string, any>>(initialData?: T) {
     return new SecureObject<T>(initialData);
 }
-
 
 /**
  * Encrypt a password with pepper and military-grade hashing
