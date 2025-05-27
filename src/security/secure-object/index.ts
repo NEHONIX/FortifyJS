@@ -21,7 +21,10 @@ export type {
 } from "./types";
 
 // Export modular components for advanced usage
-export { SensitiveKeysManager, DEFAULT_SENSITIVE_KEYS } from "./encryption/sensitive-keys";
+export {
+    SensitiveKeysManager,
+    DEFAULT_SENSITIVE_KEYS,
+} from "./encryption/sensitive-keys";
 export { CryptoHandler } from "./encryption/crypto-handler";
 export { MetadataManager } from "./metadata/metadata-manager";
 export { EventManager } from "./events/event-manager";
@@ -64,7 +67,9 @@ export function createReadOnlySecureObject<T extends Record<string, any>>(
 /**
  * Creates a SecureObject with custom sensitive keys
  */
-export function createSecureObjectWithSensitiveKeys<T extends Record<string, any>>(
+export function createSecureObjectWithSensitiveKeys<
+    T extends Record<string, any>
+>(
     initialData: Partial<T>,
     sensitiveKeys: string[],
     options?: { readOnly?: boolean; encryptionKey?: string }

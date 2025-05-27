@@ -29,6 +29,24 @@ import { ComparisonOperations } from "../operations/comparison-operations";
 import { CryptoOperations } from "../crypto/crypto-operations";
 import { StringValidator } from "../validation/string-validator";
 
+// Import advanced features
+import {
+    EntropyAnalyzer,
+    EntropyAnalysisResult,
+    PatternAnalysisResult,
+} from "../advanced/entropy-analyzer";
+import {
+    QuantumSafeOperations,
+    QuantumSafeOptions,
+    QuantumSafeHashResult,
+    QuantumSafeKeyResult,
+} from "../advanced/quantum-safe";
+import {
+    PerformanceMonitor,
+    PerformanceStats,
+    BenchmarkResult,
+} from "../advanced/performance-monitor";
+
 /**
  * A secure string that can be explicitly cleared from memory with modular architecture
  */
@@ -40,7 +58,7 @@ export class SecureString {
         Set<SecureStringEventListener>
     > = new Map();
     private _isDestroyed: boolean = false;
- 
+
     /**
      * Creates a new secure string
      */
@@ -500,6 +518,150 @@ export class SecureString {
         });
 
         return result;
+    }
+
+    // ===== ADVANCED FEATURES =====
+
+    /**
+     * Performs comprehensive entropy analysis
+     */
+    public analyzeEntropy(): EntropyAnalysisResult {
+        this.ensureNotDestroyed();
+
+        const content = this.toString();
+        return EntropyAnalyzer.analyzeEntropy(content);
+    }
+
+    /**
+     * Analyzes patterns in the string
+     */
+    public analyzePatterns(): PatternAnalysisResult {
+        this.ensureNotDestroyed();
+
+        const content = this.toString();
+        return EntropyAnalyzer.analyzePatterns(content);
+    }
+
+    /**
+     * Creates a quantum-safe hash
+     */
+    public async createQuantumSafeHash(
+        options: QuantumSafeOptions,
+        format: HashOutputFormat = "hex"
+    ): Promise<QuantumSafeHashResult> {
+        this.ensureNotDestroyed();
+
+        const content = this.toString();
+        const result = await QuantumSafeOperations.createQuantumSafeHash(
+            content,
+            options,
+            format
+        );
+
+        this.emit("hashed", {
+            type: "quantum-safe",
+            algorithm: options.algorithm,
+            format,
+        });
+
+        return result;
+    }
+
+    /**
+     * Derives a quantum-safe key
+     */
+    public async deriveQuantumSafeKey(
+        options: QuantumSafeOptions,
+        keyLength: number = 32,
+        format: HashOutputFormat = "hex"
+    ): Promise<QuantumSafeKeyResult> {
+        this.ensureNotDestroyed();
+
+        const content = this.toString();
+        const result = await QuantumSafeOperations.deriveQuantumSafeKey(
+            content,
+            options,
+            keyLength,
+            format
+        );
+
+        this.emit("hashed", {
+            type: "quantum-safe-kdf",
+            algorithm: options.algorithm,
+            format,
+        });
+
+        return result;
+    }
+
+    /**
+     * Verifies a quantum-safe hash
+     */
+    public async verifyQuantumSafeHash(
+        expectedHash: string | Uint8Array,
+        options: QuantumSafeOptions,
+        format: HashOutputFormat = "hex"
+    ): Promise<boolean> {
+        this.ensureNotDestroyed();
+
+        const content = this.toString();
+        return QuantumSafeOperations.verifyQuantumSafeHash(
+            content,
+            expectedHash,
+            options,
+            format
+        );
+    }
+
+    /**
+     * Starts performance monitoring for this SecureString
+     */
+    public startPerformanceMonitoring(): void {
+        PerformanceMonitor.startMonitoring();
+    }
+
+    /**
+     * Stops performance monitoring
+     */
+    public stopPerformanceMonitoring(): void {
+        PerformanceMonitor.stopMonitoring();
+    }
+
+    /**
+     * Gets performance statistics
+     */
+    public getPerformanceStats(): PerformanceStats {
+        return PerformanceMonitor.getStats();
+    }
+
+    /**
+     * Benchmarks a specific operation on this SecureString
+     */
+    public async benchmarkOperation(
+        operation: () => Promise<any> | any,
+        operationName: string,
+        iterations: number = 100
+    ): Promise<BenchmarkResult> {
+        return PerformanceMonitor.benchmark(
+            operation,
+            operationName,
+            iterations
+        );
+    }
+
+    /**
+     * Measures an operation with automatic performance recording
+     */
+    public async measureOperation<T>(
+        operation: () => Promise<T> | T,
+        operationType: string
+    ): Promise<T> {
+        const operationSize = this.length();
+        return PerformanceMonitor.measure(
+            operation,
+            operationType,
+            operationSize
+        );
     }
 
     // ===== EVENT MANAGEMENT =====

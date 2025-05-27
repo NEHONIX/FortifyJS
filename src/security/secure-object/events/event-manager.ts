@@ -9,7 +9,8 @@ import { SecureObjectEvent, EventListener } from "../types";
  * Manages events for SecureObject instances
  */
 export class EventManager {
-    private eventListeners: Map<SecureObjectEvent, Set<EventListener>> = new Map();
+    private eventListeners: Map<SecureObjectEvent, Set<EventListener>> =
+        new Map();
 
     /**
      * Adds an event listener
@@ -24,11 +25,14 @@ export class EventManager {
     /**
      * Removes an event listener
      */
-    removeEventListener(event: SecureObjectEvent, listener: EventListener): void {
+    removeEventListener(
+        event: SecureObjectEvent,
+        listener: EventListener
+    ): void {
         const listeners = this.eventListeners.get(event);
         if (listeners) {
             listeners.delete(listener);
-            
+
             // Clean up empty sets
             if (listeners.size === 0) {
                 this.eventListeners.delete(event);
@@ -57,7 +61,10 @@ export class EventManager {
                 try {
                     listener(event, key, value);
                 } catch (error) {
-                    console.error(`Error in SecureObject event listener:`, error);
+                    console.error(
+                        `Error in SecureObject event listener:`,
+                        error
+                    );
                 }
             }
         }
@@ -120,31 +127,36 @@ export class EventManager {
             this.removeEventListener(event, onceListener);
             listener(evt, key, value);
         };
-        
+
         this.addEventListener(event, onceListener);
     }
 
     /**
      * Creates a promise that resolves when a specific event is emitted
      */
-    waitFor(event: SecureObjectEvent, timeout?: number): Promise<{ key?: string; value?: any }> {
+    waitFor(
+        event: SecureObjectEvent,
+        timeout?: number
+    ): Promise<{ key?: string; value?: any }> {
         return new Promise((resolve, reject) => {
             let timeoutId: NodeJS.Timeout | undefined;
-            
-            const listener: EventListener = (evt, key, value) => {
+
+            const listener: EventListener = (_evt, key, value) => {
                 if (timeoutId) {
                     clearTimeout(timeoutId);
                 }
                 this.removeEventListener(event, listener);
                 resolve({ key, value });
             };
-            
+
             this.addEventListener(event, listener);
-            
+
             if (timeout) {
                 timeoutId = setTimeout(() => {
                     this.removeEventListener(event, listener);
-                    reject(new Error(`Event '${event}' timeout after ${timeout}ms`));
+                    reject(
+                        new Error(`Event '${event}' timeout after ${timeout}ms`)
+                    );
                 }, timeout);
             }
         });
@@ -153,22 +165,33 @@ export class EventManager {
     /**
      * Emits an event and waits for all listeners to complete (if they return promises)
      */
-    async emitAsync(event: SecureObjectEvent, key?: string, value?: any): Promise<void> {
+    async emitAsync(
+        event: SecureObjectEvent,
+        key?: string,
+        value?: any
+    ): Promise<void> {
         const listeners = this.eventListeners.get(event);
         if (listeners) {
             const promises: Promise<any>[] = [];
-            
+
             for (const listener of listeners) {
                 try {
                     const result = listener(event, key, value);
-                    if (result && typeof result.then === 'function') {
-                        promises.push(result);
+                    if (
+                        result &&
+                        typeof result === "object" &&
+                        "then" in result
+                    ) {
+                        promises.push(result as Promise<void>);
                     }
                 } catch (error) {
-                    console.error(`Error in SecureObject event listener:`, error);
+                    console.error(
+                        `Error in SecureObject event listener:`,
+                        error
+                    );
                 }
             }
-            
+
             if (promises.length > 0) {
                 await Promise.allSettled(promises);
             }
@@ -179,8 +202,8 @@ export class EventManager {
      * Creates a filtered event listener that only triggers for specific keys
      */
     addKeyFilteredListener(
-        event: SecureObjectEvent, 
-        keys: string[], 
+        event: SecureObjectEvent,
+        keys: string[],
         listener: EventListener
     ): void {
         const filteredListener: EventListener = (evt, key, value) => {
@@ -188,7 +211,7 @@ export class EventManager {
                 listener(evt, key, value);
             }
         };
-        
+
         this.addEventListener(event, filteredListener);
     }
 
@@ -208,11 +231,11 @@ export class EventManager {
         eventBreakdown: Record<SecureObjectEvent, number>;
     } {
         const eventBreakdown: Record<string, number> = {};
-        
+
         for (const [event, listeners] of this.eventListeners.entries()) {
             eventBreakdown[event] = listeners.size;
         }
-        
+
         return {
             totalEvents: this.eventListeners.size,
             totalListeners: this.getTotalListenerCount(),
@@ -220,3 +243,4 @@ export class EventManager {
         };
     }
 }
+

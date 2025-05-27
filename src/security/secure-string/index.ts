@@ -4,6 +4,8 @@
  */
 
 import { SecureString } from "./core/secure-string-core";
+import { CryptoOperations } from "./crypto/crypto-operations";
+import { ComparisonOperations } from "./operations/comparison-operations";
 import { SecureStringOptions, ValidationResult } from "./types";
 
 // Export the main SecureString class
@@ -32,8 +34,25 @@ export type {
     PBKDF2Options,
 } from "./types";
 
+// Export advanced feature types
+export type {
+    EntropyAnalysisResult,
+    PatternAnalysisResult,
+} from "./advanced/entropy-analyzer";
+export type {
+    QuantumSafeOptions,
+    QuantumSafeHashResult,
+    QuantumSafeKeyResult,
+} from "./advanced/quantum-safe";
+export type {
+    PerformanceMetrics,
+    PerformanceStats,
+    BenchmarkResult,
+} from "./advanced/performance-monitor";
+
 // Import types for internal use
 import type { HashAlgorithm, HashOutputFormat } from "./types";
+import { StringValidator } from "./validation/string-validator";
 
 // Export modular components for advanced usage
 export { BufferManager } from "./buffer/buffer-manager";
@@ -41,6 +60,11 @@ export { StringOperations } from "./operations/string-operations";
 export { ComparisonOperations } from "./operations/comparison-operations";
 export { CryptoOperations } from "./crypto/crypto-operations";
 export { StringValidator } from "./validation/string-validator";
+
+// Export advanced features
+export { EntropyAnalyzer } from "./advanced/entropy-analyzer";
+export { QuantumSafeOperations } from "./advanced/quantum-safe";
+export { PerformanceMonitor } from "./advanced/performance-monitor";
 
 // Export constants
 export {
@@ -65,7 +89,6 @@ export function createSecureString(
     value: string = "",
     options?: SecureStringOptions
 ): SecureString {
-    const { SecureString } = require("./core/secure-string-core");
     return new SecureString(value, options);
 }
 
@@ -76,7 +99,6 @@ export function createEnhancedSecureString(
     value: string = "",
     customOptions?: Partial<SecureStringOptions>
 ): SecureString {
-    const { SecureString } = require("./core/secure-string-core");
     const enhancedOptions: SecureStringOptions = {
         protectionLevel: "enhanced",
         enableEncryption: true,
@@ -94,7 +116,6 @@ export function createMaximumSecureString(
     value: string = "",
     customOptions?: Partial<SecureStringOptions>
 ): SecureString {
-    const { SecureString } = require("./core/secure-string-core");
     const maximumOptions: SecureStringOptions = {
         protectionLevel: "maximum",
         enableEncryption: true,
@@ -116,7 +137,6 @@ export function createSecureStringFromBuffer(
     options?: SecureStringOptions,
     encoding: string = "utf-8"
 ): SecureString {
-    const { SecureString } = require("./core/secure-string-core");
     return SecureString.fromBuffer(buffer, options, encoding);
 }
 
@@ -124,7 +144,6 @@ export function createSecureStringFromBuffer(
  * Creates a SecureString from another SecureString (clone)
  */
 export function cloneSecureString(source: SecureString): SecureString {
-    const { SecureString } = require("./core/secure-string-core");
     return SecureString.from(source);
 }
 
@@ -135,7 +154,6 @@ export function createTemporarySecureString(
     value: string,
     options?: SecureStringOptions
 ): SecureString {
-    const { SecureString } = require("./core/secure-string-core");
     const tempString = new SecureString(value, options);
 
     // Auto-destroy after a timeout (default 5 minutes)
@@ -156,7 +174,7 @@ export function createTemporarySecureString(
  * Compares two strings in constant time
  */
 export function constantTimeCompare(str1: string, str2: string): boolean {
-    const { ComparisonOperations } = require("./operations/comparison-operations");
+
     return ComparisonOperations.constantTimeEquals(str1, str2).isEqual;
 }
 
@@ -166,9 +184,9 @@ export function constantTimeCompare(str1: string, str2: string): boolean {
 export function calculateStringSimilarity(
     str1: string,
     str2: string,
-    algorithm: 'levenshtein' | 'jaro' | 'jaro-winkler' = 'levenshtein'
+    algorithm: "levenshtein" | "jaro" | "jaro-winkler" = "levenshtein"
 ): number {
-    const { ComparisonOperations } = require("./operations/comparison-operations");
+
     return ComparisonOperations.fuzzyMatch(str1, str2, algorithm);
 }
 
@@ -176,7 +194,6 @@ export function calculateStringSimilarity(
  * Validates a password with default requirements
  */
 export function validatePassword(password: string): ValidationResult {
-    const { StringValidator } = require("./validation/string-validator");
     return StringValidator.validatePassword(password);
 }
 
@@ -184,15 +201,16 @@ export function validatePassword(password: string): ValidationResult {
  * Validates an email address
  */
 export function validateEmail(email: string): ValidationResult {
-    const { StringValidator } = require("./validation/string-validator");
     return StringValidator.validateEmail(email);
 }
 
 /**
  * Generates a cryptographically secure salt
  */
-export function generateSalt(length: number = 32, format: HashOutputFormat = "hex") {
-    const { CryptoOperations } = require("./crypto/crypto-operations");
+export function generateSalt(
+    length: number = 32,
+    format: HashOutputFormat = "hex"
+) {
     if (format === "uint8array") {
         return CryptoOperations.generateSalt(length);
     } else if (format === "base64") {
@@ -210,7 +228,6 @@ export async function hashString(
     algorithm: HashAlgorithm = "SHA-256",
     format: HashOutputFormat = "hex"
 ): Promise<string | Uint8Array> {
-    const { CryptoOperations } = require("./crypto/crypto-operations");
     return CryptoOperations.hash(content, algorithm, format);
 }
 
@@ -264,3 +281,4 @@ export function getSupportedAlgorithms() {
         algorithms: CryptoOperations.getAlgorithmInfo(),
     };
 }
+

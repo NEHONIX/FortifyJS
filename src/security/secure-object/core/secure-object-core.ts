@@ -9,7 +9,7 @@
  * @see https://lab.nehonix.space
  * @description SecureObject Core Module
  *
- * Main SecureObject class 
+ * Main SecureObject class
  */
 
 import { HashAlgorithm, HashOutputFormat } from "../../../types/string";
@@ -33,7 +33,7 @@ import { ValidationUtils } from "../utils/validation";
 import SecureString from "../../secure-string";
 
 /**
- * A secure object that can store sensitive data 
+ * A secure object that can store sensitive data
  */
 export class SecureObject<T extends Record<string, SecureValue>> {
     // Core data storage
@@ -107,6 +107,14 @@ export class SecureObject<T extends Record<string, SecureValue>> {
         data: Partial<T>
     ): SecureObject<T> {
         return new SecureObject(data, { readOnly: true });
+    }
+
+    /**
+     * Creates a read-only SecureObject (public usage)
+     */
+
+    public set setReadOnly(value: boolean) {
+        this._isReadOnly = value;
     }
 
     // ===== PROPERTY ACCESSORS =====
@@ -343,7 +351,11 @@ export class SecureObject<T extends Record<string, SecureValue>> {
         this.cleanupKey(stringKey);
 
         // Handle different types of values
-        if (value && typeof value === "object" && value.constructor.name === "Uint8Array") {
+        if (
+            value &&
+            typeof value === "object" &&
+            value.constructor.name === "Uint8Array"
+        ) {
             // Store Uint8Array in a secure buffer
             const secureBuffer = SecureBuffer.from(value as Uint8Array);
             this.secureBuffers.set(stringKey, secureBuffer);
@@ -568,7 +580,8 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * Filters entries based on a predicate
+     * Filters entries based on a predicate function (like Array.filter)
+     * Returns a new SecureObject with only the entries that match the condition
      */
     public filter(
         predicate: (value: T[keyof T], key: keyof T, obj: this) => boolean
@@ -584,6 +597,146 @@ export class SecureObject<T extends Record<string, SecureValue>> {
                 filtered.set(key, value);
             }
         }
+
+        // Emit event with filter details
+        this.eventManager.emit("filtered", undefined, {
+            operation: "filter",
+            resultSize: filtered.size,
+            originalSize: this.size,
+        });
+
+        return filtered;
+    }
+
+    /**
+     * Filters entries by specific key names (type-safe for known keys)
+     * Returns a new SecureObject with only the specified keys
+     *
+     * @example
+     * const user = createSecureObject({ name: "John", password: "secret", age: 30 });
+     * const credentials = user.filterByKeys("name", "password");
+     */
+    public filterByKeys<K extends keyof T>(
+        ...keys: K[]
+    ): SecureObject<Pick<T, K>> {
+        this.ensureNotDestroyed();
+
+        const filtered = new SecureObject<Pick<T, K>>();
+
+        for (const key of keys) {
+            if (this.has(key)) {
+                const stringKey = String(key);
+                (filtered as any).set(stringKey, this.get(key));
+            }
+        }
+
+        // Copy sensitive keys that are included in the filter
+        const relevantSensitiveKeys = this.getSensitiveKeys().filter((k) =>
+            keys.includes(k as K)
+        );
+        if (relevantSensitiveKeys.length > 0) {
+            filtered.setSensitiveKeys(relevantSensitiveKeys);
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "filterByKeys",
+            keys: keys.map((k) => String(k)),
+            resultSize: filtered.size,
+        });
+
+        return filtered;
+    }
+
+    /**
+     * Filters entries by value type using a type guard function
+     * Returns a new SecureObject with only values of the specified type
+     *
+     * @example
+     * const data = createSecureObject({ name: "John", age: 30, active: true });
+     * const strings = data.filterByType((v): v is string => typeof v === "string");
+     */
+    public filterByType<U>(
+        typeGuard: (value: any) => value is U
+    ): SecureObject<Record<string, U>> {
+        this.ensureNotDestroyed();
+
+        const filtered = new SecureObject<Record<string, U>>();
+
+        for (const key of this.keys()) {
+            const value = this.get(key);
+            if (typeGuard(value)) {
+                const stringKey = String(key);
+                (filtered as any).set(stringKey, value as U);
+            }
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "filterByType",
+            resultSize: filtered.size,
+        });
+
+        return filtered;
+    }
+
+    /**
+     * Filters entries to only include sensitive keys
+     * Returns a new SecureObject with only sensitive data
+     *
+     * @example
+     * const user = createSecureObject({ name: "John", password: "secret", age: 30 });
+     * user.addSensitiveKeys("password");
+     * const sensitiveData = user.filterSensitive(); // Only contains password
+     */
+    public filterSensitive(): SecureObject<Partial<T>> {
+        this.ensureNotDestroyed();
+
+        const filtered = new SecureObject<Partial<T>>();
+        const sensitiveKeys = this.getSensitiveKeys();
+
+        for (const key of this.keys()) {
+            const stringKey = String(key);
+            if (sensitiveKeys.includes(stringKey)) {
+                (filtered as any).set(stringKey, this.get(key));
+            }
+        }
+
+        // Copy all sensitive keys to the filtered object
+        filtered.setSensitiveKeys([...sensitiveKeys]);
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "filterSensitive",
+            resultSize: filtered.size,
+        });
+
+        return filtered;
+    }
+
+    /**
+     * Filters entries to exclude sensitive keys
+     * Returns a new SecureObject with only non-sensitive data
+     *
+     * @example
+     * const user = createSecureObject({ name: "John", password: "secret", age: 30 });
+     * user.addSensitiveKeys("password");
+     * const publicData = user.filterNonSensitive(); // Contains name and age
+     */
+    public filterNonSensitive(): SecureObject<Partial<T>> {
+        this.ensureNotDestroyed();
+
+        const filtered = new SecureObject<Partial<T>>();
+        const sensitiveKeys = new Set(this.getSensitiveKeys());
+
+        for (const key of this.keys()) {
+            const stringKey = String(key);
+            if (!sensitiveKeys.has(stringKey)) {
+                (filtered as any).set(stringKey, this.get(key));
+            }
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "filterNonSensitive",
+            resultSize: filtered.size,
+        });
 
         return filtered;
     }
@@ -725,6 +878,379 @@ export class SecureObject<T extends Record<string, SecureValue>> {
         }
 
         return this;
+    }
+
+    // ===== AMAZING NEW FEATURES =====
+
+    /**
+     * 🚀 AMAZING: Transform values with a mapper function (like Array.map but returns SecureObject)
+     * Returns a new SecureObject with transformed values
+     */
+    public transform<U>(
+        mapper: (value: T[keyof T], key: keyof T, obj: this) => U
+    ): SecureObject<Record<string, U>> {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateMapper(mapper);
+
+        const transformed = new SecureObject<Record<string, U>>();
+
+        for (const key of this.keys()) {
+            const value = this.get(key);
+            const newValue = mapper(value, key, this);
+            const stringKey = String(key);
+            (transformed as any).set(stringKey, newValue);
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "transform",
+            resultSize: transformed.size,
+        });
+
+        return transformed;
+    }
+
+    /**
+     * 🚀 AMAZING: Group entries by a classifier function
+     * Returns a Map where keys are group identifiers and values are SecureObjects
+     */
+    public groupBy<K extends string | number>(
+        classifier: (value: T[keyof T], key: keyof T) => K
+    ): Map<K, SecureObject<Partial<T>>> {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateCallback(classifier, "Classifier function");
+
+        const groups = new Map<K, SecureObject<Partial<T>>>();
+
+        for (const key of this.keys()) {
+            const value = this.get(key);
+            const groupKey = classifier(value, key);
+
+            if (!groups.has(groupKey)) {
+                groups.set(groupKey, new SecureObject<Partial<T>>());
+            }
+
+            const group = groups.get(groupKey)!;
+            const stringKey = String(key);
+            (group as any).set(stringKey, value);
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "groupBy",
+            resultSize: groups.size,
+        });
+
+        return groups;
+    }
+
+    /**
+     * 🚀 AMAZING: Partition entries into two groups based on a predicate
+     * Returns [matching, notMatching] SecureObjects
+     */
+    public partition(
+        predicate: (value: T[keyof T], key: keyof T) => boolean
+    ): [SecureObject<Partial<T>>, SecureObject<Partial<T>>] {
+        this.ensureNotDestroyed();
+        ValidationUtils.validatePredicate(predicate);
+
+        const matching = new SecureObject<Partial<T>>();
+        const notMatching = new SecureObject<Partial<T>>();
+
+        for (const key of this.keys()) {
+            const value = this.get(key);
+            const stringKey = String(key);
+
+            if (predicate(value, key)) {
+                (matching as any).set(stringKey, value);
+            } else {
+                (notMatching as any).set(stringKey, value);
+            }
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "partition",
+            resultSize: matching.size + notMatching.size,
+        });
+
+        return [matching, notMatching];
+    }
+
+    /**
+     * 🚀 AMAZING: Pick specific keys (like Lodash pick but type-safe)
+     * Returns a new SecureObject with only the specified keys
+     */
+    public pick<K extends keyof T>(...keys: K[]): SecureObject<Pick<T, K>> {
+        return this.filterByKeys(...keys);
+    }
+
+    /**
+     * 🚀 AMAZING: Omit specific keys (opposite of pick)
+     * Returns a new SecureObject without the specified keys
+     */
+    public omit<K extends keyof T>(...keys: K[]): SecureObject<Omit<T, K>> {
+        this.ensureNotDestroyed();
+
+        const omitted = new SecureObject<Omit<T, K>>();
+        const keysToOmit = new Set(keys.map((k) => String(k)));
+
+        for (const key of this.keys()) {
+            const stringKey = String(key);
+            if (!keysToOmit.has(stringKey)) {
+                (omitted as any).set(stringKey, this.get(key));
+            }
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "omit",
+            keys: keys.map((k) => String(k)),
+            resultSize: omitted.size,
+        });
+
+        return omitted;
+    }
+
+    /**
+     * 🚀 AMAZING: Flatten nested objects (one level deep)
+     * Converts { user: { name: "John" } } to { "user.name": "John" }
+     */
+    public flatten(separator: string = "."): SecureObject<Record<string, any>> {
+        this.ensureNotDestroyed();
+
+        const flattened = new SecureObject<Record<string, any>>();
+
+        for (const key of this.keys()) {
+            const value = this.get(key);
+            const stringKey = String(key);
+
+            if (
+                value &&
+                typeof value === "object" &&
+                !Array.isArray(value) &&
+                !((value as any) instanceof Date)
+            ) {
+                // Flatten nested object
+                for (const [nestedKey, nestedValue] of Object.entries(value)) {
+                    const flatKey = `${stringKey}${separator}${nestedKey}`;
+                    (flattened as any).set(flatKey, nestedValue);
+                }
+            } else {
+                (flattened as any).set(stringKey, value);
+            }
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "flatten",
+            resultSize: flattened.size,
+        });
+
+        return flattened;
+    }
+
+    /**
+     * 🚀 AMAZING: Compact - removes null, undefined, and empty values
+     * Returns a new SecureObject with only truthy values
+     */
+    public compact(): SecureObject<Partial<T>> {
+        return this.filter((value) => {
+            if (value === null || value === undefined) return false;
+            if (typeof value === "string" && value.trim() === "") return false;
+            if (Array.isArray(value) && value.length === 0) return false;
+            if (typeof value === "object" && Object.keys(value).length === 0)
+                return false;
+            return true;
+        });
+    }
+
+    /**
+     * 🚀 AMAZING: Invert - swap keys and values
+     * Returns a new SecureObject with keys and values swapped
+     */
+    public invert(): SecureObject<Record<string, string>> {
+        this.ensureNotDestroyed();
+
+        const inverted = new SecureObject<Record<string, string>>();
+
+        for (const key of this.keys()) {
+            const value = this.get(key);
+            const stringValue = String(value);
+            const stringKey = String(key);
+            (inverted as any).set(stringValue, stringKey);
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "invert",
+            resultSize: inverted.size,
+        });
+
+        return inverted;
+    }
+
+    /**
+     * 🚀 AMAZING: Defaults - merge with default values (only for missing keys)
+     * Returns a new SecureObject with defaults applied
+     */
+    public defaults(defaultValues: Partial<T>): SecureObject<T> {
+        this.ensureNotDestroyed();
+
+        const result = new SecureObject<T>();
+
+        // First, copy all existing values
+        for (const key of this.keys()) {
+            const stringKey = String(key);
+            (result as any).set(stringKey, this.get(key));
+        }
+
+        // Then, add defaults for missing keys
+        for (const [key, value] of Object.entries(defaultValues)) {
+            if (!this.has(key as keyof T)) {
+                (result as any).set(key, value);
+            }
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "defaults",
+            resultSize: result.size,
+        });
+
+        return result;
+    }
+
+    /**
+     * 🚀 AMAZING: Tap - execute a function with the object and return the object (for chaining)
+     * Useful for debugging or side effects in method chains
+     */
+    public tap(fn: (obj: this) => void): this {
+        this.ensureNotDestroyed();
+        ValidationUtils.validateCallback(fn, "Tap function");
+
+        fn(this);
+        return this;
+    }
+
+    /**
+     * 🚀 AMAZING: Pipe - transform the object through a series of functions
+     * Each function receives the result of the previous function
+     */
+    public pipe<U>(fn: (obj: this) => U): U;
+    public pipe<U, V>(fn1: (obj: this) => U, fn2: (obj: U) => V): V;
+    public pipe<U, V, W>(
+        fn1: (obj: this) => U,
+        fn2: (obj: U) => V,
+        fn3: (obj: V) => W
+    ): W;
+    public pipe(...fns: Array<(obj: any) => any>): any {
+        this.ensureNotDestroyed();
+
+        return fns.reduce((result, fn) => {
+            ValidationUtils.validateCallback(fn, "Pipe function");
+            return fn(result);
+        }, this as any);
+    }
+
+    /**
+     * 🚀 AMAZING: Sample - get random entries from the object
+     * Returns a new SecureObject with randomly selected entries
+     */
+    public sample(count: number = 1): SecureObject<Partial<T>> {
+        this.ensureNotDestroyed();
+
+        if (count <= 0) {
+            return new SecureObject<Partial<T>>();
+        }
+
+        const allKeys = this.keys();
+        const sampleSize = Math.min(count, allKeys.length);
+        const sampledKeys: (keyof T)[] = [];
+
+        // Simple random sampling without replacement
+        const availableKeys = [...allKeys];
+        for (let i = 0; i < sampleSize; i++) {
+            const randomIndex = Math.floor(
+                Math.random() * availableKeys.length
+            );
+            sampledKeys.push(
+                availableKeys.splice(randomIndex, 1)[0] as keyof T
+            );
+        }
+
+        const sampled = new SecureObject<Partial<T>>();
+        for (const key of sampledKeys) {
+            const stringKey = String(key);
+            (sampled as any).set(stringKey, this.get(key));
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "sample",
+            resultSize: sampled.size,
+        });
+
+        return sampled;
+    }
+
+    /**
+     * 🚀 AMAZING: Shuffle - return a new SecureObject with keys in random order
+     * Returns a new SecureObject with the same data but shuffled key order
+     */
+    public shuffle(): SecureObject<T> {
+        this.ensureNotDestroyed();
+
+        const allKeys = this.keys();
+        const shuffledKeys = [...allKeys];
+
+        // Fisher-Yates shuffle
+        for (let i = shuffledKeys.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledKeys[i], shuffledKeys[j]] = [
+                shuffledKeys[j],
+                shuffledKeys[i],
+            ];
+        }
+
+        const shuffled = new SecureObject<T>();
+        for (const key of shuffledKeys) {
+            const stringKey = String(key);
+            (shuffled as any).set(stringKey, this.get(key));
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "shuffle",
+            resultSize: shuffled.size,
+        });
+
+        return shuffled;
+    }
+
+    /**
+     * 🚀 AMAZING: Chunk - split object into chunks of specified size
+     * Returns an array of SecureObjects, each containing up to 'size' entries
+     */
+    public chunk(size: number): SecureObject<Partial<T>>[] {
+        this.ensureNotDestroyed();
+
+        if (size <= 0) {
+            throw new Error("Chunk size must be greater than 0");
+        }
+
+        const allKeys = this.keys();
+        const chunks: SecureObject<Partial<T>>[] = [];
+
+        for (let i = 0; i < allKeys.length; i += size) {
+            const chunk = new SecureObject<Partial<T>>();
+            const chunkKeys = allKeys.slice(i, i + size);
+
+            for (const key of chunkKeys) {
+                const stringKey = String(key);
+                (chunk as any).set(stringKey, this.get(key));
+            }
+
+            chunks.push(chunk);
+        }
+
+        this.eventManager.emit("filtered", undefined, {
+            operation: "chunk",
+            resultSize: chunks.length,
+        });
+
+        return chunks;
     }
 
     /**

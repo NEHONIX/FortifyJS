@@ -29,14 +29,22 @@ export class ValidationUtils {
      * Checks if a value is a SecureString instance
      */
     static isSecureString(value: any): boolean {
-        return value && typeof value === "object" && value.constructor.name === "SecureString";
+        return (
+            value &&
+            typeof value === "object" &&
+            value.constructor.name === "SecureString"
+        );
     }
 
     /**
      * Checks if a value is a SecureObject instance
      */
     static isSecureObject(value: any): boolean {
-        return value && typeof value === "object" && value.constructor.name === "SecureObject";
+        return (
+            value &&
+            typeof value === "object" &&
+            value.constructor.name === "SecureObject"
+        );
     }
 
     /**
@@ -44,14 +52,22 @@ export class ValidationUtils {
      */
     static validateSerializationOptions(options: SerializationOptions): void {
         if (options.format && !["json", "binary"].includes(options.format)) {
-            throw new Error(`Invalid format option: ${options.format}. Must be 'json' or 'binary'.`);
+            throw new Error(
+                `Invalid format option: ${options.format}. Must be 'json' or 'binary'.`
+            );
         }
 
-        if (options.includeMetadata !== undefined && typeof options.includeMetadata !== "boolean") {
+        if (
+            options.includeMetadata !== undefined &&
+            typeof options.includeMetadata !== "boolean"
+        ) {
             throw new Error("includeMetadata option must be a boolean");
         }
 
-        if (options.encryptSensitive !== undefined && typeof options.encryptSensitive !== "boolean") {
+        if (
+            options.encryptSensitive !== undefined &&
+            typeof options.encryptSensitive !== "boolean"
+        ) {
             throw new Error("encryptSensitive option must be a boolean");
         }
     }
@@ -64,7 +80,11 @@ export class ValidationUtils {
             throw new Error("Key cannot be null or undefined");
         }
 
-        if (typeof key !== "string" && typeof key !== "number" && typeof key !== "symbol") {
+        if (
+            typeof key !== "string" &&
+            typeof key !== "number" &&
+            typeof key !== "symbol"
+        ) {
             throw new Error("Key must be a string, number, or symbol");
         }
     }
@@ -80,8 +100,10 @@ export class ValidationUtils {
         keys.forEach((key, index) => {
             try {
                 this.validateKey(key);
-            } catch (error) {
-                throw new Error(`Invalid key at index ${index}: ${error.message}`);
+            } catch (error: any) {
+                throw new Error(
+                    `Invalid key at index ${index}: ${error.message}`
+                );
             }
         });
     }
@@ -104,7 +126,11 @@ export class ValidationUtils {
      */
     static validateTimeout(timeout: any): void {
         if (timeout !== undefined) {
-            if (typeof timeout !== "number" || timeout < 0 || !Number.isFinite(timeout)) {
+            if (
+                typeof timeout !== "number" ||
+                timeout < 0 ||
+                !Number.isFinite(timeout)
+            ) {
                 throw new Error("Timeout must be a positive finite number");
             }
         }
@@ -114,7 +140,11 @@ export class ValidationUtils {
      * Validates a limit value for pagination/filtering
      */
     static validateLimit(limit: any): void {
-        if (typeof limit !== "number" || limit < 1 || !Number.isInteger(limit)) {
+        if (
+            typeof limit !== "number" ||
+            limit < 1 ||
+            !Number.isInteger(limit)
+        ) {
             throw new Error("Limit must be a positive integer");
         }
     }
@@ -139,10 +169,21 @@ export class ValidationUtils {
      * Validates an event type
      */
     static validateEventType(event: any): void {
-        const validEvents = ["set", "get", "delete", "clear", "destroy"];
-        
+        const validEvents = [
+            "set",
+            "get",
+            "delete",
+            "clear",
+            "destroy",
+            "filtered",
+        ];
+
         if (!validEvents.includes(event)) {
-            throw new Error(`Invalid event type: ${event}. Must be one of: ${validEvents.join(", ")}`);
+            throw new Error(
+                `Invalid event type: ${event}. Must be one of: ${validEvents.join(
+                    ", "
+                )}`
+            );
         }
     }
 
@@ -196,7 +237,7 @@ export class ValidationUtils {
         }
 
         if (value instanceof Array) {
-            return value.map(item => this.deepClone(item)) as unknown as T;
+            return value.map((item) => this.deepClone(item)) as unknown as T;
         }
 
         if (value instanceof Uint8Array) {
@@ -240,7 +281,8 @@ export class ValidationUtils {
         if (value instanceof Date) return "Date";
         if (this.isSecureString(value)) return "SecureString";
         if (this.isSecureObject(value)) return "SecureObject";
-        
+
         return typeof value;
     }
 }
+

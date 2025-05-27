@@ -65,10 +65,10 @@ import {
     TamperEvidentLogger,
     LogLevel,
 } from "../security/tamper-evident-logging";
-import { SecureString } from "../security/secureString";
-import { SecureObject } from "../security/secureOb";
 import { middleware } from "../integrations/express.middleware";
 import { bufferDataConverter } from "../utils/dataConverter";
+import SecureString from "../security/secure-string";
+import SecureObject from "../security/secure-object";
 
 /**
  * Main class for the FortifyJS library

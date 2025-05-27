@@ -1,2 +1,1 @@
-import { FortifyJS } from "fortify2-js";
-
+// import { Fortify } from "fortify2-js";

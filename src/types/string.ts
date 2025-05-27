@@ -1,4 +1,4 @@
-import { SecureString } from "../security/secureString";
+import SecureString from "../security/secure-string";
 
 /**
  * Options for HMAC operations

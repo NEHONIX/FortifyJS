@@ -41,32 +41,13 @@ import { FortifyJS } from "./core/crypto";
 // Use the new modular SecureString
 import { SecureString } from "./security/secure-string";
 // Use the new modular SecureObject
-import { SecureObject } from "./security/secure-object";
+import { SecureObject, SecureObjectOptions } from "./security/secure-object";
 
 // Export modular SecureObject utilities
-export {
-    SecureObject,
-    createSecureObject,
-    createReadOnlySecureObject,
-    createSecureObjectWithSensitiveKeys,
-    cloneSecureObject,
-} from "./security/secure-object";
+import * as fObjectUtils from "./security/secure-object";
 
 // Export modular SecureString utilities
-export {
-    SecureString,
-    createSecureString,
-    createEnhancedSecureString,
-    createMaximumSecureString,
-    createSecureStringFromBuffer,
-    cloneSecureString,
-    constantTimeCompare,
-    calculateStringSimilarity,
-    validatePassword as validatePasswordString,
-    validateEmail as validateEmailString,
-    generateSalt,
-    hashString,
-} from "./security/secure-string";
+import * as fstringUtils from "./security/secure-string";
 
 // Type exports
 export type {
@@ -219,8 +200,11 @@ export function fString(str: string) {
  * @param initialData - The initial data to be stored in the secure object
  * @returns A new SecureObject instance
  */
-export function fObject<T extends Record<string, any>>(initialData?: T) {
-    return new SecureObject<T>(initialData);
+export function fObject<T extends Record<string, any>>(
+    initialData?: T,
+    options?: SecureObjectOptions
+) {
+    return new SecureObject<T>(initialData, options);
 }
 
 /**
@@ -373,6 +357,12 @@ if (typeof module !== "undefined" && module.exports) {
     module.exports.PasswordAlgorithm = PasswordAlgorithm;
     module.exports.PasswordSecurityLevel = PasswordSecurityLevel;
 
+    // Export new password utility functions
+    module.exports.encryptSecurePass = encryptSecurePass;
+    module.exports.verifyEncryptedPassword = verifyEncryptedPassword;
+
+    // ===================== safe (String and Object) ====================
+
     // Export String and Object functions
     module.exports.fString = fString;
     module.exports.fObject = fObject;
@@ -381,6 +371,18 @@ if (typeof module !== "undefined" && module.exports) {
     globalThis.Object.keys(SecurityExports).forEach((key: string) => {
         if (key !== "default") {
             module.exports[key] = (SecurityExports as any)[key];
+        }
+    });
+
+    // Export Security Features (using imported modules)
+    globalThis.Object.keys(fstringUtils).forEach((key: string) => {
+        if (key !== "default") {
+            module.exports[key] = (fstringUtils as any)[key];
+        }
+    });
+    globalThis.Object.keys(fObjectUtils).forEach((key: string) => {
+        if (key !== "default") {
+            module.exports[key] = (fObjectUtils as any)[key];
         }
     });
 
@@ -394,8 +396,4 @@ if (typeof module !== "undefined" && module.exports) {
     // Export SecureString and SecureObject classes
     module.exports.SecureString = SecureString;
     module.exports.SecureObject = SecureObject;
-
-    // Export new password utility functions
-    module.exports.encryptSecurePass = encryptSecurePass;
-    module.exports.verifyEncryptedPassword = verifyEncryptedPassword;
 }

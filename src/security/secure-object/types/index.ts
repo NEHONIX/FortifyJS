@@ -2,7 +2,7 @@
  * Type definitions for SecureObject modular architecture
  */
 
-import { SecureString } from "../../secureString";
+import SecureString from "../../secure-string";
 
 /**
  * Types that can be stored securely
@@ -40,7 +40,13 @@ export interface ValueMetadata {
 /**
  * Event types for SecureObject
  */
-export type SecureObjectEvent = "set" | "get" | "delete" | "clear" | "destroy";
+export type SecureObjectEvent =
+    | "set"
+    | "get"
+    | "delete"
+    | "clear"
+    | "destroy"
+    | "filtered";
 
 /**
  * Event listener callback
@@ -49,7 +55,7 @@ export type EventListener = (
     event: SecureObjectEvent,
     key?: string,
     value?: any
-) => void;
+) => void | Promise<void>;
 
 /**
  * Configuration options for SecureObject
@@ -68,3 +74,4 @@ export interface SecureObjectData<T> {
     secureBuffers: Map<string, any>; // SecureBuffer type
     metadata: Map<string, ValueMetadata>;
 }
+
