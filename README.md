@@ -1,13 +1,6 @@
-# FortifyJS - Advanced JavaScript Security Library
+# Nehonix FortifyJS - Advanced JavaScript Security Library
 
-[![npm version](https://badge.fury.io/js/fortify2-js.svg)](https://badge.fury.io/js/fortify2-js)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
-[![Security](https://img.shields.io/badge/Security-Advanced-red.svg)](https://github.com/nehonix/fortifyjs)
-[![Downloads](https://img.shields.io/npm/dm/fortify2-js.svg)](https://www.npmjs.com/package/fortify2-js)
-[![GitHub Stars](https://img.shields.io/github/stars/nehonix/FortifyJS.svg)](https://github.com/nehonix/FortifyJS)
-
-FortifyJS is a robust JavaScript security library designed to enhance object manipulation with advanced cryptographic features, type safety, and zero dependencies. It provides a comprehensive set of tools for secure data handling, offering superior functionality compared to standard JavaScript objects and libraries like Lodash.
+FortifyJS is a robust JavaScript security library designed to enhance object manipulation with advanced cryptographic features, type safety. It provides a comprehensive set of tools for secure data handling, offering superior functionality compared to standard JavaScript objects and libraries like Lodash.
 
 ## Why Choose FortifyJS?
 
@@ -16,30 +9,27 @@ FortifyJS empowers developers to create secure, type-safe, and chainable JavaScr
 - **Enhanced Object Methods**: 19 powerful methods for data manipulation, surpassing standard JavaScript objects.
 - **Advanced Security**: Implements military-grade cryptography with quantum-resistant algorithms.
 - **Type Safety**: Full TypeScript support for robust, error-free development.
-- **Zero Dependencies**: Lightweight core with optional security enhancements.
-- **Modular Architecture**: Optimized for performance, scalability, and maintainability.
 
 ### Comparison with Standard Objects
 
-| Feature           | Standard Object    | FortifyJS SecureObject      |
-|-------------------|--------------------|-----------------------------|
-| Methods           | None               | 19 Enhanced Methods         |
-| Type Safety       | Basic              | Full TypeScript Support     |
-| Security          | None               | Advanced Cryptography       |
-| Chaining          | Not Supported      | Fully Chainable API         |
-| Events            | Not Supported      | Event-Driven Operations     |
-| Memory Safety     | Manual             | Automatic Cleanup           |
+| Feature       | Standard Object | FortifyJS SecureObject  |
+| ------------- | --------------- | ----------------------- |
+| Methods       | None            | 19 Enhanced Methods     |
+| Type Safety   | Basic           | Full TypeScript Support |
+| Security      | None            | Advanced Cryptography   |
+| Chaining      | Not Supported   | Fully Chainable API     |
+| Events        | Not Supported   | Event-Driven Operations |
+| Memory Safety | Manual          | Automatic Cleanup       |
 
 ### Comparison with Lodash
 
-| Feature               | Lodash           | FortifyJS                     |
-|-----------------------|------------------|-------------------------------|
-| Security              | None             | Built-In Cryptography         |
-| Type Safety           | Partial          | Full TypeScript Support       |
-| Memory Management     | Manual           | Automatic                    |
-| Sensitive Data        | Not Supported    | Security-Aware Filtering     |
-| Events                | Not Supported    | Operation Tracking           |
-| Bundle Size           | Larger           | Zero Dependencies for Core   |
+| Feature           | Lodash        | FortifyJS                |
+| ----------------- | ------------- | ------------------------ |
+| Security          | None          | Built-In Cryptography    |
+| Type Safety       | Partial       | Full TypeScript Support  |
+| Memory Management | Manual        | Automatic                |
+| Sensitive Data    | Not Supported | Security-Aware Filtering |
+| Events            | Not Supported | Operation Tracking       |
 
 ## Modular Architecture
 
@@ -133,14 +123,17 @@ npm install @noble/hashes @noble/ciphers libsodium-wrappers argon2 bcryptjs
 ```typescript
 import { PasswordManager } from "fortify2-js";
 
+// or import pm directly
+// import { pm } from "fortify2-js"; //NOTE: pm uses default configuration, for custom config, use PasswordManager.create() or PasswordManager.getInstance()
+
 const pm = PasswordManager.getInstance();
 
 // Generate a secure password
 const password = pm.generateSecurePassword(16, {
-    includeUppercase: true,
-    includeLowercase: true,
-    includeNumbers: true,
-    includeSymbols: true,
+  includeUppercase: true,
+  includeLowercase: true,
+  includeNumbers: true,
+  includeSymbols: true,
 });
 console.log("Generated password:", password);
 
@@ -151,8 +144,8 @@ console.log("Entropy:", analysis.entropy);
 
 // Hash password with Argon2ID
 const hash = await pm.hash("MyPassword123!", {
-    algorithm: "argon2id",
-    securityLevel: "high",
+  algorithm: "argon2id",
+  securityLevel: "high",
 });
 console.log("Secure hash:", hash);
 
@@ -166,6 +159,7 @@ console.log("Security level:", verification.securityLevel);
 
 ```typescript
 import { SecureRandom } from "fortify2-js";
+// or use: import { Random } from "fortify2-js";
 
 const randomBytes = SecureRandom.getRandomBytes(32);
 
@@ -183,12 +177,12 @@ console.log("Entropy Info:", randomBytes.getEntropyInfo());
 
 ```typescript
 import {
-    calculateRSAKeySize,
-    generateRSAKeyPairForData,
-    validateDataSizeForRSAKey,
-    getRSARecommendations,
-    assessRSASecurity,
-} from "fortify2-js/generators/rsaKeyCalculator";
+  calculateRSAKeySize,
+  generateRSAKeyPairForData,
+  validateDataSizeForRSAKey,
+  getRSARecommendations,
+  assessRSASecurity,
+} from "fortify2-js";
 
 const dataSize = 190; // bytes
 const keySize = calculateRSAKeySize(dataSize, "sha256");
@@ -204,7 +198,7 @@ console.log("Recommendation:", validation.recommendation);
 
 const recommendations = getRSARecommendations(dataSize);
 recommendations.forEach((rec) => {
-    console.log(`${rec.keySize}-bit: ${rec.recommendation}`);
+  console.log(`${rec.keySize}-bit: ${rec.recommendation}`);
 });
 
 const security = assessRSASecurity(2048, "sha256", dataSize);
@@ -217,19 +211,19 @@ console.log("NIST Compliant:", security.compliance.nist);
 
 FortifyJS supports various encoding formats:
 
-| Encoding    | Use Case                | Example Output             |
-|-------------|-------------------------|----------------------------|
-| hex         | Debugging               | `a1b2c3d4e5f6...`         |
-| base64      | Data transmission       | `oWvD1OX2...`              |
-| base64url   | URL-safe tokens         | `oWvD1OX2...` (no padding) |
-| base58      | Cryptocurrency          | `2NEpo7TZR...`             |
-| binary      | Raw binary data         | Binary string              |
-| utf8        | Text representation     | UTF-8 string               |
+| Encoding  | Use Case            | Example Output             |
+| --------- | ------------------- | -------------------------- |
+| hex       | Debugging           | `a1b2c3d4e5f6...`          |
+| base64    | Data transmission   | `oWvD1OX2...`              |
+| base64url | URL-safe tokens     | `oWvD1OX2...` (no padding) |
+| base58    | Cryptocurrency      | `2NEpo7TZR...`             |
+| binary    | Raw binary data     | Binary string              |
+| utf8      | Text representation | UTF-8 string               |
 
 ## RSA Key Size Recommendations
 
 | Data Size   | Recommended Key Size | Security Level | Use Case              |
-|-------------|----------------------|----------------|-----------------------|
+| ----------- | -------------------- | -------------- | --------------------- |
 | ≤ 190 bytes | 2048 bits            | Standard       | API keys, tokens      |
 | ≤ 318 bytes | 3072 bits            | High           | Certificates, keys    |
 | ≤ 446 bytes | 4096 bits            | Maximum        | High-security apps    |
@@ -255,41 +249,41 @@ FortifyJS supports various encoding formats:
 
 ### Random Generation Performance
 
-| Operation                     | Rate (ops/sec) | Performance Grade |
-|-------------------------------|----------------|-------------------|
-| Random Float Generation       | 2,029,015      | Excellent         |
-| Random Integer Generation     | 1,645,765      | Excellent         |
-| Secure UUID Generation        | 85,259         | Excellent         |
-| Random Bytes (32B)            | 69,485         | Excellent         |
-| Salt Generation (64B)         | 72,654         | Excellent         |
+| Operation                 | Rate (ops/sec) | Performance Grade |
+| ------------------------- | -------------- | ----------------- |
+| Random Float Generation   | 2,029,015      | Excellent         |
+| Random Integer Generation | 1,645,765      | Excellent         |
+| Secure UUID Generation    | 85,259         | Excellent         |
+| Random Bytes (32B)        | 69,485         | Excellent         |
+| Salt Generation (64B)     | 72,654         | Excellent         |
 
 ### Hash Operations Performance
 
-| Operation             | Rate (ops/sec) | Security Level |
-|-----------------------|----------------|----------------|
-| SHA-256 Hashing       | 16             | Military-Grade |
-| SHA-512 Hashing       | 14             | Military-Grade |
-| BLAKE3 Hashing        | 3              | Maximum        |
-| Hash Verification     | 16             | Military-Grade |
+| Operation         | Rate (ops/sec) | Security Level |
+| ----------------- | -------------- | -------------- |
+| SHA-256 Hashing   | 16             | Military-Grade |
+| SHA-512 Hashing   | 14             | Military-Grade |
+| BLAKE3 Hashing    | 3              | Maximum        |
+| Hash Verification | 16             | Military-Grade |
 
 ### Password Algorithm Performance
 
-| Algorithm    | Hash Time | Verify Time | Security Level | Status            |
-|--------------|-----------|-------------|----------------|-------------------|
-| Argon2ID     | 931ms     | 995ms       | High           | Production Ready  |
-| Argon2I      | 674ms     | 681ms       | High           | Production Ready  |
-| Argon2D      | 737ms     | 740ms       | High           | Production Ready  |
-| Scrypt       | TBD       | TBD         | Standard       | In Development    |
-| PBKDF2       | TBD       | TBD         | Standard       | In Development    |
-| Military     | TBD       | TBD         | Maximum        | In Development    |
+| Algorithm | Hash Time | Verify Time | Security Level | Status           |
+| --------- | --------- | ----------- | -------------- | ---------------- |
+| Argon2ID  | 931ms     | 995ms       | High           | Production Ready |
+| Argon2I   | 674ms     | 681ms       | High           | Production Ready |
+| Argon2D   | 737ms     | 740ms       | High           | Production Ready |
+| Scrypt    | TBD       | TBD         | Standard       | In Development   |
+| PBKDF2    | TBD       | TBD         | Standard       | In Development   |
+| Military  | TBD       | TBD         | Maximum        | In Development   |
 
 ### Large Data Processing
 
-| Data Size     | Rate (ops/sec) | Use Case            |
-|---------------|----------------|---------------------|
-| 1KB Data      | 15             | Small files, tokens |
-| 10KB Data     | 17             | Documents, configs  |
-| 100KB Data    | 17             | Large files, images |
+| Data Size  | Rate (ops/sec) | Use Case            |
+| ---------- | -------------- | ------------------- |
+| 1KB Data   | 15             | Small files, tokens |
+| 10KB Data  | 17             | Documents, configs  |
+| 100KB Data | 17             | Large files, images |
 
 ## Security Compliance
 
@@ -306,12 +300,15 @@ FortifyJS adheres to industry standards:
 ### Hybrid Encryption Strategy
 
 ```typescript
-import { getEncryptionSuggestion } from "fortify2-js/generators/rsaKeyCalculator";
+import { getEncryptionSuggestion } from "fortify2-js";
 
 const suggestion = getEncryptionSuggestion(1024);
 if (suggestion.approach === "hybrid") {
-    console.log(suggestion.reason);
-    console.log("Performance Gain:", suggestion.details?.estimatedPerformanceGain);
+  console.log(suggestion.reason);
+  console.log(
+    "Performance Gain:",
+    suggestion.details?.estimatedPerformanceGain
+  );
 }
 ```
 
@@ -322,38 +319,15 @@ import { FortifyJS } from "fortify2-js";
 
 const securityStatus = FortifyJS.verifyRuntimeSecurity();
 if (!securityStatus.isSecure) {
-    console.warn("Security threats detected:", securityStatus.threats);
+  console.warn("Security threats detected:", securityStatus.threats);
 }
 ```
-
-## Future Roadmap
-
-### Upcoming Enhancements
-
-- **Post-Quantum Cryptography**: Implementation of CRYSTALS-Kyber and CRYSTALS-Dilithium
-- **Performance Optimizations**: WebAssembly integration and hardware acceleration
-- **Extended API**: Advanced token generation and cryptographic protocol support
-- **Documentation**: Enhanced guides with real-world examples
-
-### Development Priorities
-
-1. Security: Post-quantum cryptography implementation
-2. Performance: WebAssembly and hardware acceleration
-3. Developer Experience: Comprehensive documentation
-4. Ecosystem: Framework integrations
-
-### Release Timeline
-
-- Q1 2024: Post-quantum cryptography modules
-- Q2 2024: Performance optimizations
-- Q3 2024: Extended API surface
-- Q4 2024: Enhanced documentation
 
 ## API Documentation
 
 ### SecureRandom Methods
 
-- `getRandomBytes(length, options?)`: Generates secure random bytes
+- `getRandomBytes(length, options?)`: Generates secure random bytes (same as SecureRandom or Random .getRandomBytes method)
 - `generateSecureToken(length, options?)`: Creates secure tokens
 - `generateSecureUUID(options?)`: Produces secure UUIDs
 - `createEnhancedUint8Array(bytes)`: Creates enhanced byte arrays
@@ -386,7 +360,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 - GitHub: [https://github.com/nehonix/fortifyjs](https://github.com/nehonix/fortifyjs)
 - NPM: [https://www.npmjs.com/package/fortify2-js](https://www.npmjs.com/package/fortify2-js)
-- Documentation: [https://lab.nehonix.space](https://lab.nehonix.space)
+- Documentation: [https://lab.nehonix.space](https://lab.nehonix.space/nehonix_viewer/_doc/Nehonix%20FortifyJs/readme.md)
 - Security: [SECURITY.md](SECURITY.md)
 
 ---

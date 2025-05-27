@@ -33,7 +33,7 @@ import {
     base58ToBuffer,
     stringToBuffer,
     bufferToString,
-} from "fortify2-js/utils/encoding";
+} from "fortify2-js";
 
 const data = stringToBuffer("Hello, World!");
 const hex = bufferToHex(data);
@@ -240,8 +240,7 @@ try {
 ## Integration with FortifyJS
 
 ```typescript
-import { SecureRandom, Hash } from "fortify2-js";
-import { bufferToHex, bufferToBase58 } from "fortify2-js/utils/encoding";
+import { SecureRandom, Hash , bufferToHex, bufferToBase58} from "fortify2-js";
 
 const randomBytes = SecureRandom.getRandomBytes(32);
 const hexKey = bufferToHex(randomBytes);

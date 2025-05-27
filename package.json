@@ -168,7 +168,7 @@
         "crystals-kyber": "^5.1.0",
         "elliptic": "^6.6.1",
         "entropy-string": "^4.2.0",
-        "fortify2-js": "3.0.1",
+        "fortify2-js": "^3.1.0",
         "kyber-crystals": "^1.0.7",
         "libsodium-wrappers": "^0.7.15",
         "nehoid": "^2.0.0",
