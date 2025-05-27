@@ -158,7 +158,7 @@ export const pm = PasswordManager.getInstance();
  * @param str - The string to be converted to a secure string
  * @returns A new SecureString instance
  */
-export function String(str: string) {
+export function fString(str: string) {
     const secureString = new SecureString(str);
     return secureString;
 }
@@ -169,7 +169,7 @@ export function String(str: string) {
  * @param initialData - The initial data to be stored in the secure object
  * @returns A new SecureObject instance
  */
-export function Object<T extends Record<string, any>>(initialData?: T) {
+export function fObject<T extends Record<string, any>>(initialData?: T) {
     return new SecureObject<T>(initialData);
 }
 
@@ -325,8 +325,8 @@ if (typeof module !== "undefined" && module.exports) {
     module.exports.PasswordSecurityLevel = PasswordSecurityLevel;
 
     // Export String and Object functions
-    module.exports.String = String;
-    module.exports.Object = Object;
+    module.exports.fString = fString;
+    module.exports.fObject = fObject;
 
     // Export Security Features (using imported modules)
     globalThis.Object.keys(SecurityExports).forEach((key: string) => {
