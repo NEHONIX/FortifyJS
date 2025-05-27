@@ -113,8 +113,11 @@ export class SecureObject<T extends Record<string, SecureValue>> {
      * Creates a read-only SecureObject (public usage)
      */
 
-    public set setReadOnly(value: boolean) {
-        this._isReadOnly = value;
+    /** Permanently enable read-only mode (cannot be disabled). */
+    public enableReadOnly(): this {
+        this.ensureNotDestroyed();
+        this._isReadOnly = true;
+        return this;
     }
 
     // ===== PROPERTY ACCESSORS =====

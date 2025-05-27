@@ -6,6 +6,8 @@
 /**
  * Performance metrics for operations
  */
+import { performance as nodePerformance } from "perf_hooks";
+
 export interface PerformanceMetrics {
     operationType: string;
     startTime: number;
@@ -186,8 +188,12 @@ export class PerformanceMonitor {
 
         for (let i = 0; i < iterations; i++) {
             const memoryBefore = this.getMemoryUsage();
-            const startTime = performance.now();
 
+            const perf =
+                typeof performance !== "undefined"
+                    ? performance
+                    : nodePerformance;
+            const startTime = perf.now();
             await operation();
 
             const endTime = performance.now();
@@ -404,8 +410,10 @@ export class PerformanceMonitor {
      */
     private static getMemoryUsage(): number {
         if (typeof performance !== "undefined" && "memory" in performance) {
-            const memory = (performance as any).memory;
-            return memory?.usedJSHeapSize || 0;
+            return (performance as any).memory?.usedJSHeapSize ?? 0;
+        }
+        if (typeof process !== "undefined" && process.memoryUsage) {
+            return process.memoryUsage().heapUsed;
         }
         return 0;
     }
