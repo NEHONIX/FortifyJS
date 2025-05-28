@@ -2,7 +2,7 @@
 
 All notable changes to @fortifyjs/react will be documented in this file.
 
-## [1.0.0] - 2025-05
+## [1.0.0] - 2025/05/28
 
 ### Added
 - 🚀 Initial release of @fortifyjs/react

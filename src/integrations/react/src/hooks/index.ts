@@ -15,7 +15,6 @@ export {
 
 // Re-export types for convenience
 export type {
-    UseSecureStateOptions,
     UseSecureStateReturn,
     UseSecureObjectOptions,
     UseSecureObjectReturn,

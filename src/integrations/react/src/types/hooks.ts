@@ -4,7 +4,6 @@
  */
 
 import { SecureObject } from "fortify2-js";
-import { SecureString } from "../../../../security/secure-string";
 
 /**
  * Configuration options for useSecureState hook

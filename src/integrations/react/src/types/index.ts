@@ -32,6 +32,4 @@ export type {
 } from "./components";
 
 // Re-export core types that are commonly used in React context
-export type { SecureObject } from "fortify2-js";
-export type { SecureString } from "../../../../security/secure-string";
-
+export type { SecureObject} from "fortify2-js";

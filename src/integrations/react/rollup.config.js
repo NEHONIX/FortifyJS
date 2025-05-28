@@ -17,52 +17,44 @@ export default [
             format: "es",
             sourcemap: true,
             exports: "named",
-            inlineDynamicImports: true, // Inline dynamic imports to avoid chunking
         },
         plugins: [
-            resolve(),
-            commonjs(),
             typescript({
                 tsconfig: "./tsconfig.json",
-                exclude: [
-                    "**/private/**/*",
-                    "**/node_modules/**/*",
-                    "**/react/**/*",
-                    "**/*.test.ts",
-                    "**/*.spec.ts",
-                ],
+                declaration: false,
+                declarationMap: false,
             }),
+            resolve({
+                preferBuiltins: false,
+                browser: true,
+            }),
+            commonjs(),
         ],
         external: [
             ...Object.keys(pkg.dependencies || {}),
             ...Object.keys(pkg.peerDependencies || {}),
         ],
     },
-    // CommonJS build - Fixed configuration
+    // CommonJS build
     {
         input: "src/index.ts",
         output: {
             file: "dist/index.cjs",
             format: "cjs",
             sourcemap: true,
-            exports: "auto", // Changed from "named" to "auto"
-            esModule: false, // Added to ensure proper CJS behavior
-            inlineDynamicImports: true, // Inline dynamic imports to avoid chunking
+            exports: "auto",
         },
         plugins: [
-            resolve(),
-            commonjs(),
             typescript({
                 tsconfig: "./tsconfig.json",
-                declaration: false, // Prevent duplicate declarations
-                exclude: [
-                    "**/private/**/*",
-                    "**/node_modules/**/*",
-                    "**/react/**/*",
-                    "**/*.test.ts",
-                    "**/*.spec.ts",
-                ],
+                declaration: false,
+                declarationMap: false,
             }),
+            resolve({
+                preferBuiltins: false,
+                browser: true,
+            }),
+            commonjs(),
         ],
         external: [
             ...Object.keys(pkg.dependencies || {}),
@@ -87,6 +79,6 @@ export default [
                 ],
             }),
         ],
-        external: ["nehonix-uri-processor"],
+        external: ["fortify2-js"],
     },
 ];

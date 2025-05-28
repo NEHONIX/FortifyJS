@@ -64,7 +64,6 @@ export type {
 
     // Core types
     SecureObject,
-    SecureString,
 } from "./types";
 
 // For CommonJS compatibility
@@ -84,3 +83,4 @@ if (typeof module !== "undefined" && module.exports) {
     module.exports.useComponentMetrics = useComponentMetrics;
     module.exports.DEFAULT_SECURITY_CONFIG = DEFAULT_SECURITY_CONFIG;
 }
+ 
