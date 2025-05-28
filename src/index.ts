@@ -310,6 +310,9 @@ export async function verifyEncryptedPassword(
 
 // Export modular SecureObject utilities
 export * from "./security/secure-object";
+export { SecureString } from "./security/secure-string";
+
+// Export modular SecureString utilities
 
 // For CommonJS compatibility
 if (typeof module !== "undefined" && module.exports) {

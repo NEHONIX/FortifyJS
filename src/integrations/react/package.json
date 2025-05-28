@@ -1,6 +1,6 @@
 {
     "name": "fortifyjs-react",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "React integration for Nehonix FortifyJS - Secure state management with enhanced object operations",
     "main": "./dist/index.cjs",
     "module": "./dist/index.esm.js",

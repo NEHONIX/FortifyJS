@@ -49,7 +49,7 @@ The modular architecture separates concerns into focused modules:
 
 -   **String Validator**: Provides validation for passwords, emails, URLs, and other formats
 
-## support@nehonix.spaceUsage
+## Usage
 
 ### Basic Usage
 
