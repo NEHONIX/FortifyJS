@@ -1,5 +1,5 @@
 {
-    "name": "@fortifyjs/react",
+    "name": "fortifyjs-react",
     "version": "1.0.0",
     "description": "React integration for Nehonix FortifyJS - Secure state management with enhanced object operations",
     "main": "./dist/index.cjs",
@@ -94,3 +94,5 @@
         "access": "public"
     }
 }
+
+
