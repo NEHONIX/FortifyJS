@@ -8,16 +8,6 @@ const pkg = JSON.parse(
     readFileSync(new URL("./package.json", import.meta.url), "utf8")
 );
 
-const external = [
-    "react",
-    "react-dom",
-    "fortify2-js",
-    // Treat relative imports to main package as external
-    /^\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/security/,
-    /^\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/types/,
-    /^\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/utils/,
-];
-
 export default [
     // ESM build
     {
@@ -32,7 +22,16 @@ export default [
         plugins: [
             resolve(),
             commonjs(),
-            typescript({ tsconfig: "./tsconfig.json" }),
+            typescript({
+                tsconfig: "./tsconfig.json",
+                exclude: [
+                    "**/private/**/*",
+                    "**/node_modules/**/*",
+                    "**/react/**/*",
+                    "**/*.test.ts",
+                    "**/*.spec.ts",
+                ],
+            }),
         ],
         external: [
             ...Object.keys(pkg.dependencies || {}),
@@ -56,6 +55,13 @@ export default [
             typescript({
                 tsconfig: "./tsconfig.json",
                 declaration: false, // Prevent duplicate declarations
+                exclude: [
+                    "**/private/**/*",
+                    "**/node_modules/**/*",
+                    "**/react/**/*",
+                    "**/*.test.ts",
+                    "**/*.spec.ts",
+                ],
             }),
         ],
         external: [
@@ -70,8 +76,17 @@ export default [
             file: "dist/index.d.ts",
             format: "es",
         },
-        plugins: [dts()],
-        external: external,
+        plugins: [
+            dts({
+                exclude: [
+                    "**/private/**/*",
+                    "**/react/**/*",
+                    "**/node_modules/**/*",
+                    "**/*.test.ts",
+                    "**/*.spec.ts",
+                ],
+            }),
+        ],
+        external: ["nehonix-uri-processor"],
     },
 ];
-
