@@ -1,114 +1,77 @@
-/**
- * Rollup Configuration for @fortifyjs/react
- * Builds the React integration package
- */
-
+import typescript from "@rollup/plugin-typescript";
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
-import typescript from "@rollup/plugin-typescript";
-import terser from "@rollup/plugin-terser";
 import dts from "rollup-plugin-dts";
+import { readFileSync } from "fs";
 
-const isProduction = process.env.NODE_ENV === "production";
+const pkg = JSON.parse(
+    readFileSync(new URL("./package.json", import.meta.url), "utf8")
+);
 
-// External dependencies that should not be bundled
 const external = [
     "react",
     "react-dom",
     "fortify2-js",
-    // Also treat relative imports to main package as external
+    // Treat relative imports to main package as external
     /^\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/security/,
     /^\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/types/,
     /^\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/utils/,
 ];
 
-// Base configuration
-const baseConfig = {
-    input: "src/index.ts",
-    external,
-    plugins: [
-        resolve({
-            browser: true,
-            preferBuiltins: false,
-        }),
-        commonjs(),
-        typescript({
-            tsconfig: "./tsconfig.json",
-            declaration: false, // We'll generate declarations separately
-            declarationMap: false,
-        }),
-    ],
-};
-
-// ESM build
-const esmConfig = {
-    ...baseConfig,
-    output: {
-        file: "dist/index.esm.js",
-        format: "es",
-        sourcemap: true,
+export default [
+    // ESM build
+    {
+        input: "src/index.ts",
+        output: {
+            file: "dist/index.esm.js",
+            format: "es",
+            sourcemap: true,
+            exports: "named",
+            inlineDynamicImports: true, // Inline dynamic imports to avoid chunking
+        },
+        plugins: [
+            resolve(),
+            commonjs(),
+            typescript({ tsconfig: "./tsconfig.json" }),
+        ],
+        external: [
+            ...Object.keys(pkg.dependencies || {}),
+            ...Object.keys(pkg.peerDependencies || {}),
+        ],
     },
-    plugins: [
-        ...baseConfig.plugins,
-        isProduction &&
-            terser({
-                compress: {
-                    drop_console: true,
-                    drop_debugger: true,
-                },
-                mangle: {
-                    reserved: [
-                        "useSecureState",
-                        "useSecureObject",
-                        "SecureProvider",
-                    ],
-                },
+    // CommonJS build - Fixed configuration
+    {
+        input: "src/index.ts",
+        output: {
+            file: "dist/index.cjs",
+            format: "cjs",
+            sourcemap: true,
+            exports: "auto", // Changed from "named" to "auto"
+            esModule: false, // Added to ensure proper CJS behavior
+            inlineDynamicImports: true, // Inline dynamic imports to avoid chunking
+        },
+        plugins: [
+            resolve(),
+            commonjs(),
+            typescript({
+                tsconfig: "./tsconfig.json",
+                declaration: false, // Prevent duplicate declarations
             }),
-    ].filter(Boolean),
-};
-
-// CommonJS build
-const cjsConfig = {
-    ...baseConfig,
-    output: {
-        file: "dist/index.cjs",
-        format: "cjs",
-        sourcemap: true,
-        exports: "named",
+        ],
+        external: [
+            ...Object.keys(pkg.dependencies || {}),
+            ...Object.keys(pkg.peerDependencies || {}),
+        ],
     },
-    plugins: [
-        ...baseConfig.plugins,
-        isProduction &&
-            terser({
-                compress: {
-                    drop_console: true,
-                    drop_debugger: true,
-                },
-                mangle: {
-                    reserved: [
-                        "useSecureState",
-                        "useSecureObject",
-                        "SecureProvider",
-                    ],
-                },
-            }),
-    ].filter(Boolean),
-};
-
-// TypeScript declarations
-const dtsConfig = {
-    input: "index.ts",
-    external,
-    output: {
-        file: "dist/index.d.ts",
-        format: "es",
+    // TypeScript declarations
+    {
+        input: "src/index.ts",
+        output: {
+            file: "dist/index.d.ts",
+            format: "es",
+        },
+        plugins: [dts()],
+        external: external,
     },
-    plugins: [
-        dts({
-            tsconfig: "./tsconfig.json",
-        }),
-    ],
-};
-
-export default [esmConfig, cjsConfig, dtsConfig];
+];
 

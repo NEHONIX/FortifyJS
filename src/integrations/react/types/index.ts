@@ -1,5 +1,5 @@
 /**
- * FortifyJS React Integration - Type Exports
+ * 🚀 FortifyJS React Integration - Type Exports
  * Centralized type exports for React integration
  */
 
@@ -32,6 +32,5 @@ export type {
 } from "./components";
 
 // Re-export core types that are commonly used in React context
-export type { SecureObject } from "fortify2-js";
-export type { SecureString } from "../../../../security/secure-string";
-
+export type { SecureObject } from "../../../security/secure-object";
+export type { SecureString } from "../../../security/secure-string";
