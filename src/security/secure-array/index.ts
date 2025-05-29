@@ -34,6 +34,12 @@
 
 // Import the main SecureArray class
 import { SecureArray } from "./core/secure-array-core";
+import {
+    DEFAULT_SECURE_ARRAY_OPTIONS,
+    SecureArrayOptions,
+    SecureArrayValue,
+} from "./types";
+import { ArrayValidationUtils } from "./utils/validation";
 
 // Export the main SecureArray class
 export { SecureArray } from "./core/secure-array-core";
@@ -75,20 +81,36 @@ export { ArrayIdGenerator } from "./utils/id-generator";
  */
 export { SecureArray as default } from "./core/secure-array-core";
 
+// Helper type to widen literal types to their base types
+type WidenLiterals<T> = T extends string
+    ? string
+    : T extends number
+    ? number
+    : T extends boolean
+    ? boolean
+    : T;
+
 /**
  * Creates a SecureArray with initial data
  */
-export function createSecureArray<T>(
-    initialData?: T[],
+export function createSecureArray<
+    T extends SecureArrayValue = SecureArrayValue
+>(
+    initialData?: WidenLiterals<T>[],
     options?: SecureArrayOptions
-): SecureArray<T> {
-    return new SecureArray<T>(initialData, options);
+): SecureArray<WidenLiterals<T>> {
+    return new SecureArray<WidenLiterals<T>>(
+        initialData as WidenLiterals<T>[],
+        options
+    );
 }
 
 /**
  * Creates a SecureArray with maximum security settings
  */
-export function createMaximumSecureArray<T>(
+export function createMaximumSecureArray<
+    T extends SecureArrayValue = SecureArrayValue
+>(
     initialData?: T[],
     customOptions?: Partial<SecureArrayOptions>
 ): SecureArray<T> {
@@ -111,10 +133,9 @@ export function createMaximumSecureArray<T>(
 /**
  * Creates a read-only SecureArray
  */
-export function createReadOnlySecureArray<T>(
-    initialData: T[],
-    options?: Partial<SecureArrayOptions>
-): SecureArray<T> {
+export function createReadOnlySecureArray<
+    T extends SecureArrayValue = SecureArrayValue
+>(initialData: T[], options?: Partial<SecureArrayOptions>): SecureArray<T> {
     const readOnlyOptions: SecureArrayOptions = {
         readOnly: true,
         enableMemoryTracking: true,
@@ -128,7 +149,9 @@ export function createReadOnlySecureArray<T>(
 /**
  * Creates a SecureArray from another array (deep copy)
  */
-export function cloneSecureArray<T>(source: SecureArray<T>): SecureArray<T> {
+export function cloneSecureArray<T extends SecureArrayValue = SecureArrayValue>(
+    source: SecureArray<T>
+): SecureArray<T> {
     const newArray = new SecureArray<T>();
     for (let i = 0; i < source.length; i++) {
         const value = source.get(i);
@@ -142,7 +165,7 @@ export function cloneSecureArray<T>(source: SecureArray<T>): SecureArray<T> {
 /**
  * Creates a SecureArray from a regular array
  */
-export function fromArray<T>(
+export function fromArray<T extends SecureArrayValue = SecureArrayValue>(
     array: T[],
     options?: SecureArrayOptions
 ): SecureArray<T> {
@@ -152,7 +175,9 @@ export function fromArray<T>(
 /**
  * Converts a SecureArray to a regular array
  */
-export function toArray<T>(secureArray: SecureArray<T>): T[] {
+export function toArray<T extends SecureArrayValue = SecureArrayValue>(
+    secureArray: SecureArray<T>
+): T[] {
     const result: T[] = [];
     for (let i = 0; i < secureArray.length; i++) {
         const value = secureArray.get(i);
@@ -166,9 +191,9 @@ export function toArray<T>(secureArray: SecureArray<T>): T[] {
 /**
  * Merges multiple SecureArrays into one
  */
-export function mergeSecureArrays<T>(
-    ...arrays: SecureArray<T>[]
-): SecureArray<T> {
+export function mergeSecureArrays<
+    T extends SecureArrayValue = SecureArrayValue
+>(...arrays: SecureArray<T>[]): SecureArray<T> {
     const result = new SecureArray<T>();
 
     for (const array of arrays) {
@@ -186,11 +211,9 @@ export function mergeSecureArrays<T>(
 /**
  * Creates a SecureArray with a specific size and fill value
  */
-export function createFilledSecureArray<T>(
-    size: number,
-    fillValue: T,
-    options?: SecureArrayOptions
-): SecureArray<T> {
+export function createFilledSecureArray<
+    T extends SecureArrayValue = SecureArrayValue
+>(size: number, fillValue: T, options?: SecureArrayOptions): SecureArray<T> {
     const array = new SecureArray<T>([], options);
     for (let i = 0; i < size; i++) {
         array.push(fillValue);

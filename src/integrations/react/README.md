@@ -56,7 +56,7 @@ src/integrations/react/
 Install the FortifyJS React integration package:
 
 ```bash
-npm install fortifyjs-react
+npm install fortify2-js-react
 ```
 
 Ensure the core FortifyJS library is installed, as it is a peer dependency:

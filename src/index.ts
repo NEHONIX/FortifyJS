@@ -253,9 +253,9 @@ export function fObject<T extends Record<string, any>>(
  * @param initialData - The initial data to be stored in the secure array
  * @returns A new SecureArray instance
  */
-export function fArray<T>(
-    ...args: Parameters<typeof fArrayUtils.createSecureArray<T>>
-) {
+export function fArray<
+    T extends fArrayUtils.SecureArrayValue = fArrayUtils.SecureArrayValue
+>(...args: Parameters<typeof fArrayUtils.createSecureArray<T>>) {
     return fArrayUtils.createSecureArray<T>(...args);
 }
 
@@ -343,8 +343,7 @@ export async function encryptSecurePass(
 export async function verifyEncryptedPassword(
     password: string,
     hashedPassword: string,
-    PEPPER: string,
-    options: PasswordHashOptions = {}
+    PEPPER: string
 ): Promise<boolean> {
     if (!PEPPER) {
         throw new Error(
@@ -356,7 +355,7 @@ export async function verifyEncryptedPassword(
     const peppered = Hash.createSecureHMAC("sha256", PEPPER, password);
 
     // Perform timing-safe verification
-    const result = await pm.verify(peppered, hashedPassword, options);
+    const result = await pm.verify(peppered, hashedPassword);
     return result.isValid;
 }
 

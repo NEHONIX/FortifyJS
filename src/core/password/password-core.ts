@@ -140,8 +140,7 @@ export class PasswordManager {
      */
     public async verify(
         password: string,
-        hash: string,
-        options: PasswordHashOptions = {}
+        hash: string
     ): Promise<PasswordVerificationResult> {
         const startTime = Date.now();
 

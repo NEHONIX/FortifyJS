@@ -1544,7 +1544,6 @@ export class SecureArray<T extends SecureArrayValue = SecureArrayValue>
         if (min === undefined) {
             return undefined;
         }
-       
 
         for (let i = 1; i < this.elements.length; i++) {
             const value = this.get(i);
@@ -1587,7 +1586,7 @@ export class SecureArray<T extends SecureArrayValue = SecureArrayValue>
                         max = value;
                     }
                 } else {
-                    if (value > max) {
+                    if (value > max!) {
                         max = value;
                     }
                 }

@@ -21,6 +21,7 @@ If you discover a security vulnerability, please report it responsibly:
 #### 📧 Email Report
 
 -   **Email**: support@nehonix.space
+-   **WhatSapp (community**: [https://s.nehonix.space/QBo0KpCl](https://s.nehonix.space/QBo0KpCl)
 -   **Subject**: [SECURITY] FortifyJS Vulnerability Report
 -   **Response Time**: Within 24 hours
 -   **Resolution Time**: 7-14 days for critical issues
