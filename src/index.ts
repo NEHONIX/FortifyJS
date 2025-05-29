@@ -280,7 +280,7 @@ export function fArray<
  * @param options - Security and performance options
  * @returns A fortified function with enhanced security features
  */
-export function Func<T extends any[], R>(
+export function func<T extends any[], R>(
     ...args: Parameters<typeof fFuncUtils.fFunc<T, R>>
 ) {
     return fFuncUtils.fFunc<T, R>(...args);
@@ -458,7 +458,7 @@ if (typeof module !== "undefined" && module.exports) {
     module.exports.fString = fString;
     module.exports.fObject = fObject;
     module.exports.fArray = fArray;
-    module.exports.Func = Func;
+    module.exports.func = func;
 
     // Export fortified function utilities (using imported modules)
     module.exports.createFortifiedFunction = fFuncUtils.createFortifiedFunction;
