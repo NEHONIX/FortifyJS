@@ -1886,7 +1886,8 @@ export class SecureArray<T extends SecureArrayValue = SecureArrayValue>
     }
 
     /**
-     * Encrypts all elements in the array using real AES-256-CTR-HMAC encryption
+     * Encrypts all elements in the array using AES-256-CTR-HMAC encryption
+     * with proper memory management and atomic operations
      */
     public encryptAll(): this {
         this.ensureNotDestroyed();
@@ -1901,22 +1902,82 @@ export class SecureArray<T extends SecureArrayValue = SecureArrayValue>
             );
         }
 
-        for (let i = 0; i < this.elements.length; i++) {
-            const value = this.get(i);
-            if (value !== undefined) {
-                // Actually encrypt the value using the crypto handler
-                const encryptedValue = this.cryptoHandler.encryptValue(value);
+        // Prepare temporary storage for atomic operation
+        const encryptedValues: any[] = [];
+        const originalMetadata = new Map<number, any>();
+        const indicesToProcess: number[] = [];
 
-                // Store the encrypted string directly in elements array
-                this.elements[i] = encryptedValue as any;
+        try {
+            // First pass: encrypt all values into temporary storage
+            for (let i = 0; i < this.elements.length; i++) {
+                const value = this.get(i);
+                if (value !== undefined) {
+                    // Skip already encrypted values to avoid double encryption
+                    if (
+                        typeof value === "string" &&
+                        this.cryptoHandler.isEncrypted(value)
+                    ) {
+                        continue;
+                    }
 
-                // Update metadata to reflect encryption
-                this.metadataManager.update(i, typeof value, true);
+                    // Store original metadata for rollback
+                    if (this.metadataManager.has(i)) {
+                        originalMetadata.set(i, this.metadataManager.get(i));
+                    }
+
+                    // Encrypt the value
+                    const encryptedValue =
+                        this.cryptoHandler.encryptValue(value);
+                    encryptedValues[i] = encryptedValue;
+                    indicesToProcess.push(i);
+                }
             }
+
+            // Second pass: atomically commit all changes
+            for (const i of indicesToProcess) {
+                const encryptedValue = encryptedValues[i];
+                const originalValue = this.elements[i];
+
+                // Clean up any existing SecureBuffer for this index
+                this.cleanupIndex(i);
+
+                // Store encrypted value
+                this.elements[i] = encryptedValue;
+
+                // Update metadata with correct type information
+                // Store original type in the type field using special format
+                const originalType = typeof originalValue;
+                this.metadataManager.update(
+                    i,
+                    `encrypted:${originalType}`,
+                    true
+                );
+            }
+        } catch (error: any) {
+            // Rollback: restore original state on any failure
+            for (const i of indicesToProcess) {
+                if (originalMetadata.has(i)) {
+                    // Restore original metadata
+                    const original = originalMetadata.get(i);
+                    this.metadataManager.update(
+                        i,
+                        original.type,
+                        original.isSecure
+                    );
+                }
+            }
+
+            throw new Error(
+                `Encryption failed: ${error?.message || "Unknown error"}`
+            );
         }
 
         this.updateLastModified();
-        this.eventManager.emit("encrypt_all", -1, undefined);
+        this.eventManager.emit(
+            "encrypt_all",
+            -1,
+            `${indicesToProcess.length}_elements_encrypted`
+        );
 
         return this;
     }

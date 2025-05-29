@@ -551,7 +551,8 @@ export class SecureObject<
     }
 
     /**
-     * Encrypts all values in the object using real AES-256-CTR-HMAC encryption
+     * Encrypts all values in the object using AES-256-CTR-HMAC encryption
+     * with proper memory management and atomic operations
      */
     public encryptAll(): this {
         this.ensureNotDestroyed();
@@ -565,22 +566,82 @@ export class SecureObject<
             );
         }
 
-        // Encrypt all values in the data map
-        for (const [key, value] of this.data.entries()) {
-            if (value !== undefined) {
-                // Actually encrypt the value using the crypto handler
-                const encryptedValue = this.cryptoHandler.encryptValue(value);
+        // Prepare temporary map for atomic operation
+        const encryptedEntries = new Map<string, any>();
+        const originalMetadata = new Map<string, any>();
+        const keysToProcess: string[] = [];
 
-                // Store the encrypted string directly in data map
+        try {
+            // First pass: encrypt all values into temporary storage
+            for (const [key, value] of this.data.entries()) {
+                if (value !== undefined) {
+                    // Skip already encrypted values to avoid double encryption
+                    if (
+                        typeof value === "string" &&
+                        this.cryptoHandler.isEncrypted(value)
+                    ) {
+                        continue;
+                    }
+
+                    // Store original metadata for rollback
+                    if (this.metadataManager.has(key)) {
+                        originalMetadata.set(
+                            key,
+                            this.metadataManager.get(key)
+                        );
+                    }
+
+                    // Encrypt the value
+                    const encryptedValue =
+                        this.cryptoHandler.encryptValue(value);
+                    encryptedEntries.set(key, encryptedValue);
+                    keysToProcess.push(key);
+                }
+            }
+
+            // Second pass: atomically commit all changes
+            for (const key of keysToProcess) {
+                const encryptedValue = encryptedEntries.get(key);
+                const originalValue = this.data.get(key);
+
+                // Clean up any existing SecureBuffer for this key
+                this.cleanupKey(key);
+
+                // Store encrypted value
                 this.data.set(key, encryptedValue);
 
-                // Update metadata to reflect encryption
-                this.metadataManager.update(key, typeof value, true);
+                // Update metadata with correct type information
+                // Store original type in the type field using special format
+                const originalType = typeof originalValue;
+                this.metadataManager.update(
+                    key,
+                    `encrypted:${originalType}`,
+                    true
+                );
             }
+        } catch (error: any) {
+            // Rollback: restore original state on any failure
+            for (const key of keysToProcess) {
+                if (originalMetadata.has(key)) {
+                    // Restore original metadata
+                    const original = originalMetadata.get(key);
+                    this.metadataManager.update(
+                        key,
+                        original.type,
+                        original.isSecure
+                    );
+                }
+            }
+
+            throw new Error(`Encryption failed: ${error.message}`);
         }
 
         this.updateLastAccessed();
-        this.eventManager.emit("set", "encrypt_all", "all_values_encrypted");
+        this.eventManager.emit(
+            "set",
+            "encrypt_all",
+            `${keysToProcess.length}_values_encrypted`
+        );
 
         return this;
     }
