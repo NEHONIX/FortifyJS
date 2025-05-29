@@ -351,14 +351,41 @@ export class PasswordUtils {
         key: Uint8Array,
         iv: Uint8Array
     ): string {
-        // Enhanced stream cipher encryption (real implementation)
-        // Uses cryptographically secure keystream generation
+        // Real AES-256-CTR-like encryption using FortifyJS Hash utilities
         const dataBytes = new TextEncoder().encode(data);
         const encrypted = new Uint8Array(dataBytes.length);
 
-        for (let i = 0; i < dataBytes.length; i++) {
-            encrypted[i] =
-                dataBytes[i] ^ key[i % key.length] ^ iv[i % iv.length];
+        // Generate keystream using secure hash functions
+        for (let i = 0; i < dataBytes.length; i += 32) {
+            // Create counter block
+            const counterBlock = new Uint8Array(16);
+            counterBlock.set(iv.slice(0, 12), 0);
+
+            // Add counter (big-endian)
+            const counter = Math.floor(i / 32);
+            const counterBytes = new Uint8Array(4);
+            new DataView(counterBytes.buffer).setUint32(0, counter, false);
+            counterBlock.set(counterBytes, 12);
+
+            // Generate keystream block using hash function
+            const combined = new Uint8Array(key.length + counterBlock.length);
+            combined.set(key, 0);
+            combined.set(counterBlock, key.length);
+
+            // Use FortifyJS Hash for secure keystream generation
+            const { Hash } = require("../hash");
+            const keystreamBlock = new Uint8Array(
+                Hash.secureHash(combined, {
+                    algorithm: "sha256",
+                    outputFormat: "buffer",
+                }) as Buffer
+            );
+
+            // XOR data with keystream
+            const blockSize = Math.min(32, dataBytes.length - i);
+            for (let j = 0; j < blockSize; j++) {
+                encrypted[i + j] = dataBytes[i + j] ^ keystreamBlock[j];
+            }
         }
 
         return bufferToHex(encrypted);
@@ -369,13 +396,41 @@ export class PasswordUtils {
         key: Uint8Array,
         iv: Uint8Array
     ): string {
-        // Enhanced stream cipher decryption (real implementation)
+        // Real AES-256-CTR-like decryption using FortifyJS Hash utilities
         const encrypted = hexToBuffer(encryptedHex);
         const decrypted = new Uint8Array(encrypted.length);
 
-        for (let i = 0; i < encrypted.length; i++) {
-            decrypted[i] =
-                encrypted[i] ^ key[i % key.length] ^ iv[i % iv.length];
+        // Generate the same keystream for decryption
+        for (let i = 0; i < encrypted.length; i += 32) {
+            // Create counter block
+            const counterBlock = new Uint8Array(16);
+            counterBlock.set(iv.slice(0, 12), 0);
+
+            // Add counter (big-endian)
+            const counter = Math.floor(i / 32);
+            const counterBytes = new Uint8Array(4);
+            new DataView(counterBytes.buffer).setUint32(0, counter, false);
+            counterBlock.set(counterBytes, 12);
+
+            // Generate keystream block using hash function
+            const combined = new Uint8Array(key.length + counterBlock.length);
+            combined.set(key, 0);
+            combined.set(counterBlock, key.length);
+
+            // Use FortifyJS Hash for secure keystream generation
+            const { Hash } = require("../hash");
+            const keystreamBlock = new Uint8Array(
+                Hash.secureHash(combined, {
+                    algorithm: "sha256",
+                    outputFormat: "buffer",
+                }) as Buffer
+            );
+
+            // XOR encrypted data with keystream to decrypt
+            const blockSize = Math.min(32, encrypted.length - i);
+            for (let j = 0; j < blockSize; j++) {
+                decrypted[i + j] = encrypted[i + j] ^ keystreamBlock[j];
+            }
         }
 
         return new TextDecoder().decode(decrypted);
@@ -438,4 +493,3 @@ export class PasswordUtils {
         return new Uint8Array(derivedKey);
     }
 }
-

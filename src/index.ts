@@ -1,8 +1,31 @@
-/* ---------------------------------------------------------------------------------------------
- *  Copyright (c) NEHONIX INC. All rights reserved.
- *  Licensed under the MIT License. See LICENSE in the project root for license information.
- * -------------------------------------------------------------------------------------------
- */
+/***************************************************************************
+ * FortifyJS - Secure Array Types
+ *
+ * This file contains type definitions for the SecureArray modular architecture
+ *
+ * @author Nehonix
+ * @license MIT
+ *
+ * Copyright (c) 2024 Nehonix. All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ***************************************************************************** */
 
 /**
  * FortifyJS Main Module
@@ -42,12 +65,17 @@ import { FortifyJS } from "./core/crypto";
 import { SecureString } from "./security/secure-string";
 // Use the new modular SecureObject
 import { SecureObject, SecureObjectOptions } from "./security/secure-object";
+// Use the new modular SecureArray
+import { SecureArray, SecureArrayOptions } from "./security/secure-array";
 
 // Export modular SecureObject utilities
 import * as fObjectUtils from "./security/secure-object";
 
 // Export modular SecureString utilities
 import * as fstringUtils from "./security/secure-string";
+
+// Export modular SecureArray utilities
+import * as fArrayUtils from "./security/secure-array";
 
 // Type exports
 export type {
@@ -84,6 +112,18 @@ export type {
     StringStatistics,
     MemoryUsage,
 } from "./security/secure-string";
+
+// Modular SecureArray types
+export type {
+    SecureArrayValue,
+    SecureArraySerializationOptions,
+    ElementMetadata,
+    SecureArrayEvent,
+    SecureArrayEventListener,
+    SecureArrayOptions,
+    SecureArrayStats,
+    FlexibleSecureArray,
+} from "./security/secure-array";
 
 // Password Management Types
 export type {
@@ -189,9 +229,10 @@ export const pm = PasswordManager.getInstance();
  * @param str - The string to be converted to a secure string
  * @returns A new SecureString instance
  */
-export function fString(str: string) {
-    const secureString = new SecureString(str);
-    return secureString;
+export function fString(
+    ...args: Parameters<typeof fstringUtils.createSecureString>
+) {
+    return fstringUtils.createSecureString(...args);
 }
 
 /**
@@ -201,10 +242,21 @@ export function fString(str: string) {
  * @returns A new SecureObject instance
  */
 export function fObject<T extends Record<string, any>>(
-    initialData?: T,
-    options?: SecureObjectOptions
+    ...args: Parameters<typeof fObjectUtils.createSecureObject<T>>
 ) {
-    return new SecureObject<T>(initialData, options);
+    return fObjectUtils.createSecureObject<T>(...args);
+}
+
+/**
+ * @author Nehonix
+ * @description Creates a secure array that can store sensitive data with enhanced security features
+ * @param initialData - The initial data to be stored in the secure array
+ * @returns A new SecureArray instance
+ */
+export function fArray<T>(
+    ...args: Parameters<typeof fArrayUtils.createSecureArray<T>>
+) {
+    return fArrayUtils.createSecureArray<T>(...args);
 }
 
 /**
@@ -311,6 +363,7 @@ export async function verifyEncryptedPassword(
 // Export modular SecureObject utilities
 export * from "./security/secure-object";
 export { SecureString } from "./security/secure-string";
+export { SecureArray } from "./security/secure-array";
 
 // Export modular SecureString utilities
 
@@ -369,9 +422,10 @@ if (typeof module !== "undefined" && module.exports) {
 
     // ===================== safe (String and Object) ====================
 
-    // Export String and Object functions
+    // Export String, Object, and Array functions
     module.exports.fString = fString;
     module.exports.fObject = fObject;
+    module.exports.fArray = fArray;
 
     // Export Security Features (using imported modules)
     globalThis.Object.keys(SecurityExports).forEach((key: string) => {
@@ -391,6 +445,11 @@ if (typeof module !== "undefined" && module.exports) {
             module.exports[key] = (fObjectUtils as any)[key];
         }
     });
+    globalThis.Object.keys(fArrayUtils).forEach((key: string) => {
+        if (key !== "default") {
+            module.exports[key] = (fArrayUtils as any)[key];
+        }
+    });
 
     // Export Utils/Encoding (using imported modules)
     globalThis.Object.keys(EncodingExports).forEach((key: string) => {
@@ -399,7 +458,8 @@ if (typeof module !== "undefined" && module.exports) {
         }
     });
 
-    // Export SecureString and SecureObject classes
+    // Export SecureString, SecureObject, and SecureArray classes
     module.exports.SecureString = SecureString;
     module.exports.SecureObject = SecureObject;
+    module.exports.SecureArray = SecureArray;
 }

@@ -25,7 +25,7 @@ let secureRandomBytes: SecureRandomInterface | null = null;
 let randombytes: RandomBytesInterface | null = null;
 let nobleHashes: NobleHashesInterface | null = null;
 let tweetnacl: TweetNaClInterface | null = null;
- 
+
 // Additional libraries for enhanced security
 let kyber: any = null;
 let entropyString: any = null;
@@ -168,13 +168,20 @@ export class RandomSources {
 
     private static initializeNobleHashes(): void {
         try {
-            const nobleHashesLib = require("@noble/hashes");
+            // Import specific submodules instead of root module
+            const sha256Lib = require("@noble/hashes/sha256");
+            const sha512Lib = require("@noble/hashes/sha512");
+
             if (
-                nobleHashesLib &&
-                nobleHashesLib.sha256 &&
-                nobleHashesLib.sha512
+                sha256Lib &&
+                sha256Lib.sha256 &&
+                sha512Lib &&
+                sha512Lib.sha512
             ) {
-                nobleHashes = nobleHashesLib as NobleHashesInterface;
+                nobleHashes = {
+                    sha256: sha256Lib.sha256,
+                    sha512: sha512Lib.sha512,
+                } as NobleHashesInterface;
                 libraryStatus.nobleHashes = true;
             }
         } catch (e) {
@@ -233,10 +240,19 @@ export class RandomSources {
             console.warn("⚠️ elliptic not available");
         }
 
-        // Initialize @noble/curves
+        // Initialize @noble/curves - import specific submodules
         try {
-            nobleCurves = require("@noble/curves");
-            libraryStatus.nobleCurves = true;
+            // Import specific curve implementations instead of root module
+            const secp256k1Lib = require("@noble/curves/secp256k1");
+            const ed25519Lib = require("@noble/curves/ed25519");
+
+            if (secp256k1Lib && ed25519Lib) {
+                nobleCurves = {
+                    secp256k1: secp256k1Lib,
+                    ed25519: ed25519Lib,
+                };
+                libraryStatus.nobleCurves = true;
+            }
         } catch (e) {
             console.warn("⚠️ @noble/curves not available");
         }

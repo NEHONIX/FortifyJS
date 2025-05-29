@@ -86,10 +86,9 @@ export { SecureString as default } from "./core/secure-string-core";
  * Creates a new SecureString with default settings
  */
 export function createSecureString(
-    value: string = "",
-    options?: SecureStringOptions
+    ...args: ConstructorParameters<typeof SecureString>
 ): SecureString {
-    return new SecureString(value, options);
+    return new SecureString(...args);
 }
 
 /**
@@ -174,7 +173,6 @@ export function createTemporarySecureString(
  * Compares two strings in constant time
  */
 export function constantTimeCompare(str1: string, str2: string): boolean {
-
     return ComparisonOperations.constantTimeEquals(str1, str2).isEqual;
 }
 
@@ -186,7 +184,6 @@ export function calculateStringSimilarity(
     str2: string,
     algorithm: "levenshtein" | "jaro" | "jaro-winkler" = "levenshtein"
 ): number {
-
     return ComparisonOperations.fuzzyMatch(str1, str2, algorithm);
 }
 
@@ -281,4 +278,3 @@ export function getSupportedAlgorithms() {
         algorithms: CryptoOperations.getAlgorithmInfo(),
     };
 }
-

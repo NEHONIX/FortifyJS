@@ -1,7 +1,7 @@
 /**
  * Type definitions for SecureString modular architecture
  */
-  
+
 import type {
     HashAlgorithm,
     HashOutputFormat,
@@ -30,18 +30,20 @@ export interface SecureStringOptions {
     quantumSafe?: boolean;
     /** Text encoding to use */
     encoding?: string;
+    /** Enable advanced memory tracking */
+    enableMemoryTracking?: boolean;
 }
 
 /**
  * String manipulation operation types
  */
-export type StringOperation = 
-    | "append" 
-    | "prepend" 
-    | "replace" 
-    | "substring" 
-    | "trim" 
-    | "toUpperCase" 
+export type StringOperation =
+    | "append"
+    | "prepend"
+    | "replace"
+    | "substring"
+    | "trim"
+    | "toUpperCase"
     | "toLowerCase";
 
 /**
@@ -133,12 +135,12 @@ export interface TransformationOptions {
 /**
  * Event types for SecureString operations
  */
-export type SecureStringEvent = 
+export type SecureStringEvent =
     | "created"
-    | "modified" 
-    | "accessed" 
-    | "hashed" 
-    | "compared" 
+    | "modified"
+    | "accessed"
+    | "hashed"
+    | "compared"
     | "destroyed";
 
 /**
@@ -183,6 +185,7 @@ export const DEFAULT_SECURE_STRING_OPTIONS: Required<SecureStringOptions> = {
     autoLock: false,
     quantumSafe: false,
     encoding: "utf-8",
+    enableMemoryTracking: true,
 } as const;
 
 /**

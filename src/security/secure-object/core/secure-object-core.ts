@@ -1,8 +1,32 @@
-/* ---------------------------------------------------------------------------------------------
- *  Copyright (c) NEHONIX INC. All rights reserved.
- *  Licensed under the MIT License. See LICENSE in the project root for license information.
- * -------------------------------------------------------------------------------------------
- */
+/***************************************************************************
+ * FortifyJS - Secure Array Types
+ *
+ * This file contains type definitions for the SecureArray modular architecture
+ *
+ * @author Nehonix
+ *
+ * @license MIT
+ *
+ * Copyright (c) 2024 Nehonix. All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ***************************************************************************** */
 
 /**
  * @license MIT
@@ -14,7 +38,12 @@
 
 import { HashAlgorithm, HashOutputFormat } from "../../../types/string";
 import { SecureBuffer } from "../../secure-memory";
-
+import {
+    memoryManager,
+    MemoryEventType,
+    PoolStrategy,
+    MemoryUtils,
+} from "../../../utils/memory";
 import {
     SecureValue,
     SerializationOptions,
@@ -34,8 +63,11 @@ import SecureString from "../../secure-string";
 
 /**
  * A secure object that can store sensitive data
+ * T represents the initial type, but the object can be extended with additional keys
  */
-export class SecureObject<T extends Record<string, SecureValue>> {
+export class SecureObject<
+    T extends Record<string, SecureValue> = Record<string, SecureValue>
+> {
     // Core data storage
     private data: Map<string, any> = new Map();
     private secureBuffers: Map<string, SecureBuffer> = new Map();
@@ -51,6 +83,13 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     private _isDestroyed: boolean = false;
     private _isReadOnly: boolean = false;
     private readonly _id: string;
+
+    // Enhanced memory management
+    private _memoryTracking: boolean = false;
+    private _autoCleanup: boolean = false;
+    private _createdAt: number = Date.now();
+    private _lastAccessed: number = Date.now();
+    private secureBufferPool?: any;
 
     /**
      * Creates a new secure object
@@ -74,6 +113,41 @@ export class SecureObject<T extends Record<string, SecureValue>> {
             this.cryptoHandler.setEncryptionKey(options.encryptionKey);
         }
 
+        // Configure memory management with enhanced features
+        this._memoryTracking = options?.enableMemoryTracking ?? true; // Enable by default
+        this._autoCleanup = options?.autoCleanup ?? true; // Enable by default
+
+        // Set memory limits if provided
+        if (options?.maxMemory) {
+            memoryManager.setLimits(
+                options.maxMemory,
+                options.gcThreshold || 0.8
+            );
+        }
+
+        // Register with advanced memory manager if tracking is enabled
+        if (this._memoryTracking) {
+            memoryManager.registerObject(this, this._id);
+
+            // Listen to memory events for proactive management
+            memoryManager.on(MemoryEventType.MEMORY_PRESSURE, (event) => {
+                if (event.data?.pressure > 0.8) {
+                    this.handleMemoryPressure();
+                }
+            });
+
+            memoryManager.on(MemoryEventType.LEAK_DETECTED, (event) => {
+                if (event.data?.leaks?.includes(this._id)) {
+                    console.warn(
+                        `Potential memory leak detected in SecureObject ${this._id}`
+                    );
+                }
+            });
+        }
+
+        // Create memory pool for secure buffers if not exists
+        this.initializeSecureBufferPool();
+
         // Set initial data
         if (initialData) {
             this.setAll(initialData);
@@ -94,7 +168,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
 
         for (const key of other.keys()) {
             const value = other.get(key);
-            copy.set(key, value);
+            copy.set(String(key), value);
         }
 
         return copy;
@@ -179,6 +253,193 @@ export class SecureObject<T extends Record<string, SecureValue>> {
         if (this._isReadOnly) {
             throw new Error("SecureObject is read-only");
         }
+    }
+
+    /**
+     * Updates the last accessed timestamp for memory management
+     */
+    private updateLastAccessed(): void {
+        this._lastAccessed = Date.now();
+    }
+
+    // ===== MEMORY MANAGEMENT =====
+
+    /**
+     * Initialize secure buffer pool for efficient memory reuse
+     */
+    private initializeSecureBufferPool(): void {
+        if (!this.secureBufferPool) {
+            try {
+                this.secureBufferPool =
+                    memoryManager.getPool("secure-buffer-pool") ||
+                    memoryManager.createPool({
+                        name: "secure-buffer-pool",
+                        factory: () => new Uint8Array(1024), // 1KB buffers
+                        reset: (buffer) => {
+                            // Secure wipe before reuse
+                            this.secureWipe(buffer);
+                        },
+                        capacity: 50,
+                        strategy: PoolStrategy.LRU,
+                        validator: (buffer) => buffer instanceof Uint8Array,
+                    });
+            } catch (error) {
+                // Pool might already exist, try to get it
+                this.secureBufferPool =
+                    memoryManager.getPool("secure-buffer-pool");
+            }
+        }
+    }
+
+    /**
+     * Handle memory pressure situations
+     */
+    private handleMemoryPressure(): void {
+        if (this._autoCleanup) {
+            // Clean up unused secure buffers
+            this.forceGarbageCollection();
+
+            // Emit event for external handlers
+            this.eventManager.emit("gc", undefined, {
+                timestamp: Date.now(),
+                objectId: this._id,
+                action: "memory_pressure_cleanup",
+            });
+        }
+    }
+
+    /**
+     * Secure wipe of buffer memory
+     */
+    private secureWipe(buffer: Uint8Array): void {
+        if (!buffer || buffer.length === 0) return;
+
+        // Multiple-pass secure wipe
+        const passes = [0x00, 0xff, 0xaa, 0x55, 0x00];
+
+        for (const pattern of passes) {
+            buffer.fill(pattern);
+        }
+
+        // Final random pass if crypto is available
+        if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+            crypto.getRandomValues(buffer);
+        }
+
+        buffer.fill(0x00); // Final zero pass
+    }
+
+    /**
+     * Gets enhanced memory usage statistics for this SecureObject
+     */
+    public getMemoryUsage(): {
+        allocatedMemory: number;
+        bufferCount: number;
+        dataSize: number;
+        createdAt: number;
+        lastAccessed: number;
+        age: number;
+        formattedMemory: string;
+        poolStats?: any;
+    } {
+        this.ensureNotDestroyed();
+
+        let allocatedMemory = 0;
+        for (const buffer of this.secureBuffers.values()) {
+            allocatedMemory += buffer.length();
+        }
+
+        const now = Date.now();
+        const usage = {
+            allocatedMemory,
+            bufferCount: this.secureBuffers.size,
+            dataSize: this.data.size,
+            createdAt: this._createdAt,
+            lastAccessed: this._lastAccessed,
+            age: now - this._createdAt,
+            formattedMemory: MemoryUtils.formatBytes(allocatedMemory),
+            poolStats: this.secureBufferPool?.getStats(),
+        };
+
+        return usage;
+    }
+
+    /**
+     * Forces enhanced garbage collection for this SecureObject
+     */
+    public forceGarbageCollection(): void {
+        this.ensureNotDestroyed();
+
+        if (this._memoryTracking) {
+            const beforeUsage = this.getMemoryUsage();
+
+            // Clean up unused secure buffers with secure wipe
+            for (const [key, buffer] of this.secureBuffers.entries()) {
+                if (!this.data.has(key)) {
+                    // Secure wipe before destroying (get buffer data safely)
+                    try {
+                        const bufferData = buffer.getBuffer(); // Use correct method
+                        if (bufferData instanceof Uint8Array) {
+                            this.secureWipe(bufferData);
+                        }
+                    } catch (error) {
+                        // Buffer might already be destroyed, continue
+                    }
+                    buffer.destroy();
+                    this.secureBuffers.delete(key);
+                }
+            }
+
+            // Return unused buffers to pool
+            if (this.secureBufferPool) {
+                // Pool cleanup is handled automatically by the advanced memory manager
+            }
+
+            // Trigger global GC with enhanced features
+            const gcResult = memoryManager.forceGC();
+
+            const afterUsage = this.getMemoryUsage();
+            const freedMemory =
+                beforeUsage.allocatedMemory - afterUsage.allocatedMemory;
+
+            this.eventManager.emit("gc", undefined, {
+                timestamp: Date.now(),
+                bufferCount: this.secureBuffers.size,
+                freedMemory,
+                gcDuration: gcResult.duration,
+                gcSuccess: gcResult.success,
+                beforeUsage: beforeUsage.formattedMemory,
+                afterUsage: afterUsage.formattedMemory,
+            });
+        }
+    }
+
+    /**
+     * Enables memory tracking for this SecureObject
+     */
+    public enableMemoryTracking(): this {
+        this.ensureNotDestroyed();
+
+        if (!this._memoryTracking) {
+            this._memoryTracking = true;
+            memoryManager.registerObject(this, this._id);
+        }
+
+        return this;
+    }
+
+    /**
+     * Disables memory tracking for this SecureObject
+     */
+    public disableMemoryTracking(): this {
+        this.ensureNotDestroyed();
+
+        if (this._memoryTracking) {
+            this._memoryTracking = false;
+            memoryManager.removeReference(this._id);
+        }
+
+        return this;
     }
 
     // ===== SENSITIVE KEYS MANAGEMENT =====
@@ -341,11 +602,12 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     // ===== CORE DATA OPERATIONS =====
 
     /**
-     * Sets a value
+     * Sets a value - allows both existing keys and new dynamic keys
      */
-    public set<K extends keyof T>(key: K, value: T[K]): this {
+    public set<K extends string>(key: K, value: SecureValue): this {
         this.ensureNotDestroyed();
         this.ensureNotReadOnly();
+        this.updateLastAccessed();
 
         const stringKey = ValidationUtils.sanitizeKey(key);
         ValidationUtils.isValidSecureValue(value);
@@ -397,7 +659,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
 
         for (const key in values) {
             if (Object.prototype.hasOwnProperty.call(values, key)) {
-                this.set(key as keyof T, values[key] as T[keyof T]);
+                this.set(String(key), values[key] as SecureValue);
             }
         }
         return this;
@@ -408,6 +670,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
      */
     public get<K extends keyof T>(key: K): T[K] {
         this.ensureNotDestroyed();
+        this.updateLastAccessed();
 
         const stringKey = ValidationUtils.sanitizeKey(key);
         const value = this.data.get(stringKey);
@@ -475,9 +738,9 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * Deletes a key
+     * Deletes a key - allows both existing keys and dynamic keys
      */
-    public delete<K extends keyof T>(key: K): boolean {
+    public delete<K extends string>(key: K): boolean {
         this.ensureNotDestroyed();
         this.ensureNotReadOnly();
 
@@ -597,7 +860,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
         for (const key of this.keys()) {
             const value = this.get(key);
             if (predicate(value, key, this)) {
-                filtered.set(key, value);
+                filtered.set(String(key), value);
             }
         }
 
@@ -766,29 +1029,28 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     // ===== SERIALIZATION METHODS =====
 
     /**
-     * Gets the full object as a regular JavaScript object
+     * Converts to a regular object
      */
     public getAll(
         options: SerializationOptions = {}
     ): T & { _metadata?: Record<string, ValueMetadata> } {
-        return this.toObject(options);
-    }
-
-    /**
-     * Converts to a regular object
-     */
-    public toObject(
-        options: SerializationOptions = {}
-    ): T & { _metadata?: Record<string, ValueMetadata> } {
         this.ensureNotDestroyed();
         ValidationUtils.validateSerializationOptions(options);
-
         const sensitiveKeys = new Set(this.sensitiveKeysManager.getAll());
+
         return this.serializationHandler.toObject<T>(
             this.data,
             sensitiveKeys,
             options
         );
+    }
+
+    /**
+     * Gets the full object as a regular JavaScript object
+     */
+    public toObject(): T & { _metadata?: Record<string, ValueMetadata> } {
+        const sensitiveKeys = new Set(this.sensitiveKeysManager.getAll());
+        return this.serializationHandler.toObject<T>(this.data, sensitiveKeys);
     }
 
     /**
@@ -866,15 +1128,16 @@ export class SecureObject<T extends Record<string, SecureValue>> {
 
         if (other instanceof SecureObject) {
             for (const key of other.keys()) {
+                const stringKey = String(key);
                 if (overwrite || !this.has(key as keyof T)) {
-                    this.set(key as keyof T, other.get(key) as T[keyof T]);
+                    this.set(stringKey, other.get(key));
                 }
             }
         } else {
             for (const key in other) {
                 if (Object.prototype.hasOwnProperty.call(other, key)) {
                     if (overwrite || !this.has(key as keyof T)) {
-                        this.set(key as keyof T, other[key] as T[keyof T]);
+                        this.set(String(key), other[key] as SecureValue);
                     }
                 }
             }
@@ -886,7 +1149,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     // ===== AMAZING NEW FEATURES =====
 
     /**
-     * AMAZING: Transform values with a mapper function (like Array.map but returns SecureObject)
+     * Transform values with a mapper function (like Array.map but returns SecureObject)
      * Returns a new SecureObject with transformed values
      */
     public transform<U>(
@@ -913,7 +1176,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Group entries by a classifier function
+     * Group entries by a classifier function
      * Returns a Map where keys are group identifiers and values are SecureObjects
      */
     public groupBy<K extends string | number>(
@@ -946,7 +1209,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Partition entries into two groups based on a predicate
+     * Partition entries into two groups based on a predicate
      * Returns [matching, notMatching] SecureObjects
      */
     public partition(
@@ -978,7 +1241,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Pick specific keys (like Lodash pick but type-safe)
+     * Pick specific keys (like Lodash pick but type-safe)
      * Returns a new SecureObject with only the specified keys
      */
     public pick<K extends keyof T>(...keys: K[]): SecureObject<Pick<T, K>> {
@@ -986,7 +1249,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Omit specific keys (opposite of pick)
+     * Omit specific keys (opposite of pick)
      * Returns a new SecureObject without the specified keys
      */
     public omit<K extends keyof T>(...keys: K[]): SecureObject<Omit<T, K>> {
@@ -1012,7 +1275,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Flatten nested objects (one level deep)
+     * Flatten nested objects (one level deep)
      * Converts { user: { name: "John" } } to { "user.name": "John" }
      */
     public flatten(separator: string = "."): SecureObject<Record<string, any>> {
@@ -1049,7 +1312,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Compact - removes null, undefined, and empty values
+     * Compact - removes null, undefined, and empty values
      * Returns a new SecureObject with only truthy values
      */
     public compact(): SecureObject<Partial<T>> {
@@ -1064,7 +1327,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Invert - swap keys and values
+     * Invert - swap keys and values
      * Returns a new SecureObject with keys and values swapped
      */
     public invert(): SecureObject<Record<string, string>> {
@@ -1088,7 +1351,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Defaults - merge with default values (only for missing keys)
+     * Defaults - merge with default values (only for missing keys)
      * Returns a new SecureObject with defaults applied
      */
     public defaults(defaultValues: Partial<T>): SecureObject<T> {
@@ -1118,7 +1381,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Tap - execute a function with the object and return the object (for chaining)
+     * Tap - execute a function with the object and return the object (for chaining)
      * Useful for debugging or side effects in method chains
      */
     public tap(fn: (obj: this) => void): this {
@@ -1130,7 +1393,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Pipe - transform the object through a series of functions
+     * Pipe - transform the object through a series of functions
      * Each function receives the result of the previous function
      */
     public pipe<U>(fn: (obj: this) => U): U;
@@ -1150,7 +1413,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Sample - get random entries from the object
+     * Sample - get random entries from the object
      * Returns a new SecureObject with randomly selected entries
      */
     public sample(count: number = 1): SecureObject<Partial<T>> {
@@ -1190,7 +1453,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Shuffle - return a new SecureObject with keys in random order
+     * Shuffle - return a new SecureObject with keys in random order
      * Returns a new SecureObject with the same data but shuffled key order
      */
     public shuffle(): SecureObject<T> {
@@ -1223,7 +1486,7 @@ export class SecureObject<T extends Record<string, SecureValue>> {
     }
 
     /**
-     * AMAZING: Chunk - split object into chunks of specified size
+     * Chunk - split object into chunks of specified size
      * Returns an array of SecureObjects, each containing up to 'size' entries
      */
     public chunk(size: number): SecureObject<Partial<T>>[] {
@@ -1261,6 +1524,11 @@ export class SecureObject<T extends Record<string, SecureValue>> {
      */
     public destroy(): void {
         if (!this._isDestroyed) {
+            // Clean up memory tracking
+            if (this._memoryTracking) {
+                memoryManager.removeReference(this._id);
+            }
+
             this.clear();
             this.eventManager.clear();
             this._isDestroyed = true;

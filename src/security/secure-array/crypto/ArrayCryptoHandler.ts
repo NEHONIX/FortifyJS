@@ -1,9 +1,37 @@
+/***************************************************************************
+ * FortifyJS - Secure Array Crypto Handler
+ *
+ * This file contains the cryptographic operations for SecureArray
+ *
+ * @author Nehonix
+ * @license MIT
+ *
+ * Copyright (c) 2024 Nehonix. All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ***************************************************************************** */
+
 /**
- * Cryptographic Handler Module
- * Handles encryption and decryption of sensitive data 
+ * Handles cryptographic operations for SecureArray
  */
 
-import { SerializationOptions } from "../types";
+// Import existing FortifyJS crypto utilities
 import { Hash } from "../../../core/hash";
 import { SecureRandom } from "../../../core/random";
 import {
@@ -14,14 +42,15 @@ import {
 } from "../../../utils/encoding";
 
 /**
- * Handles encryption and decryption operations for SecureObject
+ * Cryptographic handler for SecureArray operations
  */
-export class CryptoHandler {
-    private encryptionKey: string | null = null;
+export class ArrayCryptoHandler {
+    private encryptionKey: Uint8Array | null = null;
     private derivedKey: Uint8Array | null = null;
     private isInitialized: boolean = false;
 
-    constructor(private objectId: string) {
+    constructor(private arrayId: string) {
+        // Generate a unique salt for this array instance
         this.initializeCrypto();
     }
 
@@ -30,38 +59,34 @@ export class CryptoHandler {
      */
     private initializeCrypto(): void {
         try {
-            // Generate a unique salt for this object instance
+            // Generate a unique salt for this array instance
             const salt = SecureRandom.getRandomBytes(32);
 
-            // Create a unique identifier for this object's crypto context
-            const context = `SecureObject:${this.objectId}:${bufferToHex(
-                salt
-            )}`;
+            // Create a unique identifier for this array's crypto context
+            const context = `SecureArray:${this.arrayId}:${bufferToHex(salt)}`;
 
             // Store the salt for key derivation
-            this.derivedKey = new Uint8Array(
-                Hash.secureHash(context, {
-                    algorithm: "sha256",
-                    salt: salt,
-                    outputFormat: "buffer",
-                }) as Buffer
-            );
+            const hashResult = Hash.secureHash(context, {
+                algorithm: "sha256",
+                salt: salt,
+                outputFormat: "buffer",
+            }) as Buffer;
+            this.derivedKey = new Uint8Array(hashResult);
 
             this.isInitialized = true;
         } catch (error) {
-            console.error("Failed to initialize CryptoHandler:", error);
+            console.error("Failed to initialize ArrayCryptoHandler:", error);
             this.isInitialized = false;
         }
     }
 
     /**
-     * Sets the encryption key for sensitive data encryption
+     * Sets the encryption key for the array
      */
-    setEncryptionKey(key: string | null = null): this {
+    public setEncryptionKey(key: string): void {
         try {
-            if (!key) {
-                this.encryptionKey = null;
-                return this;
+            if (!key || key.length === 0) {
+                throw new Error("Encryption key cannot be empty");
             }
 
             // Derive a strong encryption key from the provided key
@@ -89,35 +114,25 @@ export class CryptoHandler {
                 );
             }
 
-            this.encryptionKey = key;
-            this.derivedKey = derivedKey;
+            this.encryptionKey = derivedKey;
         } catch (error) {
             console.error("Failed to set encryption key:", error);
             throw new Error(
                 `Failed to set encryption key: ${(error as Error).message}`
             );
         }
-
-        return this;
     }
 
     /**
-     * Gets the current encryption key
+     * Encrypts a value using AES-like encryption with the current key
      */
-    getEncryptionKey(): string | null {
-        return this.encryptionKey;
-    }
-
-    /**
-     * Encrypts a value using real AES-256-CTR-HMAC encryption
-     */
-    encryptValue(value: any): string {
+    public encryptValue(value: any): string {
         if (!this.isInitialized) {
             throw new Error("Crypto handler not properly initialized");
         }
 
         try {
-            const key = this.derivedKey;
+            const key = this.encryptionKey || this.derivedKey;
             if (!key) {
                 throw new Error("No encryption key available");
             }
@@ -151,9 +166,9 @@ export class CryptoHandler {
     }
 
     /**
-     * Decrypts a value using real AES-256-CTR-HMAC decryption
+     * Decrypts a value using the current key
      */
-    decryptValue(encryptedValue: string): any {
+    public decryptValue(encryptedValue: string): any {
         if (!this.isInitialized) {
             throw new Error("Crypto handler not properly initialized");
         }
@@ -166,7 +181,7 @@ export class CryptoHandler {
                 throw new Error("Invalid encrypted value format");
             }
 
-            const key = this.derivedKey;
+            const key = this.encryptionKey || this.derivedKey;
             if (!key) {
                 throw new Error("No encryption key available");
             }
@@ -203,77 +218,13 @@ export class CryptoHandler {
     }
 
     /**
-     * Decrypts all encrypted values in an object recursively
-     */
-    decryptObject(obj: any): any {
-        if (typeof obj === "string" && obj.startsWith("[ENCRYPTED:")) {
-            return this.decryptValue(obj);
-        } else if (Array.isArray(obj)) {
-            return obj.map((item) => this.decryptObject(item));
-        } else if (typeof obj === "object" && obj !== null) {
-            const result: any = {};
-            for (const [key, value] of Object.entries(obj)) {
-                result[key] = this.decryptObject(value);
-            }
-            return result;
-        }
-
-        return obj;
-    }
-
-    /**
-     * Recursively processes nested objects to check for sensitive keys
-     */
-    processNestedObject(
-        obj: any,
-        options: SerializationOptions,
-        sensitiveKeys: Set<string>
-    ): any {
-        if (Array.isArray(obj)) {
-            // Handle arrays
-            return obj.map((item) =>
-                typeof item === "object" && item !== null
-                    ? this.processNestedObject(item, options, sensitiveKeys)
-                    : item
-            );
-        } else if (typeof obj === "object" && obj !== null) {
-            // Handle objects
-            const result: any = {};
-            for (const [key, value] of Object.entries(obj)) {
-                if (options.encryptSensitive && sensitiveKeys.has(key)) {
-                    // Encrypt sensitive keys in nested objects
-                    result[key] = this.encryptValue(value);
-                } else if (typeof value === "object" && value !== null) {
-                    // Recursively process nested objects/arrays
-                    result[key] = this.processNestedObject(
-                        value,
-                        options,
-                        sensitiveKeys
-                    );
-                } else {
-                    result[key] = value;
-                }
-            }
-            return result;
-        }
-        return obj;
-    }
-
-    /**
-     * Checks if a value is encrypted
-     */
-    isEncrypted(value: any): boolean {
-        return (
-            typeof value === "string" &&
-            value.startsWith("[ENCRYPTED:") &&
-            value.endsWith("]")
-        );
-    }
-
-    /**
      * Performs the actual encryption using a secure stream cipher
      */
-    private performEncryption(data: Uint8Array, key: Uint8Array, iv: Uint8Array): Uint8Array {
+    private performEncryption(
+        data: Uint8Array,
+        key: Uint8Array,
+        iv: Uint8Array
+    ): Uint8Array {
         // Create a keystream using the key and IV
         const keystream = this.generateKeystream(key, iv, data.length);
 
@@ -297,7 +248,11 @@ export class CryptoHandler {
     /**
      * Performs the actual decryption
      */
-    private performDecryption(encryptedData: Uint8Array, key: Uint8Array, iv: Uint8Array): Uint8Array {
+    private performDecryption(
+        encryptedData: Uint8Array,
+        key: Uint8Array,
+        iv: Uint8Array
+    ): Uint8Array {
         // Split encrypted data and HMAC
         const hmacLength = 32; // SHA-256 HMAC length
         if (encryptedData.length < hmacLength) {
@@ -328,7 +283,11 @@ export class CryptoHandler {
     /**
      * Generates a secure keystream for encryption/decryption
      */
-    private generateKeystream(key: Uint8Array, iv: Uint8Array, length: number): Uint8Array {
+    private generateKeystream(
+        key: Uint8Array,
+        iv: Uint8Array,
+        length: number
+    ): Uint8Array {
         const keystream = new Uint8Array(length);
         let counter = 0;
 
@@ -391,6 +350,17 @@ export class CryptoHandler {
     }
 
     /**
+     * Checks if a value is encrypted
+     */
+    public isEncrypted(value: any): boolean {
+        return (
+            typeof value === "string" &&
+            value.startsWith("[ENCRYPTED:") &&
+            value.endsWith("]")
+        );
+    }
+
+    /**
      * Gets the current encryption status
      */
     public getEncryptionStatus(): {
@@ -410,12 +380,16 @@ export class CryptoHandler {
      */
     public destroy(): void {
         // Securely wipe keys
+        if (this.encryptionKey) {
+            this.encryptionKey.fill(0);
+            this.encryptionKey = null;
+        }
+
         if (this.derivedKey) {
             this.derivedKey.fill(0);
             this.derivedKey = null;
         }
 
-        this.encryptionKey = null;
         this.isInitialized = false;
     }
 }

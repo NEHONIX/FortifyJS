@@ -1,3 +1,33 @@
+/***************************************************************************
+ * FortifyJS - Secure Array Types
+ *
+ * This file contains type definitions for the SecureArray modular architecture
+ *
+ * @author Nehonix
+ *
+ * @license MIT
+ *
+ * Copyright (c) 2024 Nehonix. All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ***************************************************************************** */
+
 /**
  * SecureString Core Module
  * Main SecureString class with modular architecture
@@ -23,6 +53,14 @@ import {
     MemoryUsage,
     DEFAULT_SECURE_STRING_OPTIONS,
 } from "../types";
+
+// Import enhanced memory management
+import {
+    memoryManager,
+    MemoryEventType,
+    PoolStrategy,
+    MemoryUtils,
+} from "../../../utils/memory";
 import { BufferManager } from "../buffer/buffer-manager";
 import { StringOperations } from "../operations/string-operations";
 import { ComparisonOperations } from "../operations/comparison-operations";
@@ -59,12 +97,52 @@ export class SecureString {
     > = new Map();
     private _isDestroyed: boolean = false;
 
+    // Enhanced memory management
+    private readonly _id: string;
+    private _memoryTracking: boolean = false;
+    private _createdAt: number = Date.now();
+    private secureStringPool?: any;
+
     /**
-     * Creates a new secure string
+     * Creates a new secure string with enhanced memory management
      */
     constructor(value: string = "", options: SecureStringOptions = {}) {
+        this._id = `secure-string-${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 9)}`;
         this.bufferManager = new BufferManager(value, options);
-        this.emit("created", { value: value.length });
+
+        // Enable memory tracking by default for security
+        this._memoryTracking = options.enableMemoryTracking ?? true;
+
+        // Register with advanced memory manager
+        if (this._memoryTracking) {
+            memoryManager.registerObject(this, this._id);
+
+            // Listen to memory events for proactive management
+            memoryManager.on(MemoryEventType.MEMORY_PRESSURE, (event) => {
+                if (event.data?.pressure > 0.8) {
+                    this.handleMemoryPressure();
+                }
+            });
+
+            memoryManager.on(MemoryEventType.LEAK_DETECTED, (event) => {
+                if (event.data?.leaks?.includes(this._id)) {
+                    console.warn(
+                        `Potential memory leak detected in SecureString ${this._id}`
+                    );
+                }
+            });
+        }
+
+        // Initialize secure string pool for efficient reuse
+        this.initializeSecureStringPool();
+
+        this.emit("created", {
+            value: value.length,
+            id: this._id,
+            memoryTracking: this._memoryTracking,
+        });
     }
 
     /**
@@ -760,11 +838,173 @@ export class SecureString {
         }
     }
 
+    // ===== ENHANCED MEMORY MANAGEMENT METHODS =====
+
+    /**
+     * Initialize secure string pool for efficient memory reuse
+     */
+    private initializeSecureStringPool(): void {
+        if (!this.secureStringPool) {
+            try {
+                this.secureStringPool =
+                    memoryManager.getPool("secure-string-pool") ||
+                    memoryManager.createPool({
+                        name: "secure-string-pool",
+                        factory: () => new Uint8Array(256), // 256 byte buffers for strings
+                        reset: (buffer) => {
+                            // Secure wipe before reuse
+                            this.secureWipe(buffer);
+                        },
+                        capacity: 30,
+                        strategy: PoolStrategy.LRU,
+                        validator: (buffer) => buffer instanceof Uint8Array,
+                    });
+            } catch (error) {
+                // Pool might already exist, try to get it
+                this.secureStringPool =
+                    memoryManager.getPool("secure-string-pool");
+            }
+        }
+    }
+
+    /**
+     * Handle memory pressure situations
+     */
+    private handleMemoryPressure(): void {
+        // Force cleanup of the buffer manager
+        try {
+            this.bufferManager.wipe(); // Use wipe() method instead of cleanup()
+        } catch (error) {
+            // Buffer might already be destroyed
+        }
+
+        // Emit event for external handlers
+        this.emit("destroyed", {
+            reason: "memory_pressure_cleanup",
+            timestamp: Date.now(),
+            objectId: this._id,
+        });
+    }
+
+    /**
+     * Secure wipe of buffer memory
+     */
+    private secureWipe(buffer: Uint8Array): void {
+        if (!buffer || buffer.length === 0) return;
+
+        // Multiple-pass secure wipe
+        const passes = [0x00, 0xff, 0xaa, 0x55, 0x00];
+
+        for (const pattern of passes) {
+            buffer.fill(pattern);
+        }
+
+        // Final random pass if crypto is available
+        if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+            crypto.getRandomValues(buffer);
+        }
+
+        buffer.fill(0x00); // Final zero pass
+    }
+
+    /**
+     * Get enhanced memory usage statistics
+     */
+    public getEnhancedMemoryUsage(): {
+        bufferSize: number;
+        actualLength: number;
+        overhead: number;
+        isFragmented: boolean;
+        isEncrypted: boolean;
+        formattedSize: string;
+        age: number;
+        poolStats?: any;
+    } {
+        this.ensureNotDestroyed();
+
+        const basicUsage = this.getMemoryUsage();
+        const now = Date.now();
+
+        return {
+            ...basicUsage,
+            formattedSize: MemoryUtils.formatBytes(basicUsage.bufferSize),
+            age: now - this._createdAt,
+            poolStats: this.secureStringPool?.getStats(),
+        };
+    }
+
+    /**
+     * Force garbage collection for this SecureString
+     */
+    public forceGarbageCollection(): void {
+        this.ensureNotDestroyed();
+
+        if (this._memoryTracking) {
+            const beforeUsage = this.getEnhancedMemoryUsage();
+
+            // Clean up buffer manager
+            try {
+                this.bufferManager.wipe(); // Use wipe() method instead of cleanup()
+            } catch (error) {
+                // Buffer might already be cleaned
+            }
+
+            // Trigger global GC
+            const gcResult = memoryManager.forceGC();
+
+            const afterUsage = this.getEnhancedMemoryUsage();
+            const freedMemory = beforeUsage.bufferSize - afterUsage.bufferSize;
+
+            this.emit("destroyed", {
+                operation: "gc",
+                timestamp: Date.now(),
+                freedMemory,
+                gcDuration: gcResult.duration,
+                gcSuccess: gcResult.success,
+                beforeUsage: beforeUsage.formattedSize,
+                afterUsage: afterUsage.formattedSize,
+            });
+        }
+    }
+
+    /**
+     * Enable memory tracking for this SecureString
+     */
+    public enableMemoryTracking(): this {
+        this.ensureNotDestroyed();
+
+        if (!this._memoryTracking) {
+            this._memoryTracking = true;
+            memoryManager.registerObject(this, this._id);
+        }
+
+        return this;
+    }
+
+    /**
+     * Disable memory tracking for this SecureString
+     */
+    public disableMemoryTracking(): this {
+        this.ensureNotDestroyed();
+
+        if (this._memoryTracking) {
+            this._memoryTracking = false;
+            memoryManager.removeReference(this._id);
+        }
+
+        return this;
+    }
+
     /**
      * Clears the string by zeroing its contents and marks as destroyed
      */
     public clear(): void {
         if (!this._isDestroyed) {
+            // Clean up memory tracking
+            if (this._memoryTracking) {
+                memoryManager.removeReference(this._id);
+            }
+
             this.bufferManager.destroy();
             this._isDestroyed = true;
             this.emit("destroyed", { operation: "clear" });
@@ -866,4 +1106,3 @@ export class SecureString {
         return CryptoOperations.constantTimeHashCompare(hash1, hash2);
     }
 }
-

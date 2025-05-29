@@ -12,7 +12,7 @@
 
 /**
  * @author Seth Eleazar
- * @version 2.0.0
+ *
  * @license MIT
  * @description Enhanced Secure Memory Management Module
  * Enhanced secure buffer with military-grade protection
@@ -153,13 +153,15 @@ let initializationPromise: Promise<void> | null = null;
 
 function ensureLibrariesInitialized(): Promise<void> {
     if (!initializationPromise) {
-        initializationPromise = initializeSecurityLibraries().catch((_error) => {
-            // Silently handle initialization errors - libraries are optional
-            // console.error(
-            //     "Failed to initialize security libraries for SecureBuffer:",
-            //     error
-            // );
-        });
+        initializationPromise = initializeSecurityLibraries().catch(
+            (_error) => {
+                // Silently handle initialization errors - libraries are optional
+                // console.error(
+                //     "Failed to initialize security libraries for SecureBuffer:",
+                //     error
+                // );
+            }
+        );
     }
     return initializationPromise;
 }
