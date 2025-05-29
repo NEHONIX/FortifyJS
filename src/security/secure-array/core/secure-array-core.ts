@@ -349,7 +349,7 @@ export class SecureArray<T extends SecureArrayValue = SecureArrayValue>
     }
 
     /**
-     * Gets an element at the specified index
+     * Gets an element at the specified index with automatic decryption
      */
     public get(index: number): T | undefined {
         this.ensureNotDestroyed();
@@ -370,6 +370,27 @@ export class SecureArray<T extends SecureArrayValue = SecureArrayValue>
                 metadata.isSecure,
                 true
             );
+        }
+
+        // Check if value is encrypted (starts with [ENCRYPTED:)
+        if (
+            typeof value === "string" &&
+            this.cryptoHandler.isEncrypted(value)
+        ) {
+            try {
+                // Decrypt the value automatically
+                const decryptedValue = this.cryptoHandler.decryptValue(value);
+                this.eventManager.emit("get", index, decryptedValue);
+                return decryptedValue as T;
+            } catch (error) {
+                console.error(
+                    `Failed to decrypt value at index ${index}:`,
+                    error
+                );
+                // Return the encrypted value if decryption fails
+                this.eventManager.emit("get", index, value);
+                return value;
+            }
         }
 
         // Convert SecureBuffer back to original type based on metadata
@@ -1843,18 +1864,54 @@ export class SecureArray<T extends SecureArrayValue = SecureArrayValue>
     }
 
     /**
-     * Encrypts all elements in the array
+     * Gets the raw encrypted data without decryption (for verification)
+     */
+    public getRawEncryptedData(): any[] {
+        this.ensureNotDestroyed();
+        return [...this.elements];
+    }
+
+    /**
+     * Gets a specific element's raw encrypted form (for verification)
+     */
+    public getRawEncryptedElement(index: number): any {
+        this.ensureNotDestroyed();
+        this.validateIndex(index);
+
+        if (index >= this.elements.length) {
+            return undefined;
+        }
+
+        return this.elements[index];
+    }
+
+    /**
+     * Encrypts all elements in the array using real AES-256-CTR-HMAC encryption
      */
     public encryptAll(): this {
         this.ensureNotDestroyed();
         this.ensureNotReadOnly();
         this.ensureNotFrozen();
 
+        // Check if encryption key is set
+        const encryptionStatus = this.cryptoHandler.getEncryptionStatus();
+        if (!encryptionStatus.hasEncryptionKey) {
+            throw new Error(
+                "Encryption key must be set before calling encryptAll()"
+            );
+        }
+
         for (let i = 0; i < this.elements.length; i++) {
             const value = this.get(i);
-            if (value !== undefined && typeof value === "string") {
-                // Re-set the string to trigger encryption
-                this.set(i, value);
+            if (value !== undefined) {
+                // Actually encrypt the value using the crypto handler
+                const encryptedValue = this.cryptoHandler.encryptValue(value);
+
+                // Store the encrypted string directly in elements array
+                this.elements[i] = encryptedValue as any;
+
+                // Update metadata to reflect encryption
+                this.metadataManager.update(i, typeof value, true);
             }
         }
 

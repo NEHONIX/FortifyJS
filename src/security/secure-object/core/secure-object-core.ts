@@ -550,6 +550,65 @@ export class SecureObject<
         return this.cryptoHandler.decryptObject(obj);
     }
 
+    /**
+     * Encrypts all values in the object using real AES-256-CTR-HMAC encryption
+     */
+    public encryptAll(): this {
+        this.ensureNotDestroyed();
+        this.ensureNotReadOnly();
+
+        // Check if encryption key is set
+        const encryptionStatus = this.cryptoHandler.getEncryptionStatus();
+        if (!encryptionStatus.hasEncryptionKey) {
+            throw new Error(
+                "Encryption key must be set before calling encryptAll()"
+            );
+        }
+
+        // Encrypt all values in the data map
+        for (const [key, value] of this.data.entries()) {
+            if (value !== undefined) {
+                // Actually encrypt the value using the crypto handler
+                const encryptedValue = this.cryptoHandler.encryptValue(value);
+
+                // Store the encrypted string directly in data map
+                this.data.set(key, encryptedValue);
+
+                // Update metadata to reflect encryption
+                this.metadataManager.update(key, typeof value, true);
+            }
+        }
+
+        this.updateLastAccessed();
+        this.eventManager.emit("set", "encrypt_all", "all_values_encrypted");
+
+        return this;
+    }
+
+    /**
+     * Gets the raw encrypted data without decryption (for verification)
+     */
+    public getRawEncryptedData(): Map<string, any> {
+        this.ensureNotDestroyed();
+        return new Map(this.data);
+    }
+
+    /**
+     * Gets a specific key's raw encrypted form (for verification)
+     */
+    public getRawEncryptedValue(key: string): any {
+        this.ensureNotDestroyed();
+        const stringKey = ValidationUtils.sanitizeKey(key);
+        return this.data.get(stringKey);
+    }
+
+    /**
+     * Gets encryption status from the crypto handler
+     */
+    public getEncryptionStatus() {
+        return this.cryptoHandler.getEncryptionStatus();
+    }
+
     // ===== EVENT MANAGEMENT =====
 
     /**
@@ -666,7 +725,7 @@ export class SecureObject<
     }
 
     /**
-     * Gets a value
+     * Gets a value with automatic decryption
      */
     public get<K extends keyof T>(key: K): T[K] {
         this.ensureNotDestroyed();
@@ -684,6 +743,27 @@ export class SecureObject<
                 metadata.isSecure,
                 true
             );
+        }
+
+        // Check if value is encrypted (starts with [ENCRYPTED:)
+        if (
+            typeof value === "string" &&
+            this.cryptoHandler.isEncrypted(value)
+        ) {
+            try {
+                // Decrypt the value automatically
+                const decryptedValue = this.cryptoHandler.decryptValue(value);
+                this.eventManager.emit("get", stringKey, decryptedValue);
+                return decryptedValue as T[K];
+            } catch (error) {
+                console.error(
+                    `Failed to decrypt value for key ${stringKey}:`,
+                    error
+                );
+                // Return the encrypted value if decryption fails
+                this.eventManager.emit("get", stringKey, value);
+                return value as T[K];
+            }
         }
 
         if (value instanceof SecureBuffer) {
