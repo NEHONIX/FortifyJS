@@ -18,9 +18,9 @@ SecureArray is FortifyJS's flagship secure data structure that provides military
 ## Installation
 
 ```javascript
-import { fArray } from "fortifyjs";
+import { fArray } "fortify2-js"
 // or
-const { fArray } = require("fortifyjs");
+const { fArray } = require("fortify2-js");
 ```
 
 ## Basic Usage

@@ -56,7 +56,7 @@ let sensitiveData = "credit-card-number-1234-5678";
 **fObject - Enterprise Security:**
 
 ```typescript
-import { fObject } from "fortifyjs";
+import { fObject } "fortify2-js"
 
 // FortifyJS - Automatic security and memory management
 const user = fObject(
@@ -84,7 +84,7 @@ const user = fObject(
 **fString - Military-Grade Protection:**
 
 ```typescript
-import { fString } from "fortifyjs";
+import { fString } "fortify2-js"
 
 // FortifyJS - Maximum security for sensitive strings
 const sensitiveData = fString("credit-card-number-1234-5678", {
@@ -533,7 +533,7 @@ user.apiKey = null;
 **After (FortifyJS):**
 
 ```typescript
-import { fObject } from "fortifyjs";
+import { fObject } "fortify2-js"
 
 const user = fObject({
     username: "admin",
@@ -561,7 +561,7 @@ creditCard = null; // ❌ Original still in memory
 **After (FortifyJS):**
 
 ```typescript
-import { fString } from "fortifyjs";
+import { fString } "fortify2-js"
 
 const password = fString("super-secret-password", {
     protectionLevel: "maximum",

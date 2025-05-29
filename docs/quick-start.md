@@ -19,7 +19,7 @@ bun add fortify2-js
 ### 1. Create Your First SecureArray
 
 ```javascript
-import { fArray } from "fortifyjs";
+import { fArray } "fortify2-js"
 
 // Create a secure array
 const secureData = fArray(["user1", "user2", "user3"]);

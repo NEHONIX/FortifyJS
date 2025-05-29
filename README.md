@@ -132,7 +132,7 @@ npm install @noble/hashes @noble/ciphers libsodium-wrappers argon2 bcryptjs
 ### SecureArray - Military-Grade Secure Data Structure
 
 ```typescript
-import { fArray } from "fortifyjs";
+import { fArray } "fortify2-js"
 
 // Create a secure array with real AES-256-CTR-HMAC encryption
 const secureData = fArray(["sensitive-data", "api-keys", "user-info"]);
