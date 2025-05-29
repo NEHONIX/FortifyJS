@@ -374,6 +374,14 @@ export class EnhancedUint8Array extends Uint8Array {
     }
 
     /**
+     * Convert to regular Uint8Array for safe Buffer operations
+     */
+    public toUint8Array(): Uint8Array {
+        this._checkCleared();
+        return new Uint8Array(this);
+    }
+
+    /**
      * Override valueOf to prevent accidental exposure
      */
     public valueOf(): never {

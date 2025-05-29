@@ -1,6 +1,6 @@
 /**
  * Cryptographic Handler Module
- * Handles encryption and decryption of sensitive data 
+ * Handles encryption and decryption of sensitive data
  */
 
 import { SerializationOptions } from "../types";
@@ -31,7 +31,9 @@ export class CryptoHandler {
     private initializeCrypto(): void {
         try {
             // Generate a unique salt for this object instance
-            const salt = SecureRandom.getRandomBytes(32);
+            const saltEnhanced = SecureRandom.getRandomBytes(32);
+            // Convert EnhancedUint8Array to regular Uint8Array for Hash operations
+            const salt = saltEnhanced.toUint8Array();
 
             // Create a unique identifier for this object's crypto context
             const context = `SecureObject:${this.objectId}:${bufferToHex(
@@ -65,7 +67,9 @@ export class CryptoHandler {
             }
 
             // Derive a strong encryption key from the provided key
-            const salt = SecureRandom.getRandomBytes(32);
+            const saltEnhanced = SecureRandom.getRandomBytes(32);
+            // Convert EnhancedUint8Array to regular Uint8Array for Hash operations
+            const salt = saltEnhanced.toUint8Array();
             const keyBuffer = new TextEncoder().encode(key);
 
             // Use PBKDF2-like key derivation with multiple rounds
@@ -128,7 +132,8 @@ export class CryptoHandler {
             const valueBytes = new TextEncoder().encode(valueStr);
 
             // Generate a random IV for this encryption
-            const iv = SecureRandom.getRandomBytes(16);
+            const ivEnhanced = SecureRandom.getRandomBytes(16);
+            const iv = ivEnhanced.toUint8Array();
 
             // Encrypt using a secure stream cipher approach
             const encrypted = this.performEncryption(valueBytes, key, iv);
@@ -273,7 +278,11 @@ export class CryptoHandler {
     /**
      * Performs the actual encryption using a secure stream cipher
      */
-    private performEncryption(data: Uint8Array, key: Uint8Array, iv: Uint8Array): Uint8Array {
+    private performEncryption(
+        data: Uint8Array,
+        key: Uint8Array,
+        iv: Uint8Array
+    ): Uint8Array {
         // Create a keystream using the key and IV
         const keystream = this.generateKeystream(key, iv, data.length);
 
@@ -297,7 +306,11 @@ export class CryptoHandler {
     /**
      * Performs the actual decryption
      */
-    private performDecryption(encryptedData: Uint8Array, key: Uint8Array, iv: Uint8Array): Uint8Array {
+    private performDecryption(
+        encryptedData: Uint8Array,
+        key: Uint8Array,
+        iv: Uint8Array
+    ): Uint8Array {
         // Split encrypted data and HMAC
         const hmacLength = 32; // SHA-256 HMAC length
         if (encryptedData.length < hmacLength) {
@@ -328,7 +341,11 @@ export class CryptoHandler {
     /**
      * Generates a secure keystream for encryption/decryption
      */
-    private generateKeystream(key: Uint8Array, iv: Uint8Array, length: number): Uint8Array {
+    private generateKeystream(
+        key: Uint8Array,
+        iv: Uint8Array,
+        length: number
+    ): Uint8Array {
         const keystream = new Uint8Array(length);
         let counter = 0;
 

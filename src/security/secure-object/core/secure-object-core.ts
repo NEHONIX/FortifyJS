@@ -1519,6 +1519,181 @@ export class SecureObject<
         return chunks;
     }
 
+    // ===== SERIALIZATION AND EXPORT =====
+
+    /**
+     * Serializes the SecureObject to a secure format
+     */
+    public serialize(options: SerializationOptions = {}): string {
+        this.ensureNotDestroyed();
+
+        try {
+            const {
+                includeMetadata = true,
+                encryptSensitive = false,
+                format = "json",
+            } = options;
+
+            // Create serialization package
+            const package_ = {
+                version: "2.0.0",
+                format: "FortifyJS-SecureObject",
+                timestamp: Date.now(),
+                objectId: this._id,
+                data: this.serializationHandler.toObject(
+                    this.data,
+                    new Set(this.sensitiveKeysManager.getAll()),
+                    options
+                ),
+                metadata: includeMetadata
+                    ? this.getSerializationMetadata()
+                    : null,
+                size: this.size,
+                isReadOnly: this._isReadOnly,
+                encryptionEnabled:
+                    this.cryptoHandler.getEncryptionStatus().hasEncryptionKey,
+            };
+
+            // Return as JSON string or binary based on format
+            if (format === "binary") {
+                const jsonString = JSON.stringify(package_);
+                const binaryData = new TextEncoder().encode(jsonString);
+                return Array.from(binaryData)
+                    .map((b) => b.toString(16).padStart(2, "0"))
+                    .join("");
+            } else {
+                return JSON.stringify(package_, null, 2);
+            }
+        } catch (error) {
+            console.error("Serialization failed:", error);
+            throw new Error(
+                `Serialization failed: ${(error as Error).message}`
+            );
+        }
+    }
+
+    /**
+     * Exports the SecureObject data in various formats
+     */
+    public exportData(
+        format: "json" | "csv" | "xml" | "yaml" = "json"
+    ): string {
+        this.ensureNotDestroyed();
+
+        try {
+            const data = this.toObject();
+
+            switch (format) {
+                case "json":
+                    return JSON.stringify(data, null, 2);
+
+                case "csv":
+                    return this.exportToCSV(data);
+
+                case "xml":
+                    return this.exportToXML(data);
+
+                case "yaml":
+                    return this.exportToYAML(data);
+
+                default:
+                    throw new Error(`Unsupported export format: ${format}`);
+            }
+        } catch (error) {
+            console.error("Export failed:", error);
+            throw new Error(`Export failed: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Gets serialization metadata
+     */
+    private getSerializationMetadata() {
+        const stats = this.metadataManager.getStats();
+        const memoryUsage = this.getMemoryUsage();
+        return {
+            totalEntries: stats.totalEntries,
+            secureEntries: stats.secureEntries,
+            memoryUsage: memoryUsage.allocatedMemory,
+            lastModified: stats.newestEntry?.getTime() || this._createdAt,
+            createdAt: this._createdAt,
+            accessCount: stats.totalAccesses,
+            averageAccesses: stats.averageAccesses,
+            oldestEntry: stats.oldestEntry?.getTime() || null,
+            newestEntry: stats.newestEntry?.getTime() || null,
+        };
+    }
+
+    /**
+     * Exports to CSV format
+     */
+    private exportToCSV(data: any): string {
+        const entries = Object.entries(data);
+        if (entries.length === 0) return "Key,Value,Type\n";
+
+        let csv = "Key,Value,Type\n";
+        for (const [key, value] of entries) {
+            const type = typeof value;
+            const valueStr =
+                type === "object" ? JSON.stringify(value) : String(value);
+            const escapedValue = `"${valueStr.replace(/"/g, '""')}"`;
+            csv += `"${key}",${escapedValue},${type}\n`;
+        }
+        return csv;
+    }
+
+    /**
+     * Exports to XML format
+     */
+    private exportToXML(data: any): string {
+        let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<SecureObject>\n';
+
+        for (const [key, value] of Object.entries(data)) {
+            const type = typeof value;
+            const valueStr =
+                type === "object" ? JSON.stringify(value) : String(value);
+            xml += `  <entry key="${this.escapeXML(
+                key
+            )}" type="${type}">${this.escapeXML(valueStr)}</entry>\n`;
+        }
+
+        xml += "</SecureObject>";
+        return xml;
+    }
+
+    /**
+     * Exports to YAML format
+     */
+    private exportToYAML(data: any): string {
+        let yaml = "# SecureObject Export\n";
+        yaml += `# Generated: ${new Date().toISOString()}\n\n`;
+
+        for (const [key, value] of Object.entries(data)) {
+            const type = typeof value;
+            if (type === "object") {
+                yaml += `${key}:\n`;
+                yaml += `  value: ${JSON.stringify(value)}\n`;
+                yaml += `  type: ${type}\n\n`;
+            } else {
+                yaml += `${key}: ${JSON.stringify(value)}\n`;
+            }
+        }
+
+        return yaml;
+    }
+
+    /**
+     * Escapes XML special characters
+     */
+    private escapeXML(str: string): string {
+        return str
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
     /**
      * Destroys the SecureObject and clears all data
      */

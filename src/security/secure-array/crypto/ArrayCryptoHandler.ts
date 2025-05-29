@@ -60,7 +60,9 @@ export class ArrayCryptoHandler {
     private initializeCrypto(): void {
         try {
             // Generate a unique salt for this array instance
-            const salt = SecureRandom.getRandomBytes(32);
+            const saltEnhanced = SecureRandom.getRandomBytes(32);
+            // Convert EnhancedUint8Array to regular Uint8Array for Hash operations
+            const salt = saltEnhanced.toUint8Array();
 
             // Create a unique identifier for this array's crypto context
             const context = `SecureArray:${this.arrayId}:${bufferToHex(salt)}`;
@@ -90,7 +92,9 @@ export class ArrayCryptoHandler {
             }
 
             // Derive a strong encryption key from the provided key
-            const salt = SecureRandom.getRandomBytes(32);
+            const saltEnhanced = SecureRandom.getRandomBytes(32);
+            // Convert EnhancedUint8Array to regular Uint8Array for Hash operations
+            const salt = saltEnhanced.toUint8Array();
             const keyBuffer = new TextEncoder().encode(key);
 
             // Use PBKDF2-like key derivation with multiple rounds
@@ -143,7 +147,8 @@ export class ArrayCryptoHandler {
             const valueBytes = new TextEncoder().encode(valueStr);
 
             // Generate a random IV for this encryption
-            const iv = SecureRandom.getRandomBytes(16);
+            const ivEnhanced = SecureRandom.getRandomBytes(16);
+            const iv = ivEnhanced.toUint8Array();
 
             // Encrypt using a secure stream cipher approach
             const encrypted = this.performEncryption(valueBytes, key, iv);

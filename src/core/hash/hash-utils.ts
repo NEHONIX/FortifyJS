@@ -10,7 +10,7 @@ import {
     bufferToBase58,
     bufferToBinary,
     bufferToBase64Url,
-    bufferToString, 
+    bufferToString,
 } from "../../utils/encoding";
 
 export class HashUtils {
@@ -22,7 +22,13 @@ export class HashUtils {
      */
     public static formatOutput(
         data: Uint8Array | Buffer,
-        format: "hex" | "base64" | "base58" | "binary" | "base64url" | "buffer" = "hex"
+        format:
+            | "hex"
+            | "base64"
+            | "base58"
+            | "binary"
+            | "base64url"
+            | "buffer" = "hex"
     ): string | Buffer {
         const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
 
@@ -49,7 +55,9 @@ export class HashUtils {
      * @param strength - Hash strength level
      * @returns Configuration object
      */
-    public static getStrengthConfiguration(strength: HashStrength): StrengthConfiguration {
+    public static getStrengthConfiguration(
+        strength: HashStrength
+    ): StrengthConfiguration {
         switch (strength) {
             case HashStrength.WEAK:
                 return {
@@ -95,7 +103,9 @@ export class HashUtils {
      * @param strength - Hash strength level
      * @returns Argon2 configuration
      */
-    public static getArgon2Configuration(strength: HashStrength): StrengthConfiguration {
+    public static getArgon2Configuration(
+        strength: HashStrength
+    ): StrengthConfiguration {
         switch (strength) {
             case HashStrength.WEAK:
                 return {
@@ -234,9 +244,15 @@ export class HashUtils {
      */
     public static isValidAlgorithm(algorithm: string): boolean {
         const validAlgorithms = [
-            "sha256", "sha512", "sha3-256", "sha3-512",
-            "blake3", "blake2b", "blake2s",
-            "md5", "sha1" // Included for compatibility but not recommended
+            "sha256",
+            "sha512",
+            "sha3-256",
+            "sha3-512",
+            "blake3",
+            "blake2b",
+            "blake2s",
+            "md5",
+            "sha1", // Included for compatibility but not recommended
         ];
         return validAlgorithms.includes(algorithm.toLowerCase());
     }
@@ -246,9 +262,11 @@ export class HashUtils {
      * @param algorithm - Algorithm to check
      * @returns Security level
      */
-    public static getAlgorithmSecurityLevel(algorithm: string): "LOW" | "MEDIUM" | "HIGH" | "MILITARY" {
+    public static getAlgorithmSecurityLevel(
+        algorithm: string
+    ): "LOW" | "MEDIUM" | "HIGH" | "MILITARY" {
         const algo = algorithm.toLowerCase();
-        
+
         if (["md5", "sha1"].includes(algo)) {
             return "LOW";
         } else if (["sha256"].includes(algo)) {
@@ -258,7 +276,7 @@ export class HashUtils {
         } else if (["blake3", "blake2b", "blake2s"].includes(algo)) {
             return "MILITARY";
         }
-        
+
         return "MEDIUM"; // Default
     }
 
@@ -271,7 +289,17 @@ export class HashUtils {
         if (Buffer.isBuffer(input)) {
             return input;
         } else if (input instanceof Uint8Array) {
-            return Buffer.from(input);
+            // Handle EnhancedUint8Array and regular Uint8Array
+            if (
+                "toUint8Array" in input &&
+                typeof input.toUint8Array === "function"
+            ) {
+                // EnhancedUint8Array - use its toUint8Array method
+                return Buffer.from(input.toUint8Array());
+            } else {
+                // Regular Uint8Array
+                return Buffer.from(input);
+            }
         } else {
             return Buffer.from(input, "utf8");
         }
@@ -303,9 +331,11 @@ export class HashUtils {
      */
     public static xorBuffers(a: Buffer, b: Buffer): Buffer {
         if (a.length !== b.length) {
-            throw new Error("Buffers must be of equal length for XOR operation");
+            throw new Error(
+                "Buffers must be of equal length for XOR operation"
+            );
         }
-        
+
         const result = Buffer.alloc(a.length);
         for (let i = 0; i < a.length; i++) {
             result[i] = a[i] ^ b[i];
@@ -313,4 +343,3 @@ export class HashUtils {
         return result;
     }
 }
- 
