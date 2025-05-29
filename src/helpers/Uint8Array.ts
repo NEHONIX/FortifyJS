@@ -382,11 +382,11 @@ export class EnhancedUint8Array extends Uint8Array {
     }
 
     /**
-     * Override valueOf to prevent accidental exposure
+     * Override valueOf to provide safe primitive conversion
+     * Returns this instance for Buffer.from() compatibility
      */
-    public valueOf(): never {
-        throw new Error(
-            "EnhancedUint8Array cannot be converted to primitive value"
-        );
+    public valueOf(): this {
+        this._checkCleared();
+        return this;
     }
 }

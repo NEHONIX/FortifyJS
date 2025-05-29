@@ -7,7 +7,7 @@ import {
     FortifiedFunctionOptions,
     PerformanceMetrics,
     OptimizationSuggestion,
-    ThreatDetectionResult
+    ThreatDetectionResult,
 } from "./types";
 import { memoryManager } from "../memory";
 
@@ -33,33 +33,51 @@ export class OptimizationEngine {
         const optimizations: Partial<FortifiedFunctionOptions> = {};
 
         // Apply high-priority suggestions first
-        const highPrioritySuggestions = suggestions.filter(s => s.priority === 'high' || s.priority === 'critical');
-        
+        const highPrioritySuggestions = suggestions.filter(
+            (s) => s.priority === "high" || s.priority === "critical"
+        );
+
         for (const suggestion of highPrioritySuggestions) {
-            const optimization = this.applySuggestion(suggestion, currentOptions, metrics);
+            const optimization = this.applySuggestion(
+                suggestion,
+                currentOptions,
+                metrics
+            );
             Object.assign(optimizations, optimization);
         }
 
         // Adaptive timeout optimization
         if (currentOptions.adaptiveTimeout) {
-            optimizations.timeout = this.optimizeTimeout(metrics, currentOptions.timeout);
+            optimizations.timeout = this.optimizeTimeout(
+                metrics,
+                currentOptions.timeout
+            );
         }
 
         // Smart cache optimization
         if (currentOptions.smartCaching) {
-            const cacheOptimizations = this.optimizeCacheSettings(metrics, currentOptions);
+            const cacheOptimizations = this.optimizeCacheSettings(
+                metrics,
+                currentOptions
+            );
             Object.assign(optimizations, cacheOptimizations);
         }
 
         // Memory optimization
         if (currentOptions.smartMemoryManagement) {
-            const memoryOptimizations = this.optimizeMemorySettings(metrics, currentOptions);
+            const memoryOptimizations = this.optimizeMemorySettings(
+                metrics,
+                currentOptions
+            );
             Object.assign(optimizations, memoryOptimizations);
         }
 
         // Retry strategy optimization
         if (currentOptions.intelligentRetry) {
-            const retryOptimizations = this.optimizeRetryStrategy(metrics, currentOptions);
+            const retryOptimizations = this.optimizeRetryStrategy(
+                metrics,
+                currentOptions
+            );
             Object.assign(optimizations, retryOptimizations);
         }
 
@@ -69,19 +87,22 @@ export class OptimizationEngine {
     /**
      * Adaptive timeout calculation based on execution patterns
      */
-    public optimizeTimeout(metrics: PerformanceMetrics, currentTimeout: number): number {
+    public optimizeTimeout(
+        metrics: PerformanceMetrics,
+        currentTimeout: number
+    ): number {
         const { executionTime, errorRate } = metrics;
-        
+
         // If execution time is consistently much lower than timeout, reduce it
         if (executionTime < currentTimeout * 0.3 && errorRate < 0.05) {
             return Math.max(executionTime * 2, 5000); // At least 5 seconds
         }
-        
+
         // If we're getting timeouts (high error rate), increase timeout
         if (errorRate > 0.1) {
             return Math.min(currentTimeout * 1.5, 120000); // Max 2 minutes
         }
-        
+
         // Adaptive adjustment based on recent performance
         const adaptiveTimeout = executionTime * 3; // 3x average execution time
         return Math.max(Math.min(adaptiveTimeout, 60000), 5000); // Between 5s and 60s
@@ -95,25 +116,34 @@ export class OptimizationEngine {
         currentOptions: Required<FortifiedFunctionOptions>
     ): Partial<FortifiedFunctionOptions> {
         const optimizations: Partial<FortifiedFunctionOptions> = {};
-        
+
         // Adjust cache size based on hit rate and memory usage
         if (metrics.cacheHitRate < 0.5 && metrics.memoryUsage < 0.7) {
             // Low hit rate but memory available - increase cache size
-            optimizations.maxCacheSize = Math.min((currentOptions.maxCacheSize || 1000) * 1.5, 5000);
+            optimizations.maxCacheSize = Math.min(
+                (currentOptions.maxCacheSize || 1000) * 1.5,
+                5000
+            );
         } else if (metrics.cacheHitRate > 0.8 && metrics.memoryUsage > 0.8) {
             // High hit rate but memory pressure - optimize cache strategy
-            optimizations.cacheStrategy = 'lru'; // More memory efficient
+            optimizations.cacheStrategy = "lru"; // More memory efficient
         }
-        
+
         // Adjust TTL based on access patterns
         if (metrics.cacheHitRate > 0.7) {
             // High hit rate - can afford longer TTL
-            optimizations.cacheTTL = Math.min((currentOptions.cacheTTL || 300000) * 1.2, 600000);
+            optimizations.cacheTTL = Math.min(
+                (currentOptions.cacheTTL || 300000) * 1.2,
+                600000
+            );
         } else if (metrics.cacheHitRate < 0.3) {
             // Low hit rate - shorter TTL for fresher data
-            optimizations.cacheTTL = Math.max((currentOptions.cacheTTL || 300000) * 0.8, 60000);
+            optimizations.cacheTTL = Math.max(
+                (currentOptions.cacheTTL || 300000) * 0.8,
+                60000
+            );
         }
-        
+
         return optimizations;
     }
 
@@ -126,23 +156,26 @@ export class OptimizationEngine {
     ): Partial<FortifiedFunctionOptions> {
         const optimizations: Partial<FortifiedFunctionOptions> = {};
         const memoryStats = memoryManager.getStats();
-        
+
         // Adjust memory limits based on system pressure
-        if (memoryStats.usagePercentage > 0.8) {
+        if (memoryStats.pressure > 0.8) {
             // High memory pressure - reduce limits
             optimizations.maxMemoryUsage = Math.max(
                 currentOptions.maxMemoryUsage * 0.8,
                 50 * 1024 * 1024 // Minimum 50MB
             );
             optimizations.memoryWipeDelay = 0; // Immediate cleanup
-        } else if (memoryStats.usagePercentage < 0.5 && metrics.memoryUsage > currentOptions.maxMemoryUsage * 0.8) {
+        } else if (
+            memoryStats.pressure < 0.5 &&
+            metrics.memoryUsage > currentOptions.maxMemoryUsage * 0.8
+        ) {
             // Low system pressure but high function usage - increase limits
             optimizations.maxMemoryUsage = Math.min(
                 currentOptions.maxMemoryUsage * 1.2,
                 500 * 1024 * 1024 // Maximum 500MB
             );
         }
-        
+
         return optimizations;
     }
 
@@ -154,18 +187,24 @@ export class OptimizationEngine {
         currentOptions: Required<FortifiedFunctionOptions>
     ): Partial<FortifiedFunctionOptions> {
         const optimizations: Partial<FortifiedFunctionOptions> = {};
-        
+
         // Adjust retry count based on error rate
         if (metrics.errorRate > 0.2) {
             // High error rate - increase retries
             optimizations.retries = Math.min(currentOptions.retries + 1, 5);
-            optimizations.maxRetryDelay = Math.min(currentOptions.maxRetryDelay * 1.2, 10000);
+            optimizations.maxRetryDelay = Math.min(
+                currentOptions.maxRetryDelay * 1.2,
+                10000
+            );
         } else if (metrics.errorRate < 0.05) {
             // Low error rate - reduce retries for faster failure
             optimizations.retries = Math.max(currentOptions.retries - 1, 0);
-            optimizations.maxRetryDelay = Math.max(currentOptions.maxRetryDelay * 0.8, 1000);
+            optimizations.maxRetryDelay = Math.max(
+                currentOptions.maxRetryDelay * 0.8,
+                1000
+            );
         }
-        
+
         return optimizations;
     }
 
@@ -178,45 +217,54 @@ export class OptimizationEngine {
     ): ThreatDetectionResult {
         const threats: string[] = [];
         const recommendations: string[] = [];
-        let threatLevel: ThreatDetectionResult['threatLevel'] = 'none';
+        let threatLevel: ThreatDetectionResult["threatLevel"] = "none";
         let blocked = false;
 
         // Detect unusual execution patterns
-        if (metrics.executionTime > 30000) { // More than 30 seconds
-            threats.push('Potential DoS attack - extremely long execution time');
-            threatLevel = 'medium';
-            recommendations.push('Enable execution timeout limits');
+        if (metrics.executionTime > 30000) {
+            // More than 30 seconds
+            threats.push(
+                "Potential DoS attack - extremely long execution time"
+            );
+            threatLevel = "medium";
+            recommendations.push("Enable execution timeout limits");
         }
 
         // Detect memory exhaustion attempts
-        if (metrics.memoryUsage > 200 * 1024 * 1024) { // More than 200MB
-            threats.push('Potential memory exhaustion attack');
-            threatLevel = 'high';
-            recommendations.push('Enable memory usage limits');
+        if (metrics.memoryUsage > 200 * 1024 * 1024) {
+            // More than 200MB
+            threats.push("Potential memory exhaustion attack");
+            threatLevel = "high";
+            recommendations.push("Enable memory usage limits");
         }
 
         // Detect rapid successive calls (potential brute force)
         const rapidCallsDetected = this.detectRapidCalls(executionContext);
         if (rapidCallsDetected) {
-            threats.push('Potential brute force attack - rapid successive calls');
-            threatLevel = 'high';
+            threats.push(
+                "Potential brute force attack - rapid successive calls"
+            );
+            threatLevel = "high";
             blocked = true;
-            recommendations.push('Implement rate limiting');
+            recommendations.push("Implement rate limiting");
         }
 
         // Detect suspicious parameter patterns
-        const suspiciousParams = this.detectSuspiciousParameters(executionContext);
+        const suspiciousParams =
+            this.detectSuspiciousParameters(executionContext);
         if (suspiciousParams) {
-            threats.push('Suspicious parameter patterns detected');
-            threatLevel = threatLevel === 'none' ? 'low' : threatLevel;
-            recommendations.push('Enable parameter validation and sanitization');
+            threats.push("Suspicious parameter patterns detected");
+            threatLevel = threatLevel === "none" ? "low" : threatLevel;
+            recommendations.push(
+                "Enable parameter validation and sanitization"
+            );
         }
 
         return {
             threatLevel,
             threats,
             recommendations,
-            blocked
+            blocked,
         };
     }
 
@@ -232,12 +280,24 @@ export class OptimizationEngine {
         }
 
         const optimizations: Partial<FortifiedFunctionOptions> = {};
-        
+
         // Calculate performance trends
-        const avgExecutionTime = this.calculateAverage(historicalMetrics, 'executionTime');
-        const avgMemoryUsage = this.calculateAverage(historicalMetrics, 'memoryUsage');
-        const avgCacheHitRate = this.calculateAverage(historicalMetrics, 'cacheHitRate');
-        const avgErrorRate = this.calculateAverage(historicalMetrics, 'errorRate');
+        const avgExecutionTime = this.calculateAverage(
+            historicalMetrics,
+            "executionTime"
+        );
+        const avgMemoryUsage = this.calculateAverage(
+            historicalMetrics,
+            "memoryUsage"
+        );
+        const avgCacheHitRate = this.calculateAverage(
+            historicalMetrics,
+            "cacheHitRate"
+        );
+        const avgErrorRate = this.calculateAverage(
+            historicalMetrics,
+            "errorRate"
+        );
 
         // Set baseline if not exists
         if (!this.performanceBaseline) {
@@ -248,26 +308,40 @@ export class OptimizationEngine {
                 cacheHitRate: avgCacheHitRate,
                 errorRate: avgErrorRate,
                 throughput: 0,
-                latency: avgExecutionTime
+                latency: avgExecutionTime,
             };
         }
 
         // Auto-tune based on performance regression
-        const currentPerformance = historicalMetrics[historicalMetrics.length - 1];
-        const performanceRegression = this.detectPerformanceRegression(currentPerformance);
-        
+        const currentPerformance =
+            historicalMetrics[historicalMetrics.length - 1];
+        const performanceRegression =
+            this.detectPerformanceRegression(currentPerformance);
+
         if (performanceRegression) {
             // Revert to more conservative settings
-            optimizations.timeout = Math.min(currentOptions.timeout * 1.2, 60000);
-            optimizations.maxCacheSize = Math.max((currentOptions.maxCacheSize || 1000) * 0.8, 100);
+            optimizations.timeout = Math.min(
+                currentOptions.timeout * 1.2,
+                60000
+            );
+            optimizations.maxCacheSize = Math.max(
+                (currentOptions.maxCacheSize || 1000) * 0.8,
+                100
+            );
             optimizations.retries = Math.max(currentOptions.retries - 1, 0);
         } else {
             // Performance is good, can be more aggressive
             if (avgCacheHitRate > 0.8) {
-                optimizations.maxCacheSize = Math.min((currentOptions.maxCacheSize || 1000) * 1.1, 2000);
+                optimizations.maxCacheSize = Math.min(
+                    (currentOptions.maxCacheSize || 1000) * 1.1,
+                    2000
+                );
             }
             if (avgErrorRate < 0.05) {
-                optimizations.timeout = Math.max(currentOptions.timeout * 0.9, 5000);
+                optimizations.timeout = Math.max(
+                    currentOptions.timeout * 0.9,
+                    5000
+                );
             }
         }
 
@@ -286,33 +360,37 @@ export class OptimizationEngine {
         // Cache recommendations
         if (metrics.cacheHitRate < 0.5) {
             recommendations.push({
-                type: 'cache',
-                priority: 'high',
-                description: 'Low cache hit rate. Consider increasing cache size or adjusting strategy.',
+                type: "cache",
+                priority: "high",
+                description:
+                    "Low cache hit rate. Consider increasing cache size or adjusting strategy.",
                 expectedImprovement: (0.7 - metrics.cacheHitRate) * 100,
-                implementation: 'Increase maxCacheSize or change cacheStrategy to "adaptive"'
+                implementation:
+                    'Increase maxCacheSize or change cacheStrategy to "adaptive"',
             });
         }
 
         // Performance recommendations
         if (metrics.executionTime > currentOptions.timeout * 0.8) {
             recommendations.push({
-                type: 'timeout',
-                priority: 'medium',
-                description: 'Execution time approaching timeout limit.',
+                type: "timeout",
+                priority: "medium",
+                description: "Execution time approaching timeout limit.",
                 expectedImprovement: 20,
-                implementation: 'Enable adaptiveTimeout or increase timeout value'
+                implementation:
+                    "Enable adaptiveTimeout or increase timeout value",
             });
         }
 
         // Memory recommendations
         if (metrics.memoryUsage > currentOptions.maxMemoryUsage * 0.8) {
             recommendations.push({
-                type: 'memory',
-                priority: 'medium',
-                description: 'High memory usage detected.',
+                type: "memory",
+                priority: "medium",
+                description: "High memory usage detected.",
                 expectedImprovement: 25,
-                implementation: 'Enable smartMemoryManagement or increase maxMemoryUsage'
+                implementation:
+                    "Enable smartMemoryManagement or increase maxMemoryUsage",
             });
         }
 
@@ -330,22 +408,25 @@ export class OptimizationEngine {
         const optimization: Partial<FortifiedFunctionOptions> = {};
 
         switch (suggestion.type) {
-            case 'cache':
-                if (suggestion.description.includes('cache size')) {
-                    optimization.maxCacheSize = Math.min((currentOptions.maxCacheSize || 1000) * 1.5, 5000);
+            case "cache":
+                if (suggestion.description.includes("cache size")) {
+                    optimization.maxCacheSize = Math.min(
+                        (currentOptions.maxCacheSize || 1000) * 1.5,
+                        5000
+                    );
                 }
-                if (suggestion.description.includes('strategy')) {
-                    optimization.cacheStrategy = 'adaptive';
+                if (suggestion.description.includes("strategy")) {
+                    optimization.cacheStrategy = "adaptive";
                 }
                 break;
-            case 'timeout':
+            case "timeout":
                 optimization.adaptiveTimeout = true;
                 break;
-            case 'memory':
+            case "memory":
                 optimization.smartMemoryManagement = true;
                 optimization.memoryPressureHandling = true;
                 break;
-            case 'security':
+            case "security":
                 optimization.threatDetection = true;
                 optimization.smartSecurity = true;
                 break;
@@ -366,17 +447,28 @@ export class OptimizationEngine {
         return false;
     }
 
-    private calculateAverage(metrics: PerformanceMetrics[], field: keyof PerformanceMetrics): number {
+    private calculateAverage(
+        metrics: PerformanceMetrics[],
+        field: keyof PerformanceMetrics
+    ): number {
         const sum = metrics.reduce((total, metric) => total + metric[field], 0);
         return sum / metrics.length;
     }
 
-    private detectPerformanceRegression(currentMetrics: PerformanceMetrics): boolean {
+    private detectPerformanceRegression(
+        currentMetrics: PerformanceMetrics
+    ): boolean {
         if (!this.performanceBaseline) return false;
 
-        const executionTimeRegression = currentMetrics.executionTime > this.performanceBaseline.executionTime * 1.5;
-        const memoryRegression = currentMetrics.memoryUsage > this.performanceBaseline.memoryUsage * 1.3;
-        const cacheRegression = currentMetrics.cacheHitRate < this.performanceBaseline.cacheHitRate * 0.7;
+        const executionTimeRegression =
+            currentMetrics.executionTime >
+            this.performanceBaseline.executionTime * 1.5;
+        const memoryRegression =
+            currentMetrics.memoryUsage >
+            this.performanceBaseline.memoryUsage * 1.3;
+        const cacheRegression =
+            currentMetrics.cacheHitRate <
+            this.performanceBaseline.cacheHitRate * 0.7;
 
         return executionTimeRegression || memoryRegression || cacheRegression;
     }

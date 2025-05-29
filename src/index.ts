@@ -61,23 +61,12 @@
  */
 
 import { FortifyJS } from "./core/crypto";
-// Use the new modular SecureString
 import { SecureString } from "./security/secure-string";
-// Use the new modular SecureObject
-import { SecureObject, SecureObjectOptions } from "./security/secure-object";
-// Use the new modular SecureArray
-import { SecureArray, SecureArrayOptions } from "./security/secure-array";
-
-// Export modular SecureObject utilities
+import { SecureObject } from "./security/secure-object";
+import { SecureArray } from "./security/secure-array";
 import * as fObjectUtils from "./security/secure-object";
-
-// Export modular SecureString utilities
 import * as fstringUtils from "./security/secure-string";
-
-// Export modular SecureArray utilities
 import * as fArrayUtils from "./security/secure-array";
-
-// Export modular FortifiedFunction utilities
 import * as fFuncUtils from "./utils/fortified-function";
 
 // Type exports
