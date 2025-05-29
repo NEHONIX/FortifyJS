@@ -591,9 +591,28 @@ export class SecureObject<
                         );
                     }
 
+                    // Get the actual value to encrypt
+                    let valueToEncrypt = value;
+
+                    // If it's a SecureBuffer, convert it back to its original form
+                    if (value instanceof SecureBuffer) {
+                        const metadata = this.metadataManager.get(key);
+                        if (metadata?.type === "string") {
+                            valueToEncrypt = new TextDecoder().decode(
+                                value.getBuffer()
+                            );
+                        } else if (metadata?.type === "Uint8Array") {
+                            valueToEncrypt = new Uint8Array(value.getBuffer());
+                        } else {
+                            valueToEncrypt = new TextDecoder().decode(
+                                value.getBuffer()
+                            );
+                        }
+                    }
+
                     // Encrypt the value
                     const encryptedValue =
-                        this.cryptoHandler.encryptValue(value);
+                        this.cryptoHandler.encryptValue(valueToEncrypt);
                     encryptedEntries.set(key, encryptedValue);
                     keysToProcess.push(key);
                 }
@@ -801,8 +820,7 @@ export class SecureObject<
             this.metadataManager.update(
                 stringKey,
                 metadata.type,
-                metadata.isSecure,
-                true
+                metadata.isSecure
             );
         }
 
@@ -832,7 +850,10 @@ export class SecureObject<
             const buffer = value.getBuffer();
             const metadata = this.metadataManager.get(stringKey);
 
-            if (metadata?.type === "Uint8Array") {
+            if (
+                metadata?.type === "Uint8Array" ||
+                metadata?.type === "encrypted:Uint8Array"
+            ) {
                 // Return as Uint8Array for binary data
                 const result = new Uint8Array(buffer) as unknown as T[K];
                 this.eventManager.emit("get", stringKey, result);

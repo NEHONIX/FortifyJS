@@ -1910,7 +1910,7 @@ export class SecureArray<T extends SecureArrayValue = SecureArrayValue>
         try {
             // First pass: encrypt all values into temporary storage
             for (let i = 0; i < this.elements.length; i++) {
-                const value = this.get(i);
+                const value = this.elements[i]; // Get raw value, not through get() method
                 if (value !== undefined) {
                     // Skip already encrypted values to avoid double encryption
                     if (
@@ -1925,9 +1925,30 @@ export class SecureArray<T extends SecureArrayValue = SecureArrayValue>
                         originalMetadata.set(i, this.metadataManager.get(i));
                     }
 
+                    // Get the actual value to encrypt
+                    let valueToEncrypt: any = value;
+
+                    // If it's a SecureBuffer, convert it back to its original form
+                    if (value instanceof SecureBuffer) {
+                        const metadata = this.metadataManager.get(i);
+                        if (metadata?.type === "string") {
+                            valueToEncrypt = new TextDecoder().decode(
+                                value.getBuffer()
+                            ) as any;
+                        } else if (metadata?.type === "Uint8Array") {
+                            valueToEncrypt = new Uint8Array(
+                                value.getBuffer()
+                            ) as any;
+                        } else {
+                            valueToEncrypt = new TextDecoder().decode(
+                                value.getBuffer()
+                            ) as any;
+                        }
+                    }
+
                     // Encrypt the value
                     const encryptedValue =
-                        this.cryptoHandler.encryptValue(value);
+                        this.cryptoHandler.encryptValue(valueToEncrypt);
                     encryptedValues[i] = encryptedValue;
                     indicesToProcess.push(i);
                 }
