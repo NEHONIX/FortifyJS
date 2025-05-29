@@ -267,9 +267,8 @@ Active contributors may be invited to become maintainers based on:
 
 Your contributions help make the web more secure. Every bug fix, feature addition, and documentation improvement makes a difference.
 
-**Happy coding!** 🚀🔐
+**Happy coding!** 🔐
 
 ---
 
 _For security vulnerabilities, please see our [Security Policy](SECURITY.md)_
-

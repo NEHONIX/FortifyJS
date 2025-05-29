@@ -11,22 +11,41 @@ export interface FortifiedFunctionOptions {
     secureParameters?: (string | number)[];
     memoryWipeDelay?: number;
     stackTraceProtection?: boolean;
+    smartSecurity?: boolean;
+    threatDetection?: boolean;
 
     // Performance Options
     memoize?: boolean;
     timeout?: number;
     retries?: number;
     maxRetryDelay?: number;
+    smartCaching?: boolean;
+    cacheStrategy?: "lru" | "lfu" | "adaptive";
+    cacheTTL?: number;
+    maxCacheSize?: number;
+    precompile?: boolean;
+    optimizeExecution?: boolean;
+
+    // Smart Actions
+    autoTuning?: boolean;
+    predictiveAnalytics?: boolean;
+    adaptiveTimeout?: boolean;
+    intelligentRetry?: boolean;
+    anomalyDetection?: boolean;
+    performanceRegression?: boolean;
 
     // Monitoring Options
     auditLog?: boolean;
     performanceTracking?: boolean;
     debugMode?: boolean;
+    detailedMetrics?: boolean;
 
     // Memory Management
     memoryPool?: boolean;
     maxMemoryUsage?: number;
     autoCleanup?: boolean;
+    smartMemoryManagement?: boolean;
+    memoryPressureHandling?: boolean;
 }
 
 export interface FunctionStats {
@@ -73,6 +92,10 @@ export interface CacheEntry<R> {
     timestamp: number;
     accessCount: number;
     lastAccessed: Date;
+    ttl?: number;
+    priority?: number;
+    size?: number;
+    frequency?: number;
 }
 
 export interface SecurityFlags {
@@ -82,3 +105,106 @@ export interface SecurityFlags {
     stackProtected: boolean;
 }
 
+// New interfaces for enhanced functionality
+export interface SmartCacheConfig {
+    strategy: "lru" | "lfu" | "adaptive";
+    maxSize: number;
+    ttl: number;
+    autoCleanup: boolean;
+    compressionEnabled: boolean;
+    persistToDisk: boolean;
+}
+
+export interface PerformanceMetrics {
+    executionTime: number;
+    memoryUsage: number;
+    cpuUsage: number;
+    cacheHitRate: number;
+    errorRate: number;
+    throughput: number;
+    latency: number;
+}
+
+export interface ExecutionPattern {
+    parametersHash: string;
+    frequency: number;
+    averageExecutionTime: number;
+    lastExecuted: Date;
+    predictedNextExecution?: Date;
+    cacheWorthiness: number;
+}
+
+export interface OptimizationSuggestion {
+    type: "cache" | "timeout" | "retry" | "memory" | "security";
+    priority: "low" | "medium" | "high" | "critical";
+    description: string;
+    expectedImprovement: number;
+    implementation: string;
+}
+
+export interface ThreatDetectionResult {
+    threatLevel: "none" | "low" | "medium" | "high" | "critical";
+    threats: string[];
+    recommendations: string[];
+    blocked: boolean;
+}
+
+export interface AnalyticsData {
+    patterns: ExecutionPattern[];
+    trends: PerformanceMetrics[];
+    anomalies: AnomalyDetection[];
+    predictions: PredictiveAnalysis[];
+}
+
+export interface AnomalyDetection {
+    type: "performance" | "memory" | "security" | "error";
+    severity: "low" | "medium" | "high";
+    description: string;
+    timestamp: Date;
+    metrics: Record<string, number>;
+}
+
+export interface PredictiveAnalysis {
+    metric: string;
+    currentValue: number;
+    predictedValue: number;
+    confidence: number;
+    timeframe: number;
+    trend: "increasing" | "decreasing" | "stable";
+}
+
+/**
+ * Enhanced function type that provides access to FortifiedFunction methods
+ * while maintaining the original function signature
+ */
+export interface EnhancedFortifiedFunction<T extends any[], R> {
+    // Main execution method (callable as function)
+    (...args: T): Promise<R>;
+
+    // Analytics and monitoring methods
+    getStats(): FunctionStats;
+    getAnalyticsData(): AnalyticsData;
+    getOptimizationSuggestions(): OptimizationSuggestion[];
+    getPerformanceTrends(): PerformanceMetrics[];
+    detectAnomalies(): AnomalyDetection[];
+    getDetailedMetrics(): Record<string, any>;
+
+    // Cache management methods
+    clearCache(): void;
+    getCacheStats(): { hits: number; misses: number; size: number };
+    warmCache(args: T[]): Promise<void>;
+
+    // Smart actions
+    handleMemoryPressure(level: "low" | "medium" | "high"): void;
+    optimizePerformance(): void;
+
+    // Configuration methods
+    updateOptions(options: Partial<FortifiedFunctionOptions>): void;
+    getConfiguration(): FortifiedFunctionOptions;
+
+    // Lifecycle methods
+    destroy(): void;
+
+    // Internal FortifiedFunction instance (for advanced usage)
+    readonly _fortified: any; // Will be properly typed as FortifiedFunction<T, R>
+}

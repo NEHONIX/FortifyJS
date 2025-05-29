@@ -273,18 +273,8 @@ export function fArray<
     return fArrayUtils.createSecureArray<T>(...args);
 }
 
-/**
- * @author suppercodercodelover
- * @description Creates a fortified function with automatic security, memory management, and monitoring
- * @param fn - The function to be fortified
- * @param options - Security and performance options
- * @returns A fortified function with enhanced security features
- */
-export function func<T extends any[], R>(
-    ...args: Parameters<typeof fFuncUtils.fFunc<T, R>>
-) {
-    return fFuncUtils.fFunc<T, R>(...args);
-}
+// func
+export { func } from "./utils/fortified-function";
 
 /**
  * Encrypt a password with pepper and military-grade hashing
@@ -458,7 +448,7 @@ if (typeof module !== "undefined" && module.exports) {
     module.exports.fString = fString;
     module.exports.fObject = fObject;
     module.exports.fArray = fArray;
-    module.exports.func = func;
+    module.exports.func = fFuncUtils.func;
 
     // Export fortified function utilities (using imported modules)
     module.exports.createFortifiedFunction = fFuncUtils.createFortifiedFunction;

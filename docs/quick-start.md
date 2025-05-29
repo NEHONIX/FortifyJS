@@ -1,6 +1,6 @@
 # FortifyJS SecureArray - Quick Start Guide
 
-## 🚀 Get Started in 5 Minutes
+## Get Started in 5 Minutes
 
 Welcome to FortifyJS SecureArray! This guide will get you up and running with secure, encrypted arrays in just a few minutes.
 
@@ -311,6 +311,5 @@ You now have a secure, encrypted array with military-grade security features. St
 const mySecureApp = fArray([]);
 mySecureApp.setEncryptionKey("your-app-key");
 
-// Build something amazing! 🚀
+// Build something amazing!
 ```
-

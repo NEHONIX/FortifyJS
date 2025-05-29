@@ -1,6 +1,6 @@
 import { Hash, HashStrength, SecureRandom } from "../src/core";
 
-console.log("COMPREHENSIVE PERFORMANCE BENCHMARKS 🚀");
+console.log("COMPREHENSIVE PERFORMANCE BENCHMARKS ");
 console.log("Measuring modular architecture performance improvements");
 
 interface BenchmarkResult {
@@ -331,4 +331,3 @@ Promise.all(concurrentPromises).then(() => {
         console.log("\n📋 NEXT PHASE: Documentation Updates");
     }, 100);
 });
-

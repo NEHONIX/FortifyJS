@@ -1,16 +1,29 @@
 /**
- * FortifyJS - Fortified Function Performance Monitor
- * Handles performance tracking and statistics
+ * FortifyJS - Enhanced Performance Monitor
+ * Advanced performance tracking with smart caching and analytics
  */
 
-import { FunctionStats, SecureExecutionContext, AuditEntry, CacheEntry } from "./types";
+import {
+    FunctionStats,
+    SecureExecutionContext,
+    AuditEntry,
+    CacheEntry,
+    PerformanceMetrics,
+    SmartCacheConfig,
+} from "./types";
+import { SmartCache } from "./smart-cache";
+import { AnalyticsEngine } from "./analytics-engine";
+import { memoryManager } from "../memory";
 
 export class PerformanceMonitor {
     private readonly stats: FunctionStats;
     private readonly auditLog: AuditEntry[] = [];
-    private readonly memoCache = new Map<string, CacheEntry<any>>();
+    private readonly smartCache: SmartCache<string, any>;
+    private readonly analyticsEngine: AnalyticsEngine;
+    private readonly performanceHistory: PerformanceMetrics[] = [];
+    private lastCleanupTime = Date.now();
 
-    constructor() {
+    constructor(cacheConfig?: Partial<SmartCacheConfig>) {
         this.stats = {
             executionCount: 0,
             totalExecutionTime: 0,
@@ -20,22 +33,29 @@ export class PerformanceMonitor {
             cacheMisses: 0,
             errorCount: 0,
             lastExecuted: new Date(),
-            securityEvents: 0
+            securityEvents: 0,
         };
+
+        this.smartCache = new SmartCache(cacheConfig);
+        this.analyticsEngine = new AnalyticsEngine();
     }
 
     /**
      * Update execution statistics
      */
-    public updateStats(context: SecureExecutionContext, success: boolean): void {
+    public updateStats(
+        context: SecureExecutionContext,
+        success: boolean
+    ): void {
         const executionTime = performance.now() - context.startTime;
-        
+
         this.stats.executionCount++;
         this.stats.totalExecutionTime += executionTime;
-        this.stats.averageExecutionTime = this.stats.totalExecutionTime / this.stats.executionCount;
+        this.stats.averageExecutionTime =
+            this.stats.totalExecutionTime / this.stats.executionCount;
         this.stats.lastExecuted = new Date();
         this.stats.memoryUsage = this.getCurrentMemoryUsage();
-        
+
         if (!success) {
             this.stats.errorCount++;
         }
@@ -51,7 +71,7 @@ export class PerformanceMonitor {
      */
     public addAuditEntry(entry: AuditEntry): void {
         this.auditLog.push(entry);
-        
+
         // Limit audit log size
         if (this.auditLog.length > 1000) {
             this.auditLog.splice(0, 100);
@@ -80,47 +100,38 @@ export class PerformanceMonitor {
     }
 
     /**
-     * Get cached result
+     * Get cached result with smart caching
      */
     public getCachedResult<R>(key: string): R | null {
-        const entry = this.memoCache.get(key);
-        if (entry) {
-            entry.accessCount++;
-            entry.lastAccessed = new Date();
-            return entry.result;
-        }
-        return null;
+        return this.smartCache.get(key);
     }
 
     /**
-     * Cache result
+     * Cache result with smart management
      */
-    public cacheResult<R>(key: string, result: R): void {
-        this.memoCache.set(key, {
-            result,
-            timestamp: Date.now(),
-            accessCount: 1,
-            lastAccessed: new Date()
-        });
+    public cacheResult<R>(key: string, result: R, ttl?: number): void {
+        this.smartCache.set(key, result, ttl);
     }
 
     /**
      * Clear cache
      */
     public clearCache(): void {
-        this.memoCache.clear();
+        this.smartCache.clear();
     }
 
     /**
-     * Clean up old cache entries
+     * Clean up old cache entries with smart cleanup
      */
     public cleanupOldCacheEntries(maxAge: number = 300000): void {
-        const now = Date.now();
-        for (const [key, entry] of this.memoCache.entries()) {
-            if (now - entry.timestamp > maxAge) {
-                this.memoCache.delete(key);
-            }
+        // Smart cache handles this automatically, but we can trigger manual cleanup
+        const memoryStats = memoryManager.getStats();
+        if (memoryStats.pressure > 0.7) {
+            this.smartCache.handleMemoryPressure("medium");
+        } else if (memoryStats.pressure > 0.5) {
+            this.smartCache.handleMemoryPressure("low");
         }
+        this.lastCleanupTime = Date.now();
     }
 
     /**
@@ -152,14 +163,120 @@ export class PerformanceMonitor {
     }
 
     /**
-     * Get cache statistics
+     * Get enhanced cache statistics
      */
     public getCacheStats() {
+        const smartCacheStats = this.smartCache.getStats();
         return {
-            size: this.memoCache.size,
-            hitRate: this.stats.cacheHits / (this.stats.cacheHits + this.stats.cacheMisses) || 0,
+            ...smartCacheStats,
             totalHits: this.stats.cacheHits,
-            totalMisses: this.stats.cacheMisses
+            totalMisses: this.stats.cacheMisses,
         };
     }
+
+    /**
+     * Update performance metrics with analytics
+     */
+    public updatePerformanceMetrics(metrics: PerformanceMetrics): void {
+        this.performanceHistory.push(metrics);
+
+        // Limit history size
+        if (this.performanceHistory.length > 100) {
+            this.performanceHistory.splice(
+                0,
+                this.performanceHistory.length - 100
+            );
+        }
+
+        // Update analytics
+        this.analyticsEngine.updatePerformanceMetrics(metrics);
+
+        // Adapt cache strategy based on performance
+        this.smartCache.adaptStrategy(metrics);
+    }
+
+    /**
+     * Get analytics data
+     */
+    public getAnalyticsData() {
+        return this.analyticsEngine.getAnalyticsData();
+    }
+
+    /**
+     * Get optimization suggestions
+     */
+    public getOptimizationSuggestions() {
+        return this.analyticsEngine.generateOptimizationSuggestions();
+    }
+
+    /**
+     * Warm cache with predicted entries
+     */
+    public warmCache(): void {
+        const patterns = this.analyticsEngine.getExecutionPatterns();
+        const predictions = this.analyticsEngine.predictNextExecutions();
+
+        // Warm cache with high-value patterns
+        const warmingData = patterns
+            .slice(0, 10) // Top 10 patterns
+            .map((pattern) => ({
+                key: pattern.parametersHash,
+                value: null, // Would need actual cached values
+                priority: pattern.cacheWorthiness,
+            }));
+
+        this.smartCache.warmCache(warmingData);
+
+        // Map predictions to the correct format
+        const mappedPredictions = predictions.map((p) => ({
+            key: p.parametersHash,
+            probability: p.probability,
+        }));
+        this.smartCache.preloadPredictedEntries(mappedPredictions);
+    }
+
+    /**
+     * Handle memory pressure intelligently
+     */
+    public handleMemoryPressure(level: "low" | "medium" | "high"): void {
+        this.smartCache.handleMemoryPressure(level);
+
+        if (level === "high") {
+            // Aggressive cleanup
+            this.auditLog.splice(0, Math.floor(this.auditLog.length * 0.5));
+            this.performanceHistory.splice(
+                0,
+                Math.floor(this.performanceHistory.length * 0.5)
+            );
+        } else if (level === "medium") {
+            // Moderate cleanup
+            this.auditLog.splice(0, Math.floor(this.auditLog.length * 0.25));
+        }
+    }
+
+    /**
+     * Get performance trends
+     */
+    public getPerformanceTrends(): PerformanceMetrics[] {
+        return [...this.performanceHistory];
+    }
+
+    /**
+     * Detect anomalies in current execution
+     */
+    public detectAnomalies(auditEntry: AuditEntry) {
+        this.analyticsEngine.analyzeExecution(auditEntry);
+        return this.analyticsEngine.getAnalyticsData().anomalies;
+    }
+
+    /**
+     * Destroy and cleanup resources
+     */
+    public destroy(): void {
+        this.smartCache.destroy();
+        this.analyticsEngine.clearAnalytics();
+        this.auditLog.length = 0;
+        this.performanceHistory.length = 0;
+    }
 }
+
