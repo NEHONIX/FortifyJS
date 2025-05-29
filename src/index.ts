@@ -6,7 +6,7 @@
  * @author Nehonix
  * @license MIT
  *
- * Copyright (c) 2024 Nehonix. All rights reserved.
+ * Copyright (c) 2025 Nehonix. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -77,6 +77,9 @@ import * as fstringUtils from "./security/secure-string";
 // Export modular SecureArray utilities
 import * as fArrayUtils from "./security/secure-array";
 
+// Export modular FortifiedFunction utilities
+import * as fFuncUtils from "./utils/fortified-function";
+
 // Type exports
 export type {
     SecureTokenOptions,
@@ -124,6 +127,17 @@ export type {
     SecureArrayStats,
     FlexibleSecureArray,
 } from "./security/secure-array";
+
+// Modular FortifiedFunction types
+export type {
+    FortifiedFunctionOptions,
+    FunctionStats,
+    AuditEntry,
+    SecureExecutionContext,
+    ExecutionEvent,
+    CacheEntry,
+    SecurityFlags,
+} from "./utils/fortified-function";
 
 // Password Management Types
 export type {
@@ -260,6 +274,19 @@ export function fArray<
 }
 
 /**
+ * @author suppercodercodelover
+ * @description Creates a fortified function with automatic security, memory management, and monitoring
+ * @param fn - The function to be fortified
+ * @param options - Security and performance options
+ * @returns A fortified function with enhanced security features
+ */
+export function Func<T extends any[], R>(
+    ...args: Parameters<typeof fFuncUtils.fFunc<T, R>>
+) {
+    return fFuncUtils.fFunc<T, R>(...args);
+}
+
+/**
  * Encrypt a password with pepper and military-grade hashing
  *
  * This function provides an additional layer of security by applying a pepper (secret)
@@ -364,6 +391,12 @@ export * from "./security/secure-object";
 export { SecureString } from "./security/secure-string";
 export { SecureArray } from "./security/secure-array";
 
+// Export modular FortifiedFunction utilities
+export {
+    createFortifiedFunction,
+    FortifiedFunction,
+} from "./utils/fortified-function";
+
 // Export modular SecureString utilities
 
 // For CommonJS compatibility
@@ -421,10 +454,15 @@ if (typeof module !== "undefined" && module.exports) {
 
     // ===================== safe (String and Object) ====================
 
-    // Export String, Object, and Array functions
+    // Export String, Object, Array, and Function utilities
     module.exports.fString = fString;
     module.exports.fObject = fObject;
     module.exports.fArray = fArray;
+    module.exports.Func = Func;
+
+    // Export fortified function utilities (using imported modules)
+    module.exports.createFortifiedFunction = fFuncUtils.createFortifiedFunction;
+    module.exports.FortifiedFunction = fFuncUtils.FortifiedFunction;
 
     // Export Security Features (using imported modules)
     globalThis.Object.keys(SecurityExports).forEach((key: string) => {

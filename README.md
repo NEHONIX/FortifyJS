@@ -138,7 +138,7 @@ import { fArray } "fortify2-js"
 const secureData = fArray(["sensitive-data", "api-keys", "user-info"]);
 
 // Set encryption key
-secureData.setEncryptionKey("your-super-secret-key-2024");
+secureData.setEncryptionKey("your-super-secret-key-2025");
 
 // Encrypt all data with military-grade security
 secureData.encryptAll();
