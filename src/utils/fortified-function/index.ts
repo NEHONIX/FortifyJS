@@ -82,7 +82,7 @@ import { FortifiedFunctionOptions, EnhancedFortifiedFunction } from "./types";
  *
  * @example
  * ```typescript
- * import { func } from 'fortifyjs';
+ * import { func } from 'fortify2-js';
  *
  * // Zero configuration needed - all smart features enabled by default
  * const smartFunction = func(async (data: string) => {
@@ -178,7 +178,7 @@ export function func<T extends any[], R>(
  *
  * @example
  * ```typescript
- * import { createFortifiedFunction } from 'fortifyjs';
+ * import { createFortifiedFunction } from 'fortify2-js';
  *
  * const fortified = createFortifiedFunction(myFunction, {
  *     autoEncrypt: true,
