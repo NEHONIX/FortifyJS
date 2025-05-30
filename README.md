@@ -31,33 +31,6 @@ FortifyJS empowers developers to create secure, type-safe, and chainable JavaScr
 | Sensitive Data    | Not Supported | Security-Aware Filtering |
 | Events            | Not Supported | Operation Tracking       |
 
-## Modular Architecture
-
-FortifyJS 2.0 introduces a modular architecture to enhance performance, maintainability, and developer experience:
-
-### Performance Highlights
-
--   Random Float Generation: 2,029,015 operations/second
--   Random Integer Generation: 1,645,765 operations/second
--   Secure UUID Generation: 85,259 operations/second
--   Minimal memory footprint with optimized resource usage
--   100% backward compatibility with no breaking changes
-
-### Modular Benefits
-
--   **Maintainability**: Single-responsibility modules for easier updates.
--   **Scalability**: Simplified addition of new features.
--   **Performance**: Optimized imports with effective tree-shaking.
--   **Developer Experience**: Improved IDE support and debugging.
-
-### Directory Structure
-
-```
-src/core/
-├── hash/           # Hash operations and security
-├── random/         # Random generation and entropy
-└── types/          # Shared type definitions
-```
 
 ### Testing and Validation
 
@@ -134,7 +107,7 @@ npm install @noble/hashes @noble/ciphers libsodium-wrappers argon2 bcryptjs
 ```typescript
 import { fArray } "fortify2-js"
 
-// Create a secure array with real AES-256-CTR-HMAC encryption
+// Create a secure array with AES-256-CTR-HMAC encryption
 const secureData = fArray(["sensitive-data", "api-keys", "user-info"]);
 
 // Set encryption key
