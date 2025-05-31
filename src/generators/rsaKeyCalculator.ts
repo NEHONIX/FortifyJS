@@ -4,7 +4,17 @@
  * Calculates appropriate RSA key size based on data size with improved security and performance
  */
 
-import * as crypto from "crypto";
+// Conditional import for Node.js crypto module
+let crypto: any = null;
+
+// Check if we're in Node.js environment and import accordingly
+if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+    try {
+        crypto = require("crypto");
+    } catch (e) {
+        console.warn("Node.js crypto module not available");
+    }
+}
 
 // Enhanced constants for better maintainability and security
 const HASH_SIZES = {

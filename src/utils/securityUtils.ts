@@ -53,9 +53,18 @@ export function generateSecureRandom(size: number = SECURITY_CONSTANTS.SECURE_RA
     if (size <= 0 || size > 1024) {
         throw new Error('Invalid random size: must be between 1 and 1024 bytes');
     }
-    
+
     try {
-        return crypto.randomBytes(size);
+        if (crypto && crypto.randomBytes) {
+            return crypto.randomBytes(size);
+        } else if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+            // Browser environment - use Web Crypto API
+            const array = new Uint8Array(size);
+            window.crypto.getRandomValues(array);
+            return Buffer.from(array);
+        } else {
+            throw new Error('No secure random number generator available');
+        }
     } catch (error: any) {
         throw new Error(`Failed to generate secure random bytes: ${error.message}`);
     }
@@ -150,8 +159,15 @@ export function secureMemoryClear(buffer: Buffer): void {
     if (buffer && buffer.length > 0) {
         // Overwrite with random data multiple times
         for (let i = 0; i < 3; i++) {
-            const randomData = crypto.randomBytes(buffer.length);
-            randomData.copy(buffer);
+            try {
+                const randomData = generateSecureRandom(buffer.length);
+                randomData.copy(buffer);
+            } catch (e) {
+                // Fallback to simple pattern if secure random fails
+                for (let j = 0; j < buffer.length; j++) {
+                    buffer[j] = Math.floor(Math.random() * 256);
+                }
+            }
         }
         // Final zero fill
         buffer.fill(0);
@@ -168,12 +184,21 @@ export function timingSafeEqual(a: string, b: string): boolean {
     if (a.length !== b.length) {
         return false;
     }
-    
+
     const bufferA = Buffer.from(a, 'utf8');
     const bufferB = Buffer.from(b, 'utf8');
-    
+
     try {
-        return crypto.timingSafeEqual(bufferA, bufferB);
+        if (crypto && crypto.timingSafeEqual) {
+            return crypto.timingSafeEqual(bufferA, bufferB);
+        } else {
+            // Fallback constant-time comparison
+            let result = 0;
+            for (let i = 0; i < bufferA.length; i++) {
+                result |= bufferA[i] ^ bufferB[i];
+            }
+            return result === 0;
+        }
     } finally {
         secureMemoryClear(bufferA);
         secureMemoryClear(bufferB);

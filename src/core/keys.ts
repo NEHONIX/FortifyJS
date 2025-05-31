@@ -5,8 +5,25 @@ import { StatsTracker } from "../utils/stats";
 import { SecureRandom } from "./random";
 import { Validators } from "./validators";
 import { Hash } from "./hash";
-import crypto from "crypto";
-import childProcess from "child_process"
+
+// Conditional imports for Node.js environment
+let crypto: any = null;
+let childProcess: any = null;
+
+// Check if we're in Node.js environment and import accordingly
+if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+    try {
+        crypto = require("crypto");
+    } catch (e) {
+        console.warn("Node.js crypto module not available");
+    }
+
+    try {
+        childProcess = require("child_process");
+    } catch (e) {
+        console.warn("child_process not available");
+    }
+}
 
 /**
  * Key derivation functionality
