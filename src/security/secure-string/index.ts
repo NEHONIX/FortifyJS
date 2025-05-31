@@ -271,7 +271,6 @@ export function getModuleInfo() {
  * Gets supported algorithms
  */
 export function getSupportedAlgorithms() {
-    const { CryptoOperations } = require("./crypto/crypto-operations");
     return {
         hash: CryptoOperations.getSupportedHashAlgorithms(),
         hmac: CryptoOperations.getSupportedHMACAlgorithms(),
