@@ -19,9 +19,46 @@ import { SecureRandom } from "../core/random";
 import { Hash } from "../core/hash";
 import { StatsTracker } from "../utils/stats";
 import { bufferToHex } from "../utils/encoding";
-import argon2 from "argon2";
-import childProcess from "child_process"
-// import { XMLHttpRequest } from "xmlhttprequest";
+
+// Conditional imports for Node.js environment
+let argon2: any = null;
+let childProcess: any = null;
+let fs: any = null;
+let os: any = null;
+let path: any = null;
+
+// Check if we're in Node.js environment and import accordingly
+if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+    try {
+        argon2 = require("argon2");
+    } catch (e) {
+        console.warn("argon2 package not available");
+    }
+
+    try {
+        childProcess = require("child_process");
+    } catch (e) {
+        console.warn("child_process not available");
+    }
+
+    try {
+        fs = require("fs");
+    } catch (e) {
+        console.warn("fs not available");
+    }
+
+    try {
+        os = require("os");
+    } catch (e) {
+        console.warn("os not available");
+    }
+
+    try {
+        path = require("path");
+    } catch (e) {
+        console.warn("path not available");
+    }
+}
 
 /**
  * Options for memory-hard key derivation

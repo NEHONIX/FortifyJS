@@ -3,7 +3,17 @@
  * Enhanced security functions for robust cryptographic operations
  */
 
-import * as crypto from "crypto";
+// Conditional import for Node.js crypto module
+let crypto: any = null;
+
+// Check if we're in Node.js environment and import accordingly
+if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+    try {
+        crypto = require("crypto");
+    } catch (e) {
+        console.warn("Node.js crypto module not available");
+    }
+}
 
 // Security constants
 export const SECURITY_CONSTANTS = {

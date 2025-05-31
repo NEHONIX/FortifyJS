@@ -11,7 +11,7 @@
         "README.md",
         "CHANGELOG.md"
     ],
-    "scripts": {
+    "scripts": { 
         "build": "rollup -c",
         "build:watch": "rollup -c -w",
         "clean": "rimraf dist",
