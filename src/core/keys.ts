@@ -6,6 +6,7 @@ import { SecureRandom } from "./random";
 import { Validators } from "./validators";
 import { Hash } from "./hash";
 import crypto from "crypto";
+import childProcess from "child_process"
 
 /**
  * Key derivation functionality
@@ -697,7 +698,7 @@ export class Keys {
 
                             // If sync method is not available, use child_process to run in a separate process
                             // This is a proper way to make async operations synchronous in Node.js
-                            const childProcess = require("child_process");
+                            // const childProcess = require("child_process");
 
                             // Create a small script to run argon2 in a separate process
                             const script = `

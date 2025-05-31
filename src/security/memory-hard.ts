@@ -20,6 +20,8 @@ import { Hash } from "../core/hash";
 import { StatsTracker } from "../utils/stats";
 import { bufferToHex } from "../utils/encoding";
 import argon2 from "argon2";
+import childProcess from "child_process"
+// import { XMLHttpRequest } from "xmlhttprequest";
 
 /**
  * Options for memory-hard key derivation
@@ -596,7 +598,7 @@ function argon2DeriveSimplified(
 
             // Try to use a child process to run the argon2 command-line tool
             try {
-                const childProcess = require("child_process");
+                // const childProcess = require("child_process");
                 const fs = require("fs");
                 const path = require("path");
                 const os = require("os");
