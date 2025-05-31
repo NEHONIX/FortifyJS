@@ -1,6 +1,6 @@
 {
     "name": "fortifyjs-react",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "React integration for Nehonix FortifyJS - Secure state management with enhanced object operations",
     "main": "./dist/index.cjs",
     "module": "./dist/index.esm.js",
@@ -11,7 +11,7 @@
         "README.md",
         "CHANGELOG.md"
     ],
-    "scripts": { 
+    "scripts": {
         "build": "rollup -c",
         "build:watch": "rollup -c -w",
         "clean": "rimraf dist",
@@ -62,7 +62,6 @@
     },
     "homepage": "https://lab.nehonix.space/nehonix_viewer/_doc/FortifyJS",
     "peerDependencies": {
-        "fortify2-js": "^3.1.2",
         "react": ">=16.8.0"
     },
     "peerDependenciesMeta": {
@@ -92,5 +91,8 @@
     "sideEffects": false,
     "publishConfig": {
         "access": "public"
+    },
+    "dependencies": {
+        "fortify2-js": "^4.1.6"
     }
 }

@@ -8,7 +8,7 @@ export {
     useSecureState,
     useSecureObject,
     useStaticSecureObject,
-    useAsyncSecureObject,
+    useAsyncSecureObject, 
 } from "./hooks";
 
 // Components

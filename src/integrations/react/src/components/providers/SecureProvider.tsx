@@ -42,7 +42,7 @@ export const SecureProvider: React.FC<SecureProviderProps> = ({
     config: userConfig,
     children,
     fallback = null,
-    onError,
+    onError, 
 }) => {
     // Merge user config with defaults
     const [config, setConfig] = useState<SecurityConfig>(() => {
