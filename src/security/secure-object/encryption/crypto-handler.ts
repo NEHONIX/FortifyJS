@@ -42,7 +42,7 @@ export class CryptoHandler {
 
             // Store the salt for key derivation
             this.derivedKey = new Uint8Array(
-                Hash.secureHash(context, {
+                Hash.create(context, {
                     algorithm: "sha256",
                     salt: salt,
                     outputFormat: "buffer",
@@ -74,7 +74,7 @@ export class CryptoHandler {
 
             // Use PBKDF2-like key derivation with multiple rounds
             let derivedKey = new Uint8Array(
-                Hash.secureHash(keyBuffer, {
+                Hash.create(keyBuffer, {
                     algorithm: "sha256",
                     iterations: 100000,
                     salt: salt,
@@ -85,7 +85,7 @@ export class CryptoHandler {
             // Additional rounds for enhanced security
             for (let i = 0; i < 10; i++) {
                 derivedKey = new Uint8Array(
-                    Hash.secureHash(derivedKey, {
+                    Hash.create(derivedKey, {
                         algorithm: "sha256",
                         salt: salt,
                         outputFormat: "buffer",
@@ -232,7 +232,7 @@ export class CryptoHandler {
     processNestedObject(
         obj: any,
         options: SerializationOptions,
-        sensitiveKeys: Set<string>
+        sensitiveKeys: Set<string> | ((key: string) => boolean)
     ): any {
         if (Array.isArray(obj)) {
             // Handle arrays
@@ -245,9 +245,18 @@ export class CryptoHandler {
             // Handle objects
             const result: any = {};
             for (const [key, value] of Object.entries(obj)) {
-                if (options.encryptSensitive && sensitiveKeys.has(key)) {
-                    // Encrypt sensitive keys in nested objects
-                    result[key] = this.encryptValue(value);
+                const isSensitive =
+                    typeof sensitiveKeys === "function"
+                        ? sensitiveKeys(key)
+                        : sensitiveKeys.has(key);
+
+                if (isSensitive) {
+                    if (options.encryptSensitive) {
+                        // Encrypt sensitive keys in nested objects
+                        result[key] = this.encryptValue(value);
+                    }
+                    // If encryptSensitive is false, skip sensitive keys (filter them out)
+                    // This is the fix for the nested password filtering bug
                 } else if (typeof value === "object" && value !== null) {
                     // Recursively process nested objects/arrays
                     result[key] = this.processNestedObject(
@@ -365,7 +374,7 @@ export class CryptoHandler {
             combined.set(counterBlock, key.length);
 
             const block = new Uint8Array(
-                Hash.secureHash(combined, {
+                Hash.create(combined, {
                     algorithm: "sha256",
                     outputFormat: "buffer",
                 }) as Buffer

@@ -5,25 +5,8 @@ import { StatsTracker } from "../utils/stats";
 import { SecureRandom } from "./random";
 import { Validators } from "./validators";
 import { Hash } from "./hash";
-
-// Conditional imports for Node.js environment
-let crypto: any = null;
-let childProcess: any = null;
-
-// Check if we're in Node.js environment and import accordingly
-if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-    try {
-        crypto = require("crypto");
-    } catch (e) {
-        console.warn("Node.js crypto module not available");
-    }
-
-    try {
-        childProcess = require("child_process");
-    } catch (e) {
-        console.warn("child_process not available");
-    }
-}
+import * as crypto from "crypto";
+// Note: childProcess and argon2 are imported dynamically when needed
 
 /**
  * Key derivation functionality
@@ -273,7 +256,7 @@ export class Keys {
                     keyToUse = new Uint8Array(hash.digest());
                 } else {
                     // Fallback to our implementation
-                    const hashResult = Hash.secureHash(key, {
+                    const hashResult = Hash.create(key, {
                         algorithm: hashAlgo,
                         iterations: 1,
                         outputFormat: "buffer",
@@ -313,7 +296,7 @@ export class Keys {
                 // Fallback to our implementation
                 const hashAlgo =
                     hashFunction === "sha512" ? "sha512" : "sha256";
-                const hashResult = Hash.secureHash(innerInput, {
+                const hashResult = Hash.create(innerInput, {
                     algorithm: hashAlgo,
                     iterations: 1,
                     outputFormat: "buffer",
@@ -338,7 +321,7 @@ export class Keys {
                 // Fallback to our implementation
                 const hashAlgo =
                     hashFunction === "sha512" ? "sha512" : "sha256";
-                const hashResult = Hash.secureHash(outerInput, {
+                const hashResult = Hash.create(outerInput, {
                     algorithm: hashAlgo,
                     iterations: 1,
                     outputFormat: "buffer",
@@ -685,7 +668,6 @@ export class Keys {
             if (typeof require === "function") {
                 try {
                     // Import the argon2 package
-                    const argon2 = require("argon2");
 
                     // Since argon2 is async and our API is sync, we need to use a workaround
                     // This is not ideal but allows us to maintain compatibility
@@ -698,24 +680,8 @@ export class Keys {
                         len: number
                     ): Uint8Array => {
                         try {
-                            // Use the argon2 package's sync method if available
-                            if (typeof argon2.hashSync === "function") {
-                                // Some versions of argon2 provide a sync method
-                                const hash = argon2.hashSync(Buffer.from(pwd), {
-                                    type: argon2.argon2id,
-                                    timeCost: iter,
-                                    memoryCost: 4096, // 4 MB
-                                    parallelism: 1,
-                                    salt: Buffer.from(slt),
-                                    hashLength: len,
-                                    raw: true,
-                                });
-                                return new Uint8Array(hash);
-                            }
-
-                            // If sync method is not available, use child_process to run in a separate process
-                            // This is a proper way to make async operations synchronous in Node.js
-                            // const childProcess = require("child_process");
+                            // Since argon2 is async, we need to use child_process for sync operation
+                            const childProcess = require("child_process");
 
                             // Create a small script to run argon2 in a separate process
                             const script = `
@@ -757,7 +723,7 @@ export class Keys {
                             const bytes = new Uint8Array(len);
                             for (let i = 0; i < len; i++) {
                                 bytes[i] = parseInt(
-                                    hexOutput.substr(i * 2, 2),
+                                    hexOutput.substring(i * 2, i * 2 + 2),
                                     16
                                 );
                             }

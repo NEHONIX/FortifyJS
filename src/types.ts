@@ -54,8 +54,7 @@ export type HashAlgorithmType =
     | "blake3"
     | "blake2b"
     | "blake2s"
-    | "pbkdf2"
-
+    | "pbkdf2";
 
 /**
  * Key derivation algorithm enum
@@ -125,6 +124,8 @@ export interface SecureTokenOptions {
      * @default 'high'
      */
     entropy: "high" | "maximum" | "standard";
+
+    maxValidityLength?: number;
 }
 
 /**
@@ -152,7 +153,7 @@ export interface HashOptions {
      * Hash algorithm
      * @default 'sha256'
      */
-    algorithm?: HashAlgorithm |  HashAlgorithmType;
+    algorithm?: HashAlgorithm | HashAlgorithmType;
 
     /**
      * Output format ()
@@ -556,7 +557,6 @@ export type EncodingHashType =
     | BaseEncodingType;
 
 export type HashAlgo = "sha256" | "sha512" | "blake3" | "sha3";
-
 
 export interface SecureHashOptions {
     algorithm?: string;

@@ -388,7 +388,7 @@ function encryptCanary(data: string, key: string): string {
 
     // Create a key stream by hashing the key repeatedly
     const keyStream = new Uint8Array(dataBytes.length);
-    let hashResult = Hash.secureHash(key, { outputFormat: "hex" }) as string;
+    let hashResult = Hash.create(key, { outputFormat: "hex" }) as string;
     let keyBlock = hexToBuffer(hashResult);
 
     for (let i = 0; i < keyStream.length; i += keyBlock.length) {
@@ -397,7 +397,7 @@ function encryptCanary(data: string, key: string): string {
         keyStream.set(keyBlock.subarray(0, bytesToCopy), i);
 
         // Generate the next key block
-        hashResult = Hash.secureHash(bufferToHex(keyBlock), {
+        hashResult = Hash.create(bufferToHex(keyBlock), {
             outputFormat: "hex",
         }) as string;
         keyBlock = hexToBuffer(hashResult);
@@ -426,7 +426,7 @@ function decryptCanary(encrypted: string, key: string): string | null {
 
         // Create a key stream by hashing the key repeatedly
         const keyStream = new Uint8Array(encryptedBytes.length);
-        let hashResult = Hash.secureHash(key, {
+        let hashResult = Hash.create(key, {
             outputFormat: "hex",
         }) as string;
         let keyBlock = hexToBuffer(hashResult);
@@ -437,7 +437,7 @@ function decryptCanary(encrypted: string, key: string): string | null {
             keyStream.set(keyBlock.subarray(0, bytesToCopy), i);
 
             // Generate the next key block
-            hashResult = Hash.secureHash(bufferToHex(keyBlock), {
+            hashResult = Hash.create(bufferToHex(keyBlock), {
                 outputFormat: "hex",
             }) as string;
             keyBlock = hexToBuffer(hashResult);

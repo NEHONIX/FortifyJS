@@ -680,7 +680,7 @@ function signPayload(payload: string, key: string): string {
     const keyBytes = typeof key === "string" ? hexToBuffer(key) : key;
 
     // Create a signature using a keyed hash
-    const signature = Hash.secureHash(payloadBytes, {
+    const signature = Hash.create(payloadBytes, {
         salt: keyBytes,
         algorithm: "sha256",
         iterations: 1000,
@@ -1057,7 +1057,7 @@ function getLibraryHash(): string {
         components.push(getModuleHash("testing"));
 
         // Combine all hashes
-        const combinedHash = Hash.secureHash(components.join("|"), {
+        const combinedHash = Hash.create(components.join("|"), {
             algorithm: "sha256",
             outputFormat: "hex",
         });
@@ -1335,7 +1335,7 @@ function getModuleHash(moduleName: string): string {
         }
 
         // Hash the module representation
-        return Hash.secureHash(moduleRepresentation, {
+        return Hash.create(moduleRepresentation, {
             algorithm: "sha256",
             outputFormat: "hex",
         }) as string;

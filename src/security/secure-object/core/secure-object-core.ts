@@ -515,6 +515,42 @@ export class SecureObject<
         return SensitiveKeysManager.getDefaultKeys();
     }
 
+    /**
+     * Adds custom regex patterns for sensitive key detection
+     * @param patterns - Regex patterns or strings to match sensitive keys
+     */
+    public addSensitivePatterns(...patterns: (RegExp | string)[]): this {
+        this.ensureNotDestroyed();
+        this.sensitiveKeysManager.addCustomPatterns(...patterns);
+        return this;
+    }
+
+    /**
+     * Removes custom sensitive patterns
+     */
+    public removeSensitivePatterns(...patterns: (RegExp | string)[]): this {
+        this.ensureNotDestroyed();
+        this.sensitiveKeysManager.removeCustomPatterns(...patterns);
+        return this;
+    }
+
+    /**
+     * Clears all custom sensitive patterns
+     */
+    public clearSensitivePatterns(): this {
+        this.ensureNotDestroyed();
+        this.sensitiveKeysManager.clearCustomPatterns();
+        return this;
+    }
+
+    /**
+     * Gets all custom sensitive patterns
+     */
+    public getSensitivePatterns(): RegExp[] {
+        this.ensureNotDestroyed();
+        return this.sensitiveKeysManager.getCustomPatterns();
+    }
+
     // ===== ENCRYPTION MANAGEMENT =====
 
     /**
@@ -1148,16 +1184,37 @@ export class SecureObject<
      * user.addSensitiveKeys("password");
      * const publicData = user.filterNonSensitive(); // Contains name and age
      */
-    public filterNonSensitive(): SecureObject<Partial<T>> {
+    public filterNonSensitive(options?: {
+        strictMode?: boolean;
+    }): SecureObject<Partial<T>> {
         this.ensureNotDestroyed();
+        // Default to non-strict mode (false) - only exact matches
+        const strictMode = options?.strictMode === true;
 
         const filtered = new SecureObject<Partial<T>>();
-        const sensitiveKeys = new Set(this.getSensitiveKeys());
 
         for (const key of this.keys()) {
             const stringKey = String(key);
-            if (!sensitiveKeys.has(stringKey)) {
-                (filtered as any).set(stringKey, this.get(key));
+            // Use the enhanced sensitive key detection with strictMode
+            if (!this.sensitiveKeysManager.isSensitive(stringKey, strictMode)) {
+                const value = this.get(key);
+
+                // If the value is a nested object, process it with the same strictMode
+                if (
+                    value &&
+                    typeof value === "object" &&
+                    value !== null &&
+                    !Array.isArray(value)
+                ) {
+                    // Process nested object with the same strict mode
+                    const processedValue = this.processNestedObjectForFiltering(
+                        value,
+                        strictMode
+                    );
+                    (filtered as any).set(stringKey, processedValue);
+                } else {
+                    (filtered as any).set(stringKey, value);
+                }
             }
         }
 
@@ -1167,6 +1224,42 @@ export class SecureObject<
         });
 
         return filtered;
+    }
+
+    /**
+     * Processes nested objects for filtering with the same strict mode
+     */
+    private processNestedObjectForFiltering(
+        obj: any,
+        strictMode: boolean
+    ): any {
+        if (Array.isArray(obj)) {
+            // Handle arrays
+            return obj.map((item) =>
+                typeof item === "object" && item !== null
+                    ? this.processNestedObjectForFiltering(item, strictMode)
+                    : item
+            );
+        } else if (typeof obj === "object" && obj !== null) {
+            // Handle objects
+            const result: any = {};
+            for (const [key, value] of Object.entries(obj)) {
+                if (!this.sensitiveKeysManager.isSensitive(key, strictMode)) {
+                    if (typeof value === "object" && value !== null) {
+                        // Recursively process nested objects/arrays
+                        result[key] = this.processNestedObjectForFiltering(
+                            value,
+                            strictMode
+                        );
+                    } else {
+                        result[key] = value;
+                    }
+                }
+                // If key is sensitive, skip it (don't add to result)
+            }
+            return result;
+        }
+        return obj;
     }
 
     // ===== METADATA OPERATIONS =====
@@ -1210,9 +1303,18 @@ export class SecureObject<
     /**
      * Gets the full object as a regular JavaScript object
      */
-    public toObject(): T & { _metadata?: Record<string, ValueMetadata> } {
-        const sensitiveKeys = new Set(this.sensitiveKeysManager.getAll());
-        return this.serializationHandler.toObject<T>(this.data, sensitiveKeys);
+    public toObject(
+        options?: SerializationOptions
+    ): T & { _metadata?: Record<string, ValueMetadata> } {
+        // Use non-strict mode by default (only exact matches)
+        const strictMode = options?.strictSensitiveKeys === true;
+        const isSensitiveKey = (key: string) =>
+            this.sensitiveKeysManager.isSensitive(key, strictMode);
+        return this.serializationHandler.toObject<T>(
+            this.data,
+            isSensitiveKey,
+            options
+        );
     }
 
     /**
@@ -1222,10 +1324,13 @@ export class SecureObject<
         this.ensureNotDestroyed();
         ValidationUtils.validateSerializationOptions(options);
 
-        const sensitiveKeys = new Set(this.sensitiveKeysManager.getAll());
+        // Use non-strict mode by default (only exact matches)
+        const strictMode = options.strictSensitiveKeys === true;
+        const isSensitiveKey = (key: string) =>
+            this.sensitiveKeysManager.isSensitive(key, strictMode);
         return this.serializationHandler.toJSON<T>(
             this.data,
-            sensitiveKeys,
+            isSensitiveKey,
             options
         );
     }
@@ -1704,7 +1809,8 @@ export class SecureObject<
                 objectId: this._id,
                 data: this.serializationHandler.toObject(
                     this.data,
-                    new Set(this.sensitiveKeysManager.getAll()),
+                    (key: string) =>
+                        this.sensitiveKeysManager.isSensitive(key, true), // Use strict mode
                     options
                 ),
                 metadata: includeMetadata

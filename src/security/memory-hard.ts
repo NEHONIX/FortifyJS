@@ -19,46 +19,9 @@ import { SecureRandom } from "../core/random";
 import { Hash } from "../core/hash";
 import { StatsTracker } from "../utils/stats";
 import { bufferToHex } from "../utils/encoding";
-
-// Conditional imports for Node.js environment
-let argon2: any = null;
-let childProcess: any = null;
-let fs: any = null;
-let os: any = null;
-let path: any = null;
-
-// Check if we're in Node.js environment and import accordingly
-if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-    try {
-        argon2 = require("argon2");
-    } catch (e) {
-        console.warn("argon2 package not available");
-    }
-
-    try {
-        childProcess = require("child_process");
-    } catch (e) {
-        console.warn("child_process not available");
-    }
-
-    try {
-        fs = require("fs");
-    } catch (e) {
-        console.warn("fs not available");
-    }
-
-    try {
-        os = require("os");
-    } catch (e) {
-        console.warn("os not available");
-    }
-
-    try {
-        path = require("path");
-    } catch (e) {
-        console.warn("path not available");
-    }
-}
+import argon2 from "argon2";
+import childProcess from "child_process";
+// import { XMLHttpRequest } from "xmlhttprequest";
 
 /**
  * Options for memory-hard key derivation
@@ -725,9 +688,9 @@ function argon2DeriveSimplified(
     }
 
     // If all else fails, use a more secure fallback implementation
-    console.warn("Using Hash.secureHash as final Argon2 fallback");
+    console.warn("Using Hash.create as final Argon2 fallback");
 
-    // Use multiple iterations of Hash.secureHash with memory-hard properties
+    // Use multiple iterations of Hash.create with memory-hard properties
     const blockSize = 64; // Size of each memory block in bytes
     const numBlocks = Math.max(256, Math.min(memoryCost, 4096)); // Limit memory usage
     const memory = new Array(numBlocks);
@@ -745,9 +708,9 @@ function argon2DeriveSimplified(
         const view = new DataView(blockSeed.buffer);
         view.setUint32(passwordBytes.length + salt.length, i, true);
 
-        // Use Hash.secureHash to fill the block
+        // Use Hash.create to fill the block
         try {
-            const hashResult = Hash.secureHash(blockSeed, {
+            const hashResult = Hash.create(blockSeed, {
                 algorithm: "sha512",
                 iterations: Math.max(1, Math.floor(timeCost / 2)),
                 salt: salt,
@@ -757,7 +720,7 @@ function argon2DeriveSimplified(
             // Convert the hash result to a Uint8Array
             memory[i] = new Uint8Array(hashResult as any).slice(0, blockSize);
         } catch (e) {
-            // If Hash.secureHash fails, use a simple hash
+            // If Hash.create fails, use a simple hash
             memory[i] = new Uint8Array(blockSize);
             for (let j = 0; j < blockSize; j++) {
                 memory[i][j] = (blockSeed[j % blockSeed.length] + i + j) & 0xff;
@@ -780,9 +743,9 @@ function argon2DeriveSimplified(
                 mixBuffer.set(memory[k], blockSize * 2);
                 mixBuffer.set(salt, blockSize * 3);
 
-                // Use Hash.secureHash for mixing
+                // Use Hash.create for mixing
                 try {
-                    const hashResult = Hash.secureHash(mixBuffer, {
+                    const hashResult = Hash.create(mixBuffer, {
                         algorithm: "sha512",
                         iterations: 1,
                         outputFormat: "buffer",
@@ -794,7 +757,7 @@ function argon2DeriveSimplified(
                         blockSize
                     );
                 } catch (e) {
-                    // If Hash.secureHash fails, use a simple mixing function
+                    // If Hash.create fails, use a simple mixing function
                     for (let b = 0; b < blockSize; b++) {
                         memory[i][b] ^= memory[j][b] ^ memory[k][b];
                         memory[i][b] =
@@ -818,7 +781,7 @@ function argon2DeriveSimplified(
 
     // Final hash to derive the key
     try {
-        const hashResult = Hash.secureHash(finalMixBuffer, {
+        const hashResult = Hash.create(finalMixBuffer, {
             algorithm: "sha512",
             iterations: timeCost * 2,
             salt: salt,
@@ -831,7 +794,7 @@ function argon2DeriveSimplified(
             result[i] = hashBytes[i % hashBytes.length];
         }
     } catch (e) {
-        // If Hash.secureHash fails, derive key from memory blocks
+        // If Hash.create fails, derive key from memory blocks
         for (let i = 0; i < keyLength; i++) {
             let value = 0;
             for (let j = 0; j < Math.min(16, numBlocks); j++) {
@@ -934,7 +897,7 @@ export function balloonDerive(
     const secureHash = (data: Uint8Array): Uint8Array => {
         try {
             // Use the Hash module's secure hash function
-            const hashResult = Hash.secureHash(data, {
+            const hashResult = Hash.create(data, {
                 algorithm: "sha512", // Use SHA-512 for better security
                 outputFormat: "buffer",
             });
@@ -948,7 +911,7 @@ export function balloonDerive(
                 return new Uint8Array(hashResult as any).slice(0, blockSize);
             }
         } catch (e) {
-            console.warn("Error using Hash.secureHash:", e);
+            console.warn("Error using Hash.create:", e);
 
             // Fallback to a more secure custom implementation
             try {
@@ -1110,7 +1073,7 @@ export function balloonDerive(
     try {
         // Use PBKDF2 with a single iteration for the final extraction
         // This adds some extra security and allows flexible key length
-        finalHash = Hash.secureHash(extractBuffer, {
+        finalHash = Hash.create(extractBuffer, {
             algorithm: "sha512",
             iterations: 1,
             salt: salt,

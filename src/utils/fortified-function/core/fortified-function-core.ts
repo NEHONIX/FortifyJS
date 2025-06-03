@@ -7,7 +7,7 @@
 import { SecureBuffer } from "../../../security/secure-memory";
 import { SecureString } from "../../../security/secure-string";
 import { ArrayCryptoHandler } from "../../../security/secure-array/crypto/ArrayCryptoHandler";
-import { EventEmitter } from "events";
+import { EventEmitter } from "events"; 
 
 export interface FortifiedFunctionOptions {
     // Security Options

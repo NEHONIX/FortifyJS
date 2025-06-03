@@ -14,7 +14,7 @@ export class SecurityHandler {
     private readonly hashUtil: typeof Hash;
     private readonly randomUtil: typeof SecureRandom;
 
-    constructor() {
+    constructor() { 
         this.hashUtil = Hash;
         this.randomUtil = SecureRandom;
     }

@@ -3,7 +3,7 @@
  * Handles hashing, HMAC, and key derivation for SecureString
  */
 
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { ALGORITHM_REGISTRY } from "../../../algorithms/registry";
 import { CryptoAlgorithmUtils } from "../../../utils/CryptoAlgorithmUtils";
 import type {

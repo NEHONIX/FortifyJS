@@ -68,7 +68,7 @@ export class ArrayCryptoHandler {
             const context = `SecureArray:${this.arrayId}:${bufferToHex(salt)}`;
 
             // Store the salt for key derivation
-            const hashResult = Hash.secureHash(context, {
+            const hashResult = Hash.create(context, {
                 algorithm: "sha256",
                 salt: salt,
                 outputFormat: "buffer",
@@ -99,7 +99,7 @@ export class ArrayCryptoHandler {
 
             // Use PBKDF2-like key derivation with multiple rounds
             let derivedKey = new Uint8Array(
-                Hash.secureHash(keyBuffer, {
+                Hash.create(keyBuffer, {
                     algorithm: "sha256",
                     iterations: 100000,
                     salt: salt,
@@ -110,7 +110,7 @@ export class ArrayCryptoHandler {
             // Additional rounds for enhanced security
             for (let i = 0; i < 10; i++) {
                 derivedKey = new Uint8Array(
-                    Hash.secureHash(derivedKey, {
+                    Hash.create(derivedKey, {
                         algorithm: "sha256",
                         salt: salt,
                         outputFormat: "buffer",
@@ -312,7 +312,7 @@ export class ArrayCryptoHandler {
             combined.set(counterBlock, key.length);
 
             const block = new Uint8Array(
-                Hash.secureHash(combined, {
+                Hash.create(combined, {
                     algorithm: "sha256",
                     outputFormat: "buffer",
                 }) as Buffer

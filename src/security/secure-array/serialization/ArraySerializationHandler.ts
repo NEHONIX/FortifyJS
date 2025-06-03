@@ -269,7 +269,7 @@ export class ArraySerializationHandler {
         const dataStr = JSON.stringify(package_, Object.keys(package_).sort());
 
         // Generate SHA-256 hash
-        const hash = Hash.secureHash(dataStr, {
+        const hash = Hash.create(dataStr, {
             algorithm: "sha256",
             outputFormat: "hex",
         }) as string;

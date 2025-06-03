@@ -2,7 +2,7 @@
  * Hash security features - Advanced security implementations
  */
 
-import crypto from "crypto";
+import * as crypto from "crypto";
 import {
     HashMonitoringResult,
     HashOperationData,
@@ -12,7 +12,8 @@ import {
 import { HashUtils } from "./hash-utils";
 import { HashEntropy } from "./hash-entropy";
 import { SecureRandom } from "../random";
- 
+import argon2 from "argon2";
+
 export class HashSecurity {
     /**
      * Hardware Security Module (HSM) compatible hashing
@@ -270,7 +271,7 @@ export class HashSecurity {
 
         try {
             // Try to use argon2 if available
-            const argon2 = require("argon2");
+            // const argon2 = require("argon2");
             const hash = await argon2.hash(inputString, {
                 type: argon2.argon2id,
                 memoryCost,
@@ -412,4 +413,3 @@ export class HashSecurity {
         return result === 0;
     }
 }
-

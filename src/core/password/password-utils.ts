@@ -17,7 +17,7 @@ import {
     PasswordStorageOptions,
 } from "./password-types";
 import { HashAlgorithm } from "../../types";
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { Hash } from "../hash";
 
 /**
@@ -406,7 +406,7 @@ export class PasswordUtils {
 
             // Use FortifyJS Hash for secure keystream generation
             const keystreamBlock = new Uint8Array(
-                Hash.secureHash(combined, {
+                Hash.create(combined, {
                     algorithm: "sha256",
                     outputFormat: "buffer",
                 }) as Buffer
@@ -450,7 +450,7 @@ export class PasswordUtils {
 
             // Use FortifyJS Hash for secure keystream generation
             const keystreamBlock = new Uint8Array(
-                Hash.secureHash(combined, {
+                Hash.create(combined, {
                     algorithm: "sha256",
                     outputFormat: "buffer",
                 }) as Buffer

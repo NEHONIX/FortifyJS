@@ -1,6 +1,5 @@
 /**
  * FortifyJS React Components - Type Definitions
- * Modular type definitions for React components
  */
 
 import { ReactNode } from "react";

@@ -8,7 +8,7 @@ import { SecureBuffer } from "../../secure-memory";
 import { CryptoHandler } from "../encryption/crypto-handler";
 import { MetadataManager } from "../metadata/metadata-manager";
 import SecureString from "../../secure-string";
- 
+
 /**
  * Handles serialization operations for SecureObject
  */
@@ -23,35 +23,48 @@ export class SerializationHandler {
      */
     toObject<T>(
         data: Map<string, any>,
-        sensitiveKeys: Set<string>,
+        sensitiveKeys: Set<string> | ((key: string) => boolean),
         options: SerializationOptions = {}
     ): T & { _metadata?: Record<string, ValueMetadata> } {
         const result = {} as T & { _metadata?: Record<string, ValueMetadata> };
 
         for (const [key, value] of data.entries()) {
             const metadata = this.metadataManager.get(key);
-            const isUserDefinedSensitive = sensitiveKeys.has(key);
+            const isUserDefinedSensitive =
+                typeof sensitiveKeys === "function"
+                    ? sensitiveKeys(key)
+                    : sensitiveKeys.has(key);
 
-            // Check if we should encrypt/mask sensitive data
-            if (options.encryptSensitive && isUserDefinedSensitive) {
-                // Encrypt user-defined sensitive data
-                let valueToEncrypt: any;
-                if (value instanceof SecureBuffer) {
-                    const buffer = value.getBuffer();
-                    if (metadata?.type === "Uint8Array") {
-                        valueToEncrypt = Array.from(new Uint8Array(buffer));
+            // Handle sensitive keys
+            if (isUserDefinedSensitive) {
+                if (options.encryptSensitive) {
+                    // Encrypt user-defined sensitive data
+                    let valueToEncrypt: any;
+                    if (value instanceof SecureBuffer) {
+                        const buffer = value.getBuffer();
+                        if (metadata?.type === "Uint8Array") {
+                            valueToEncrypt = Array.from(new Uint8Array(buffer));
+                        } else {
+                            valueToEncrypt = new TextDecoder().decode(buffer);
+                        }
+                    } else if (value instanceof SecureString) {
+                        valueToEncrypt = value.toString();
                     } else {
-                        valueToEncrypt = new TextDecoder().decode(buffer);
+                        valueToEncrypt = value;
                     }
-                } else if (value instanceof SecureString) {
-                    valueToEncrypt = value.toString();
-                } else {
-                    valueToEncrypt = value;
+                    (result as any)[key] =
+                        this.cryptoHandler.encryptValue(valueToEncrypt);
                 }
-                (result as any)[key] = this.cryptoHandler.encryptValue(valueToEncrypt);
+                // If encryptSensitive is false, skip sensitive keys (filter them out)
+                // This is the fix for the nested password filtering bug
             } else {
-                // Normal processing - show actual values
-                (result as any)[key] = this.processValue(value, metadata, options);
+                // Normal processing - show actual values for non-sensitive keys
+                (result as any)[key] = this.processValue(
+                    value,
+                    metadata,
+                    options,
+                    sensitiveKeys
+                );
             }
         }
 
@@ -65,7 +78,12 @@ export class SerializationHandler {
     /**
      * Processes a single value for serialization
      */
-    private processValue(value: any, metadata: ValueMetadata | undefined, options: SerializationOptions): any {
+    private processValue(
+        value: any,
+        metadata: ValueMetadata | undefined,
+        options: SerializationOptions,
+        sensitiveKeys: Set<string> | ((key: string) => boolean)
+    ): any {
         if (value instanceof SecureBuffer) {
             const buffer = value.getBuffer();
 
@@ -78,12 +96,22 @@ export class SerializationHandler {
             }
         } else if (value instanceof SecureString) {
             return value.toString();
-        } else if (value && typeof value === "object" && typeof value.toObject === "function") {
+        } else if (
+            value &&
+            typeof value === "object" &&
+            typeof value.toObject === "function"
+        ) {
             // For nested SecureObjects, recursively process with the same options
+            // Pass through the strictSensitiveKeys option to maintain consistency
             return value.toObject(options);
         } else if (typeof value === "object" && value !== null) {
             // For regular nested objects, recursively check for sensitive keys
-            return this.cryptoHandler.processNestedObject(value, options, new Set());
+            // FIXED: Pass the actual sensitive keys instead of empty Set
+            return this.cryptoHandler.processNestedObject(
+                value,
+                options,
+                sensitiveKeys
+            );
         } else {
             return value;
         }
@@ -111,7 +139,7 @@ export class SerializationHandler {
      */
     toJSON<T>(
         data: Map<string, any>,
-        sensitiveKeys: Set<string>,
+        sensitiveKeys: Set<string> | ((key: string) => boolean),
         options: SerializationOptions = {}
     ): string {
         const obj = this.toObject<T>(data, sensitiveKeys, options);
@@ -125,7 +153,7 @@ export class SerializationHandler {
         const sortedEntries = entries.sort(([a], [b]) =>
             String(a).localeCompare(String(b))
         );
-        
+
         return JSON.stringify(
             sortedEntries.map(([key, value]) => [
                 String(key),
@@ -139,8 +167,16 @@ export class SerializationHandler {
     /**
      * Processes nested objects recursively for sensitive key detection
      */
-    processNestedObject(obj: any, options: SerializationOptions, sensitiveKeys: Set<string>): any {
-        return this.cryptoHandler.processNestedObject(obj, options, sensitiveKeys);
+    processNestedObject(
+        obj: any,
+        options: SerializationOptions,
+        sensitiveKeys: Set<string> | ((key: string) => boolean)
+    ): any {
+        return this.cryptoHandler.processNestedObject(
+            obj,
+            options,
+            sensitiveKeys
+        );
     }
 
     /**
@@ -148,7 +184,9 @@ export class SerializationHandler {
      */
     validateOptions(options: SerializationOptions): void {
         if (options.format && !["json", "binary"].includes(options.format)) {
-            throw new Error(`Invalid format option: ${options.format}. Must be 'json' or 'binary'.`);
+            throw new Error(
+                `Invalid format option: ${options.format}. Must be 'json' or 'binary'.`
+            );
         }
     }
 
@@ -191,7 +229,10 @@ export class SerializationHandler {
     /**
      * Estimates serialized size
      */
-    estimateSerializedSize(data: Map<string, any>, options: SerializationOptions = {}): number {
+    estimateSerializedSize(
+        data: Map<string, any>,
+        options: SerializationOptions = {}
+    ): number {
         try {
             const serialized = this.toJSON(data, new Set(), options);
             return new TextEncoder().encode(serialized).length;

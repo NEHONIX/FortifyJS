@@ -2,7 +2,7 @@
  * Random generators - Core random generation methods (bytes, ints, UUIDs)
  */
 
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { SECURITY_CONSTANTS } from "../../utils/constants";
 import { RandomGenerationOptions } from "./random-types";
 import { EnhancedUint8Array } from "../../helpers/Uint8Array";

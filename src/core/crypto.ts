@@ -48,7 +48,7 @@ import { StatsTracker } from "../utils/stats";
 import { runSecurityTests } from "../utils/testing";
 import { Hash } from "./hash";
 import { Keys } from "./keys";
-import { SecureRandom, RandomTokens } from "./random";
+import { SecureRandom, RandomTokens, RandomGenerationOptions } from "./random";
 import { Validators } from "./validators";
 
 // Import advanced security features
@@ -114,12 +114,13 @@ export class FortifyJS {
             includeLowercase = true,
             includeNumbers = true,
             includeSymbols = false,
+            maxValidityLength = 1024,
             excludeSimilarCharacters = false,
             entropy,
         } = options;
 
         // Validate inputs
-        Validators.validateLength(length, 1, 1024);
+        Validators.validateLength(length, 1, maxValidityLength);
         Validators.validateEntropyLevel(entropy);
 
         // Map entropy string to SecurityLevel enum
@@ -140,6 +141,32 @@ export class FortifyJS {
             excludeSimilarCharacters,
             entropyLevel: securityLevel[entropy],
         });
+    }
+
+    // PIN GENERATOR
+    /**
+     * Generate secure PIN
+     * @param length - PIN length
+     * @param options - Generation options
+     * @returns Secure numeric PIN
+     */
+    public static generateSecurePIN(
+        ...args: Parameters<(typeof RandomTokens)["generateSecurePIN"]>
+    ): string {
+        return RandomTokens.generateSecurePIN(...args);
+    }
+
+    /**
+     * Generate recovery codes
+     * @param count - Number of codes to generate
+     * @param codeLength - Length of each code
+     * @param options - Generation options
+     * @returns Array of recovery codes
+     */
+    public static generateRecoveryCodes(
+        ...args: Parameters<(typeof RandomTokens)["generateRecoveryCodes"]>
+    ): string[] {
+        return RandomTokens.generateRecoveryCodes(...args);
     }
 
     /**
@@ -215,7 +242,7 @@ export class FortifyJS {
      * @returns High-entropy JWT secret
      */
     public static generateJWTSecret(
-        length: number = 64,
+        length: number = 32,
         encoding?: EncodingHashType
     ): string {
         // Validate inputs

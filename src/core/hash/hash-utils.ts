@@ -2,7 +2,7 @@
  * Hash utilities - Common utility functions for hash operations
  */
 
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { HashStrength, StrengthConfiguration } from "./hash-types";
 import {
     bufferToHex,

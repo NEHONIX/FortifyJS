@@ -6,6 +6,9 @@
 import { SecureBuffer } from "../../security";
 
 export interface FortifiedFunctionOptions {
+    // **ULTRA-FAST OPTIMIZATION: Performance mode**
+    ultraFast?: boolean | "minimal" | "standard" | "maximum" | undefined;
+
     // Security Options
     autoEncrypt?: boolean;
     secureParameters?: (string | number)[];
@@ -16,6 +19,9 @@ export interface FortifiedFunctionOptions {
 
     // Performance Options
     memoize?: boolean;
+    /**
+     * Timeout in milliseconds. Default is 14 seconds.
+     */
     timeout?: number;
     retries?: number;
     maxRetryDelay?: number;
@@ -58,6 +64,32 @@ export interface FunctionStats {
     errorCount: number;
     lastExecuted: Date;
     securityEvents: number;
+    // Performance timing data
+    timingStats?: TimingStats;
+}
+
+// Performance timing interfaces
+export interface TimingMeasurement {
+    label: string;
+    startTime: number;
+    endTime?: number;
+    duration?: number;
+    metadata?: Record<string, any>;
+}
+
+export interface TimingStats {
+    totalMeasurements: number;
+    completedMeasurements: number;
+    activeMeasurements: number;
+    measurements: TimingMeasurement[];
+    summary: {
+        totalDuration: number;
+        averageDuration: number;
+        minDuration: number;
+        maxDuration: number;
+        slowestOperation: string;
+        fastestOperation: string;
+    };
 }
 
 export interface AuditEntry {
@@ -201,6 +233,18 @@ export interface EnhancedFortifiedFunction<T extends any[], R> {
     // Configuration methods
     updateOptions(options: Partial<FortifiedFunctionOptions>): void;
     getConfiguration(): FortifiedFunctionOptions;
+
+    // Performance timing methods
+    startTimer(label: string, metadata?: Record<string, any>): void;
+    endTimer(label: string, additionalMetadata?: Record<string, any>): number;
+    measureDelay(startPoint: string, endPoint: string): number;
+    timeFunction<U>(
+        label: string,
+        fn: () => U | Promise<U>,
+        metadata?: Record<string, any>
+    ): Promise<{ result: U; duration: number }>;
+    getTimingStats(): TimingStats;
+    clearTimings(): void;
 
     // Lifecycle methods
     destroy(): void;

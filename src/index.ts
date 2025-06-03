@@ -68,6 +68,8 @@ import * as fObjectUtils from "./security/secure-object";
 import * as fstringUtils from "./security/secure-string";
 import * as fArrayUtils from "./security/secure-array";
 import * as fFuncUtils from "./utils/fortified-function";
+import * as CacheUtils from "./security/cache";
+import * as serverUtils from "./integrations/express/server/ServerFactory";
 
 // Type exports
 export type {
@@ -175,6 +177,7 @@ import * as SecurityExports from "./security";
 
 // Import all encoding exports
 import * as EncodingExports from "./utils/encoding";
+import { cjsExports } from "./cjs.export";
 
 export { SecureRandom } from "./core/random";
 export { SecureRandom as Random } from "./core/random";
@@ -365,18 +368,45 @@ export async function verifyEncryptedPassword(
     return result.isValid;
 }
 
-// Export modular SecureObject utilities
+//  SecureObject utilities
 export * from "./security/secure-object";
 export { SecureString } from "./security/secure-string";
 export { SecureArray } from "./security/secure-array";
 
-// Export modular FortifiedFunction utilities
+//  FortifiedFunction utilities
 export {
     createFortifiedFunction,
     FortifiedFunction,
 } from "./utils/fortified-function";
 
-// Export modular SecureString utilities
+//  Cache sys
+export * from "./security/cache";
+
+// Enhanced Express Cache Factory
+export {
+    CacheFactory,
+    createOptimalCache,
+    createResilientCache,
+    createMonitoredCache,
+    LegacyCacheAdapter,
+    CacheUtils,
+} from "./integrations/express/cache/CacheFactory";
+
+export { SecureCacheAdapter } from "./integrations/express/cache/SecureCacheAdapter";
+
+// Enhanced Cache Configuration Types
+export type {
+    CacheConfig,
+    CacheBackendStrategy,
+    CachePerformanceConfig,
+    CacheSecurityConfig,
+    CacheMonitoringConfig,
+    CacheResilienceConfig,
+    CacheMetrics,
+    RedisConfig,
+    MemoryConfig,
+} from "./integrations/express/types";
+export * from "./integrations/express/server/ServerFactory";
 
 // For CommonJS compatibility
 if (typeof module !== "undefined" && module.exports) {
@@ -478,4 +508,18 @@ if (typeof module !== "undefined" && module.exports) {
     module.exports.SecureString = SecureString;
     module.exports.SecureObject = SecureObject;
     module.exports.SecureArray = SecureArray;
+
+    // ======================= v4.x.y =================
+    // Cache system
+    globalThis.Object.keys(CacheUtils).forEach((key: string) => {
+        if (key !== "default") {
+            module.exports[key] = (CacheUtils as any)[key];
+        }
+    });
+
+    globalThis.Object.keys(serverUtils).forEach((key: string) => {
+        if (key !== "default") {
+            module.exports[key] = (serverUtils as any)[key];
+        }
+    });
 }

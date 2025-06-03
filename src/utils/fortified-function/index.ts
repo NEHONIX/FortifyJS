@@ -1,7 +1,7 @@
 /***************************************************************************
  * FortifyJS - Secure Array Types
  *
- * This file contains type definitions for the SecureArray modular architecture
+ * This file contains type definitions for the SecureArrayarchitecture
  *
  * @author Nehonix
  * @license MIT
@@ -49,16 +49,17 @@ export type {
     AnalyticsData,
     AnomalyDetection,
     PredictiveAnalysis,
-    EnhancedFortifiedFunction,
+    EnhancedFortifiedFunction as FortifiedFunctionType,
 } from "./types";
 
 // Export main class
 export { FortifiedFunction } from "./fortified-function";
 
-// Export modular components for advanced usage
+// Exportcomponents for advanced usage
 export { SecurityHandler } from "./security-handler";
 export { PerformanceMonitor } from "./performance-monitor";
 export { ExecutionEngine } from "./execution-engine";
+export { PerformanceTimer } from "./performance-timer";
 
 // Export new smart components
 export { SmartCache } from "./smart-cache";
@@ -157,10 +158,24 @@ export function func<T extends any[], R>(
 
         // Configuration methods
         updateOptions: (newOptions: Partial<FortifiedFunctionOptions>) => {
-            // Update internal options (this is a simplified implementation)
-            Object.assign(options, newOptions);
+            fortifiedFunction.updateOptions(newOptions);
         },
         getConfiguration: () => ({ ...options }),
+
+        // Performance timing methods
+        startTimer: (label: string, metadata?: Record<string, any>) =>
+            fortifiedFunction.startTimer(label, metadata),
+        endTimer: (label: string, additionalMetadata?: Record<string, any>) =>
+            fortifiedFunction.endTimer(label, additionalMetadata),
+        measureDelay: (startPoint: string, endPoint: string) =>
+            fortifiedFunction.measureDelay(startPoint, endPoint),
+        timeFunction: <U>(
+            label: string,
+            fn: () => U | Promise<U>,
+            metadata?: Record<string, any>
+        ) => fortifiedFunction.timeFunction(label, fn, metadata),
+        getTimingStats: () => fortifiedFunction.getTimingStats(),
+        clearTimings: () => fortifiedFunction.clearTimings(),
 
         // Lifecycle methods
         destroy: () => fortifiedFunction.destroy(),

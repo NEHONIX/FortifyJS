@@ -2,7 +2,7 @@
  * Random entropy - Entropy pool management and quality assessment
  */
 
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { SECURITY_CONSTANTS } from "../../utils/constants";
 import {
     RNGState,

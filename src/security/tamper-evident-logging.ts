@@ -190,7 +190,7 @@ export class TamperEvidentLogger {
         });
 
         // Calculate the hash
-        return Hash.secureHash(entryString, {
+        return Hash.create(entryString, {
             salt: this.key,
             algorithm: "sha256",
             iterations: 1,

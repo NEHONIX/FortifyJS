@@ -2,7 +2,7 @@
  * Hash entropy analysis and quality assessment
  */
 
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { HashEntropyAnalysis } from "./hash-types";
 
 export class HashEntropy {
@@ -15,7 +15,7 @@ export class HashEntropy {
         data: Buffer | Uint8Array
     ): HashEntropyAnalysis {
         const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
-        const recommendations: string[] = [];
+        const recommendations: string[] = []; 
 
         // Shannon entropy calculation
         const frequency = new Map<number, number>();

@@ -2,7 +2,7 @@
  * Random sources - Multiple entropy sources and library management
  */
 
-import crypto from "crypto";
+import * as crypto from "crypto";
 import {
     SodiumInterface,
     ForgeInterface,

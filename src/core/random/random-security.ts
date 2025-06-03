@@ -2,7 +2,7 @@
  * Random security - Advanced security features and monitoring
  */
 
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { SecurityLevel } from "../../types";
 import {
     EntropyQuality,

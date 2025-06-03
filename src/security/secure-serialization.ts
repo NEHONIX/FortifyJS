@@ -579,7 +579,7 @@ function deserializeData(
  * @returns Signature
  */
 function signData(data: string, key: string): string {
-    return Hash.secureHash(data, {
+    return Hash.create(data, {
         salt: key,
         algorithm: "sha256",
         iterations: 1000,
@@ -621,7 +621,7 @@ function encryptData(data: string, key: string): string {
 
         // Derive encryption key from the provided key
         const keyBytes = hexToBuffer(key);
-        const derivedKey = Hash.secureHash(keyBytes, {
+        const derivedKey = Hash.create(keyBytes, {
             algorithm: "sha256",
             outputFormat: "buffer",
         }) as unknown as Uint8Array;
@@ -784,7 +784,7 @@ function computeGHash(
     combinedData.set(iv, data.length + key.length);
 
     // Use SHA-256 for the hash
-    const hash = Hash.secureHash(combinedData, {
+    const hash = Hash.create(combinedData, {
         algorithm: "sha256",
         outputFormat: "buffer",
     }) as unknown as Uint8Array;
@@ -839,7 +839,7 @@ function aesEncryptBlock(block: Uint8Array, key: Uint8Array): Uint8Array {
     combinedData.set(block, 0);
     combinedData.set(key, block.length);
 
-    const hash = Hash.secureHash(combinedData, {
+    const hash = Hash.create(combinedData, {
         algorithm: "sha256",
         outputFormat: "buffer",
     }) as unknown as Uint8Array;
@@ -896,7 +896,7 @@ function computeGCMTag(
     );
 
     // Compute the hash
-    const hash = Hash.secureHash(authData, {
+    const hash = Hash.create(authData, {
         algorithm: "sha256",
         outputFormat: "buffer",
     }) as unknown as Uint8Array;
@@ -936,7 +936,7 @@ function decryptData(data: string, key: string): string {
 
         // Derive decryption key from the provided key
         const keyBytes = hexToBuffer(key);
-        const derivedKey = Hash.secureHash(keyBytes, {
+        const derivedKey = Hash.create(keyBytes, {
             algorithm: "sha256",
             outputFormat: "buffer",
         }) as unknown as Uint8Array;

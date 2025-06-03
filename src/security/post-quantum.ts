@@ -503,7 +503,7 @@ function generateKyberKeyPairFallback(
     const seed = SecureRandom.getRandomBytes(32);
 
     // Use the seed to derive three seeds for different purposes
-    const seedA = Hash.secureHash(
+    const seedA = Hash.create(
         Buffer.concat([Buffer.from([0x00]), Buffer.from(seed)]),
         {
             algorithm: "sha256",
@@ -511,7 +511,7 @@ function generateKyberKeyPairFallback(
         }
     ) as unknown as Uint8Array;
 
-    const seedE = Hash.secureHash(
+    const seedE = Hash.create(
         Buffer.concat([Buffer.from([0x01]), Buffer.from(seed)]),
         {
             algorithm: "sha256",
@@ -519,7 +519,7 @@ function generateKyberKeyPairFallback(
         }
     ) as unknown as Uint8Array;
 
-    const seedS = Hash.secureHash(
+    const seedS = Hash.create(
         Buffer.concat([Buffer.from([0x02]), Buffer.from(seed)]),
         {
             algorithm: "sha256",
@@ -634,7 +634,7 @@ function generateMatrix(
 
         for (let j = 0; j < cols; j++) {
             // Generate a unique seed for each position
-            const positionSeed = Hash.secureHash(
+            const positionSeed = Hash.create(
                 Buffer.concat([seed, Buffer.from([i, j])]),
                 { algorithm: "sha256", outputFormat: "buffer" }
             ) as unknown as Uint8Array;
@@ -650,7 +650,7 @@ function generateMatrix(
             while (byteCounter < n) {
                 // Generate more bytes if needed
                 if (seedIndex >= currentSeed.length) {
-                    currentSeed = Hash.secureHash(currentSeed, {
+                    currentSeed = Hash.create(currentSeed, {
                         algorithm: "sha256",
                         outputFormat: "buffer",
                     }) as unknown as Uint8Array;
@@ -693,7 +693,7 @@ function generateNoiseVector(
 
     for (let i = 0; i < size; i++) {
         // Generate a unique seed for each position
-        const positionSeed = Hash.secureHash(
+        const positionSeed = Hash.create(
             Buffer.concat([seed, Buffer.from([i])]),
             { algorithm: "sha256", outputFormat: "buffer" }
         ) as unknown as Uint8Array;
@@ -709,7 +709,7 @@ function generateNoiseVector(
         while (byteCounter < n) {
             // Generate more bytes if needed
             if (seedIndex >= currentSeed.length) {
-                currentSeed = Hash.secureHash(currentSeed, {
+                currentSeed = Hash.create(currentSeed, {
                     algorithm: "sha256",
                     outputFormat: "buffer",
                 }) as unknown as Uint8Array;
@@ -914,7 +914,7 @@ function kyberEncapsulateFallback(
     const m = SecureRandom.getRandomBytes(32);
 
     // Hash the message to get noise seeds
-    const noiseHash = Hash.secureHash(m, {
+    const noiseHash = Hash.create(m, {
         algorithm: "sha512", // Using SHA-512 instead of SHA3-512
         outputFormat: "buffer",
     }) as unknown as Uint8Array;
@@ -951,7 +951,7 @@ function kyberEncapsulateFallback(
     }
 
     // Generate another error e2
-    const e2_seed = Hash.secureHash(
+    const e2_seed = Hash.create(
         Buffer.concat([Buffer.from(m), Buffer.from(seed)]),
         {
             algorithm: "sha256",
@@ -1016,7 +1016,7 @@ function kyberEncapsulateFallback(
     }
 
     // Derive the shared secret from the message
-    const sharedSecret = Hash.secureHash(m, {
+    const sharedSecret = Hash.create(m, {
         algorithm: "sha256", // Using SHA-256 instead of SHA3-256
         outputFormat: "buffer",
     }) as unknown as Uint8Array;
@@ -1259,7 +1259,7 @@ function kyberDecapsulateFallback(
     }
 
     // Derive the shared secret from the message
-    const sharedSecret = Hash.secureHash(m, {
+    const sharedSecret = Hash.create(m, {
         algorithm: "sha256",
         outputFormat: "buffer",
     }) as unknown as Uint8Array;
@@ -1287,7 +1287,7 @@ function kyberDecapsulateFallback(
  */
 function simpleHash(data: Uint8Array, outputLength: number): Uint8Array {
     // Use the secure hash function from the Hash module
-    const hashResult = Hash.secureHash(data, {
+    const hashResult = Hash.create(data, {
         algorithm: "sha256",
         outputFormat: "buffer",
     });
@@ -1336,7 +1336,7 @@ function simpleHash(data: Uint8Array, outputLength: number): Uint8Array {
             extendBuffer.set(counterBuffer, hashBuffer.length);
 
             // Hash the extended buffer
-            const extendedHashResult = Hash.secureHash(extendBuffer, {
+            const extendedHashResult = Hash.create(extendBuffer, {
                 algorithm: "sha256",
                 outputFormat: "buffer",
             });

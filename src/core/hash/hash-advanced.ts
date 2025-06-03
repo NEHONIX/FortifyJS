@@ -2,7 +2,7 @@
  * Hash advanced features - Cutting-edge hash implementations
  */
 
-import crypto from "crypto";
+import * as crypto from "crypto";
 import {
     HashAgilityResult,
     AgilityHashOptions,

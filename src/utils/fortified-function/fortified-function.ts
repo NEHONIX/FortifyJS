@@ -4,10 +4,17 @@
  */
 
 import { EventEmitter } from "events";
-import { FortifiedFunctionOptions, FunctionStats, AuditEntry } from "./types";
+import {
+    FortifiedFunctionOptions,
+    FunctionStats,
+    AuditEntry,
+    TimingStats,
+} from "./types";
 import { SecurityHandler } from "./security-handler";
 import { PerformanceMonitor } from "./performance-monitor";
 import { ExecutionEngine } from "./execution-engine";
+import { PerformanceTimer } from "./performance-timer";
+import { debugLog, generateSafeCacheKey } from "./safe-serializer";
 
 /**
  * Fortified Function - Secure function wrapper using existing FortifyJS components
@@ -18,6 +25,7 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
     private readonly securityHandler: SecurityHandler;
     private readonly performanceMonitor: PerformanceMonitor;
     private readonly executionEngine: ExecutionEngine;
+    private performanceTimer: PerformanceTimer | null = null;
     private isDestroyed = false;
     private cleanupInterval?: NodeJS.Timeout;
 
@@ -28,48 +36,52 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
         super();
 
         this.originalFunction = fn;
-        // Smart defaults for production-ready performance and security
+
+        // Optimal defaults for production use - balanced performance, security, and usability
         this.options = {
-            // Security - Best practices enabled by default
-            autoEncrypt: true,
+            // Performance Mode - Explicit opt-in for ultra-fast mode
+            ultraFast: "maximum",
+
+            // Security - Safe defaults for production
+            autoEncrypt: false, // Explicit opt-in for encryption to avoid performance overhead
             secureParameters: [],
             memoryWipeDelay: 0,
-            stackTraceProtection: true,
-            smartSecurity: true, //  Enable smart security by default
-            threatDetection: true, //  Enable threat detection by default
+            stackTraceProtection: true, // Essential for debugging
+            smartSecurity: false, // Disable advanced security by default for performance
+            threatDetection: false, // Disable by default, enable for high-security environments
 
-            // Performance - Smart caching and optimization enabled by default
-            memoize: true, //  Enable memoization by default for better performance
-            timeout: 30000,
-            retries: 2, //  Reasonable retry count by default
-            maxRetryDelay: 5000,
-            smartCaching: true, //  Smart caching enabled by default
-            cacheStrategy: "adaptive", //  Best strategy by default
-            cacheTTL: 600000, //  10 minutes - longer TTL for better performance
-            maxCacheSize: 2000, //  Larger cache size for better hit rates
+            // Performance - Balanced defaults optimized for typical use cases
+            memoize: true, // Enable caching for performance
+            timeout: 30000, // 30 seconds - reasonable for most operations
+            retries: 2, // Reasonable retry count
+            maxRetryDelay: 5000, // 5 seconds max retry delay
+            smartCaching: true, // Enable intelligent caching
+            cacheStrategy: "adaptive", // Adaptive strategy for best performance
+            cacheTTL: 300000, // 5 minutes - balanced TTL
+            maxCacheSize: 1000, // Reasonable cache size
             precompile: false,
-            optimizeExecution: true, //  Optimization enabled by default
+            optimizeExecution: true, // Enable basic optimizations
 
-            // Smart Actions - All intelligence features enabled by default
-            autoTuning: true, //  Auto-optimization enabled
-            predictiveAnalytics: true, //  Pattern learning enabled
-            adaptiveTimeout: true, //  Smart timeout adjustment
-            intelligentRetry: true, //  Smart retry strategy
-            anomalyDetection: true, //  Anomaly detection enabled
-            performanceRegression: true, //  Performance monitoring enabled
+            // Smart Actions - Conservative defaults for stability
+            autoTuning: false, // Disable auto-tuning by default for predictable behavior
+            predictiveAnalytics: false, // Disable by default to reduce overhead
+            adaptiveTimeout: false, // Use fixed timeouts by default
+            intelligentRetry: true, // Enable smart retry logic
+            anomalyDetection: false, // Disable by default, enable for monitoring environments
+            performanceRegression: false, // Disable by default to reduce overhead
 
-            // Monitoring - Comprehensive tracking enabled by default
-            auditLog: true,
-            performanceTracking: true,
-            debugMode: false,
-            detailedMetrics: true, //  Detailed metrics for optimization
+            // Monitoring - Essential tracking enabled for production insights
+            auditLog: true, // Essential for production debugging and compliance
+            performanceTracking: true, // Essential for performance monitoring
+            debugMode: false, // Disabled in production
+            detailedMetrics: false, // Disabled by default to reduce overhead
 
-            // Memory Management - Smart memory handling enabled by default
-            memoryPool: true,
-            maxMemoryUsage: 200 * 1024 * 1024, //  200MB - more generous limit
-            autoCleanup: true,
-            smartMemoryManagement: true, //  Smart memory management enabled
-            memoryPressureHandling: true, //  Memory pressure handling enabled
+            // Memory Management - Conservative defaults
+            memoryPool: true, // Enable object pooling for performance
+            maxMemoryUsage: 100 * 1024 * 1024, // 100MB - conservative limit
+            autoCleanup: true, // Enable automatic cleanup
+            smartMemoryManagement: false, // Disable advanced memory management by default
+            memoryPressureHandling: false, // Disable by default
 
             // Override with user options
             ...options,
@@ -95,6 +107,17 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
             this.securityHandler,
             this.performanceMonitor
         );
+
+        // **ULTRA-FAST OPTIMIZATION: Enable fast mode if performance is prioritized**
+        if (options.ultraFast || options.performanceTracking === false) {
+            this.executionEngine.enableFastMode(
+                options.ultraFast === "minimal"
+                    ? "minimal"
+                    : options.ultraFast === "maximum"
+                    ? "maximum"
+                    : "standard"
+            );
+        }
 
         // Forward events from execution engine
         this.executionEngine.on("execution_success", (data) =>
@@ -127,6 +150,14 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
             throw new Error("Cannot execute destroyed fortified function");
         }
 
+        // **ULTRA-FAST BYPASS: Skip all overhead for maximum performance**
+        if (this.options.ultraFast === "minimal") {
+            return await this.executeUltraFast(...args);
+        }
+
+        // Initialize performance timer for this execution
+        this.initializePerformanceTimer();
+
         // Create secure execution context
         const context = await this.executionEngine.createSecureExecutionContext(
             args,
@@ -147,7 +178,7 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
                             16
                         )}...`
                     );
-                    console.log(`[DEBUG] Args: ${JSON.stringify(args)}`);
+                    debugLog("Args", args);
                 }
 
                 const cached =
@@ -204,12 +235,7 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
                             16
                         )}...`
                     );
-                    console.log(
-                        `[DEBUG] Result: ${JSON.stringify(result).substring(
-                            0,
-                            50
-                        )}...`
-                    );
+                    debugLog("Result", result);
                 }
 
                 this.performanceMonitor.cacheResult(cacheKey, result, ttl);
@@ -253,6 +279,37 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
             );
             throw error;
         }
+    }
+
+    /**
+     * **ULTRA-FAST EXECUTION: Bypass all overhead for maximum performance**
+     */
+    private async executeUltraFast(...args: T): Promise<R> {
+        // **ULTRA-FAST: Direct execution with minimal cache check**
+        if (this.options.memoize) {
+            // Safe cache key generation that handles cyclic structures
+            const cacheKey = generateSafeCacheKey(args, "ultrafast");
+            const cached = this.performanceMonitor.getCachedResult<R>(cacheKey);
+
+            if (cached !== null) {
+                return cached;
+            }
+
+            // Execute function directly
+            const result = await this.originalFunction(...args);
+
+            // Simple cache store
+            this.performanceMonitor.cacheResult(
+                cacheKey,
+                result,
+                this.options.cacheTTL
+            );
+
+            return result;
+        }
+
+        // **ULTRA-FAST: Direct execution without any overhead**
+        return await this.originalFunction(...args);
     }
 
     /**
@@ -389,7 +446,14 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
      * Public API methods
      */
     public getStats(): FunctionStats {
-        return this.performanceMonitor.getStats();
+        const stats = this.performanceMonitor.getStats();
+
+        // Include timing data if available
+        if (this.performanceTimer) {
+            stats.timingStats = this.performanceTimer.getStats();
+        }
+
+        return stats;
     }
 
     public getAuditLog(): AuditEntry[] {
@@ -477,6 +541,12 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
         // Clean up all active executions
         this.executionEngine.cleanupAllExecutions();
 
+        // Clear timing data
+        if (this.performanceTimer) {
+            this.performanceTimer.clear();
+            this.performanceTimer = null;
+        }
+
         // Enhanced cleanup with smart components
         this.performanceMonitor.destroy();
 
@@ -492,5 +562,279 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
         this.removeAllListeners();
         this.executionEngine.removeAllListeners();
     }
-}
 
+    /**
+     * Update function options dynamically
+     * @param newOptions - Partial options to update
+     */
+    public updateOptions(newOptions: Partial<FortifiedFunctionOptions>): void {
+        if (this.isDestroyed) {
+            throw new Error(
+                "Cannot update options on destroyed fortified function"
+            );
+        }
+
+        // Store previous options for comparison
+        const previousOptions = { ...this.options };
+
+        // Merge new options with existing ones
+        Object.assign(this.options, newOptions);
+
+        // Handle ultra-fast mode changes
+        if (
+            newOptions.ultraFast !== undefined &&
+            newOptions.ultraFast !== previousOptions.ultraFast
+        ) {
+            if (newOptions.ultraFast) {
+                this.executionEngine.enableFastMode(
+                    newOptions.ultraFast === "minimal"
+                        ? "minimal"
+                        : newOptions.ultraFast === "maximum"
+                        ? "maximum"
+                        : "standard"
+                );
+            }
+        }
+
+        // Handle cache configuration changes
+        if (
+            newOptions.smartCaching !== undefined ||
+            newOptions.maxCacheSize !== undefined ||
+            newOptions.cacheTTL !== undefined ||
+            newOptions.cacheStrategy !== undefined
+        ) {
+            // Clear existing cache when configuration changes
+            this.performanceMonitor.clearCache();
+
+            // Log cache configuration update
+            console.log("Cache configuration updated:", {
+                smartCaching: this.options.smartCaching,
+                maxCacheSize: this.options.maxCacheSize,
+                cacheTTL: this.options.cacheTTL,
+                cacheStrategy: this.options.cacheStrategy,
+            });
+        }
+
+        // Handle cleanup interval changes
+        if (newOptions.autoCleanup !== undefined) {
+            if (newOptions.autoCleanup && !previousOptions.autoCleanup) {
+                // Start cleanup if it wasn't running
+                this.setupAutoCleanup();
+            } else if (!newOptions.autoCleanup && previousOptions.autoCleanup) {
+                // Stop cleanup if it was running
+                if (this.cleanupInterval) {
+                    clearInterval(this.cleanupInterval);
+                    this.cleanupInterval = undefined;
+                }
+            }
+        }
+
+        // Emit options updated event
+        this.emit("options_updated", {
+            previousOptions,
+            newOptions: this.options,
+            changedKeys: Object.keys(newOptions),
+        });
+    }
+
+    /**
+     * Optimize performance by applying recommended settings
+     */
+    public optimizePerformance(): void {
+        if (this.isDestroyed) {
+            throw new Error("Cannot optimize destroyed fortified function");
+        }
+
+        // Get current performance suggestions
+        const suggestions = this.getOptimizationSuggestions();
+        const stats = this.getStats();
+
+        // Apply performance optimizations
+        const optimizations: Partial<FortifiedFunctionOptions> = {};
+
+        // Enable ultra-fast mode if not already enabled
+        if (!this.options.ultraFast) {
+            optimizations.ultraFast = "minimal";
+        }
+
+        // Optimize cache settings based on usage
+        if (stats.executionCount > 10) {
+            const cacheStats = this.getCacheStats();
+
+            if (cacheStats.hitRate < 0.5) {
+                // Increase cache size if hit rate is low
+                optimizations.maxCacheSize = Math.min(
+                    this.options.maxCacheSize * 1.5,
+                    5000
+                );
+                optimizations.cacheTTL = Math.min(
+                    this.options.cacheTTL * 1.2,
+                    600000
+                ); // Max 10 minutes
+            }
+        }
+
+        // Optimize timeout based on average execution time
+        if (stats.averageExecutionTime > 0) {
+            const optimalTimeout = Math.max(
+                stats.averageExecutionTime * 3,
+                5000
+            ); // At least 5 seconds
+            if (optimalTimeout < this.options.timeout) {
+                optimizations.timeout = optimalTimeout;
+            }
+        }
+
+        // Disable heavy features for better performance
+        optimizations.detailedMetrics = false;
+        optimizations.anomalyDetection = false;
+        optimizations.predictiveAnalytics = false;
+        optimizations.autoTuning = false;
+
+        // Apply optimizations
+        if (Object.keys(optimizations).length > 0) {
+            this.updateOptions(optimizations);
+
+            this.emit("performance_optimized", {
+                appliedOptimizations: optimizations,
+                suggestions: suggestions.length,
+                executionCount: stats.executionCount,
+            });
+
+            console.log("Performance optimizations applied:", optimizations);
+        } else {
+            console.log(
+                "No performance optimizations needed - already optimized"
+            );
+        }
+    }
+
+    /**
+     * **PERFORMANCE TIMING METHODS**
+     */
+
+    /**
+     * Initialize performance timer for current execution
+     */
+    private initializePerformanceTimer(): void {
+        if (!this.performanceTimer) {
+            const executionId = `exec_${Date.now()}_${Math.random()
+                .toString(36)
+                .substring(2, 11)}`;
+            const ultraFastMode = this.options.ultraFast === "minimal";
+            this.performanceTimer = new PerformanceTimer(
+                executionId,
+                ultraFastMode
+            );
+        }
+    }
+
+    /**
+     * Start timing a specific operation
+     */
+    public startTimer(label: string, metadata?: Record<string, any>): void {
+        this.initializePerformanceTimer();
+        this.performanceTimer!.startTimer(label, metadata);
+    }
+
+    /**
+     * End timing for a specific operation
+     */
+    public endTimer(
+        label: string,
+        additionalMetadata?: Record<string, any>
+    ): number {
+        if (!this.performanceTimer) {
+            console.warn(
+                "Performance timer not initialized. Call startTimer first."
+            );
+            return 0;
+        }
+        return this.performanceTimer.endTimer(label, additionalMetadata);
+    }
+
+    /**
+     * Measure delay between two points
+     */
+    public measureDelay(startPoint: string, endPoint: string): number {
+        if (!this.performanceTimer) {
+            console.warn("Performance timer not initialized.");
+            return 0;
+        }
+        return this.performanceTimer.measureDelay(startPoint, endPoint);
+    }
+
+    /**
+     * Time a function execution
+     */
+    public async timeFunction<U>(
+        label: string,
+        fn: () => U | Promise<U>,
+        metadata?: Record<string, any>
+    ): Promise<{ result: U; duration: number }> {
+        this.initializePerformanceTimer();
+        return await this.performanceTimer!.timeFunction(label, fn, metadata);
+    }
+
+    /**
+     * Get timing statistics
+     */
+    public getTimingStats(): TimingStats {
+        if (!this.performanceTimer) {
+            return {
+                totalMeasurements: 0,
+                completedMeasurements: 0,
+                activeMeasurements: 0,
+                measurements: [],
+                summary: {
+                    totalDuration: 0,
+                    averageDuration: 0,
+                    minDuration: 0,
+                    maxDuration: 0,
+                    slowestOperation: "",
+                    fastestOperation: "",
+                },
+            };
+        }
+        return this.performanceTimer.getStats();
+    }
+
+    /**
+     * Clear all timing measurements
+     */
+    public clearTimings(): void {
+        if (this.performanceTimer) {
+            this.performanceTimer.clear();
+        }
+    }
+
+    /**
+     * Get measurements by pattern
+     */
+    public getMeasurementsByPattern(pattern: RegExp): any[] {
+        if (!this.performanceTimer) {
+            return [];
+        }
+        return this.performanceTimer.getMeasurementsByPattern(pattern);
+    }
+
+    /**
+     * Check if a timer is active
+     */
+    public isTimerActive(label: string): boolean {
+        if (!this.performanceTimer) {
+            return false;
+        }
+        return this.performanceTimer.isTimerActive(label);
+    }
+
+    /**
+     * Get active timers
+     */
+    public getActiveTimers(): string[] {
+        if (!this.performanceTimer) {
+            return [];
+        }
+        return this.performanceTimer.getActiveTimers();
+    }
+}

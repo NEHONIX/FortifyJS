@@ -1,3 +1,9 @@
+/* ---------------------------------------------------------------------------------------------
+ *  Copyright (c) NEHONIX INC. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE in the project root for license information.
+ * -------------------------------------------------------------------------------------------
+ */
+
 /**
  * Hash Core - Main Hash class with modular architecture
  * This is the primary interface for all hashing operations
@@ -15,7 +21,7 @@ import { HashAlgorithms } from "../../algorithms/hash-algorithms";
 import { HashSecurity } from "./hash-security";
 import { HashAdvanced } from "./hash-advanced";
 import { HashEntropy } from "./hash-entropy";
-
+import * as crypto from "crypto";
 /**
  * Military-grade hashing functionality with enhanced security features
  * Modular architecture for maintainable and scalable hash operations
@@ -27,8 +33,17 @@ export class Hash {
 
     /**
      * Create secure hash with military-grade security options
+     *
+     * IMPORTANT: This method automatically generates a random salt
+     * when no salt is provided, resulting in different hashes for the same input.
+     * This is designed for password hashing where randomness enhances security.
+     *
+     * For consistent hashes, either:
+     * - Provide a fixed salt parameter, or
+     * - Use Hash.create() method instead
+     *
      * @param input - The input to hash
-     * @param salt - Salt for the hash
+     * @param salt - Salt for the hash (if not provided, random salt is auto-generated)
      * @param options - Enhanced hashing options
      * @returns The hash in the specified format
      */
@@ -273,6 +288,59 @@ export class Hash {
      */
     public static deriveKeyArgon2 = HashSecurity.memoryHardHash;
 
+    /**
+     * Standard PBKDF2 key derivation
+     *
+     * BEHAVIOR: Uses Node.js crypto.pbkdf2Sync for reliable, standard PBKDF2 implementation.
+     * Produces consistent results and is widely compatible.
+     * With crypto:
+     * @example
+     * crypto.pbkdf2Sync(
+            password,
+            salt,
+            iterations,
+            keyLength,
+            hashFunction
+        );
+     *
+     * @param password - Password to derive key from
+     * @param salt - Salt for the derivation
+     * @param iterations - Number of iterations (default: 100000)
+     * @param keyLength - Desired key length in bytes (default: 32)
+     * @param hashFunction - Hash function to use (default: "sha256")
+     * @param outputFormat - Output format (default: "hex")
+     * @returns PBKDF2 derived key
+     */
+    public static pbkdf2(
+        password: string,
+        salt: string,
+        iterations: number = 100000,
+        keyLength: number = 32,
+        hashFunction: "sha256" | "sha512" = "sha256",
+        outputFormat: "hex" | "base64" | "buffer" = "hex"
+    ): string | Buffer {
+        // const crypto = require("crypto");
+
+        const result = crypto.pbkdf2Sync(
+            password,
+            salt,
+            iterations,
+            keyLength,
+            hashFunction
+        );
+
+        switch (outputFormat) {
+            case "hex":
+                return result.toString("hex");
+            case "base64":
+                return result.toString("base64");
+            case "buffer":
+                return result;
+            default:
+                return result.toString("hex");
+        }
+    }
+
     // ============================================================================
     // ADVANCED SECURITY FEATURES
     // ============================================================================
@@ -434,8 +502,13 @@ export class Hash {
 
     /**
      * Legacy secure hash method (for backward compatibility)
+     *
+     * BEHAVIOR: Produces consistent hashes for the same input (like CryptoJS).
+     * This method does NOT auto-generate random salts, ensuring deterministic results.
+     *
+     * For password hashing with auto-salt generation, use Hash.createSecureHash() instead.
      */
-    public static secureHash = HashAlgorithms.secureHash;
+    public static create = HashAlgorithms.secureHash;
 
     /**
      * Legacy HMAC creation (for backward compatibility)

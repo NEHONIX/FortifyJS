@@ -1,6 +1,5 @@
 /**
  * FortifyJS React Hooks - Type Definitions
- * Modular type definitions for React integration
  */
 
 import { SecureObject } from "fortify2-js";

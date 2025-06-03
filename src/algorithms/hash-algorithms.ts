@@ -3,7 +3,7 @@
  * Maintains backward compatibility while adding quantum-resistant features
  */
 
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { HashUtils } from "../core/hash/hash-utils";
 import { SecureHashOptions } from "../types";
 import { SecureRandom } from "../core";
@@ -104,11 +104,19 @@ export class HashAlgorithms {
     }
 
     /**
-     *  better security while maintaining compatibility
      * Core secure hash function with multiple algorithm support
+     *
+     * BEHAVIOR: This method produces consistent hashes for the same input. Unlike Hash.createSecureHash(), this method
+     * does NOT auto-generate random salts, ensuring deterministic results.
+     *
+     * Use this method when you need:
+     * - Consistent hashes for data integrity verification
+     * - Content-based hashing (like file checksums)
+     * - Deterministic hash generation
+     *
      * @param input - Input to hash
-     * @param options - Hash options
-     * @returns Hash result
+     * @param options - Hash options (salt is optional and won't be auto-generated)
+     * @returns Hash result (consistent for same input/options)
      */
     public static secureHash(
         input: string | Uint8Array,
