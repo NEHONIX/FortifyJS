@@ -54,7 +54,6 @@ export interface SerializationOptions {
     includeMetadata?: boolean;
     encryptSensitive?: boolean;
     format?: "json" | "binary";
-    strictSensitiveKeys?: boolean;
 }
 
 /**

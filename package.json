@@ -1,6 +1,6 @@
 {
     "name": "fortify2-js",
-    "version": "4.2.0",
+    "version": "4.3.0",
     "description": "MOST POWERFUL JavaScript Security Library! Military-grade cryptography + 19 enhanced object methods + quantum-resistant algorithms + perfect TypeScript support. More powerful than Lodash with built-in security.",
     "main": "./dist/index.cjs",
     "module": "./dist/index.esm.js",
@@ -187,6 +187,7 @@
         "argon2": "^0.43.0",
         "bcrypt": "^6.0.0",
         "bcryptjs": "^2.4.3",
+        "check-disk-space": "^3.4.0",
         "compression": "^1.8.0",
         "cors": "^2.8.5",
         "crypto-js": "^4.2.0",

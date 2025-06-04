@@ -1284,7 +1284,33 @@ export class SecureObject<
     // ===== SERIALIZATION METHODS =====
 
     /**
-     * Converts to a regular object
+     * Converts to a regular object with security-focused serialization
+     *
+     * BEHAVIOR: This is the security-focused method that handles sensitive key filtering.
+     * Use this method when you need controlled access to data with security considerations.
+     * For simple object conversion without filtering, use toObject().
+     * 
+     *  @example
+     * const user = fObject({
+        id: "1",
+        email: "test@test.com",
+        password: "test123",
+        isVerified: true,
+        userName: "test",
+        firstName: "test",
+        lastName: "test",
+        bio: "test",
+        });
+
+        const getAllResult = user.getAll();
+        console.log("getAllResult.email:", getAllResult.email);
+        console.log("getAllResult.password:", getAllResult.password);
+        console.log("Has password?", "password" in getAllResult);
+        
+        // Purpose: Security-conscious data access
+        // Behavior: Filters out sensitive keys by default
+        // Result: ❌ password: undefined (filtered for security)
+        // With encryptSensitive: true: ✅ password: "[ENCRYPTED:...]" (encrypted but included)
      */
     public getAll(
         options: SerializationOptions = {}
@@ -1302,17 +1328,42 @@ export class SecureObject<
 
     /**
      * Gets the full object as a regular JavaScript object
+     *
+     * BEHAVIOR: Returns ALL data including sensitive keys (like standard JS object conversion).
+     * This method does NOT filter sensitive keys by default - use getAll() for security-focused serialization.
+     * 
+     * @example
+     * const user = fObject({
+        id: "1",
+        email: "test@test.com",
+        password: "test123",
+        isVerified: true,
+        userName: "test",
+        firstName: "test",
+        lastName: "test",
+        bio: "test",
+        });
+
+        const toObjectResult = user.toObject();
+        console.log("toObjectResult.email:", toObjectResult.email);
+        console.log("toObjectResult.password:", toObjectResult.password);
+        console.log("Has password?", "password" in toObjectResult);
+
+        // Purpose: Standard JavaScript object conversion
+        // Behavior: Returns ALL data including sensitive keys (like password)
+        // Result: ✅ password: "test123" (included)
+
+        Sensitive keys can be handled using .add/removeSensitiveKeys()
      */
     public toObject(
         options?: SerializationOptions
     ): T & { _metadata?: Record<string, ValueMetadata> } {
-        // Use non-strict mode by default (only exact matches)
-        const strictMode = options?.strictSensitiveKeys === true;
-        const isSensitiveKey = (key: string) =>
-            this.sensitiveKeysManager.isSensitive(key, strictMode);
+        // toObject() should return ALL data by default (no filtering)
+        // Pass an empty Set to indicate no keys should be filtered
+        const noFiltering = new Set<string>();
         return this.serializationHandler.toObject<T>(
             this.data,
-            isSensitiveKey,
+            noFiltering,
             options
         );
     }
@@ -1320,7 +1371,11 @@ export class SecureObject<
     /**
      * Converts to JSON string
      */
-    public toJSON(options: SerializationOptions = {}): string {
+    public toJSON(
+        options: SerializationOptions & {
+            strictSensitiveKeys?: boolean;
+        } = {}
+    ): string {
         this.ensureNotDestroyed();
         ValidationUtils.validateSerializationOptions(options);
 

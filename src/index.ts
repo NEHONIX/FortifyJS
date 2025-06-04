@@ -42,7 +42,7 @@
  *
  * @NEHONIX
  * @augments FortifyJS
- * @exports FortifyJS
+ * @exports Fortify
  * @author Nehonix
  * @see https://lab.nehonix.space
  * @name FortifyJS
@@ -154,7 +154,7 @@ export {
     HashAlgorithm,
     KeyDerivationAlgorithm,
 } from "./types";
-export { HashStrength } from "./core";
+export type { HashStrength } from "./core";
 
 // Core exports
 import { SecureRandom, RandomCrypto, RandomTokens } from "./core/random";
@@ -179,7 +179,6 @@ import * as SecurityExports from "./security";
 import * as EncodingExports from "./utils/encoding";
 import { cjsExports } from "./cjs.export";
 
-export { SecureRandom } from "./core/random";
 export { SecureRandom as Random } from "./core/random";
 export { Keys } from "./core/keys";
 export { Validators } from "./core/validators";
@@ -314,7 +313,7 @@ export async function encryptSecurePass(
 }
 
 /**
- * 🔍 Verify a password against a peppered hash with timing-safe comparison
+ * Verify a password against a peppered hash with timing-safe comparison
  *
  * This function verifies a plain text password against a hash that was created
  * using encryptSecurePass(). It applies the same pepper and uses constant-time
@@ -382,17 +381,6 @@ export {
 //  Cache sys
 export * from "./security/cache";
 
-// Enhanced Express Cache Factory
-export {
-    CacheFactory,
-    createOptimalCache,
-    createResilientCache,
-    createMonitoredCache,
-    LegacyCacheAdapter,
-    CacheUtils,
-} from "./integrations/express/cache/CacheFactory";
-
-export { SecureCacheAdapter } from "./integrations/express/cache/SecureCacheAdapter";
 
 // Enhanced Cache Configuration Types
 export type {

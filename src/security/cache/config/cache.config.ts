@@ -1,4 +1,5 @@
 import * as crypto from "crypto";
+import { FileCacheOptions } from "../types/cache.type";
 
 const CONFIG = {
     CACHE_EXPIRY_MS: 10 * 60 * 1000, // 10 minutes default TTL
@@ -17,3 +18,23 @@ const CONFIG = {
 };
 
 export { CONFIG };
+
+// ========================================
+// FILE CACHE CONFIGURATION
+// ========================================
+
+/**
+ * Default configuration for file-based cache
+ */
+export const DEFAULT_FILE_CACHE_CONFIG: Required<FileCacheOptions> = {
+    directory: ".data/cache",
+    extension: ".cache",
+    atomic: true,
+    compress: true,
+    encrypt: true,
+    namingStrategy: "hierarchical",
+    maxFileSize: 10 * 1024 * 1024, // 10MB
+    trackMetadata: true,
+    maxCacheSize: 50 * 1024 * 1024, // 50MB
+    ttl: 5 * 60 * 1000, // 5 minutes
+};
