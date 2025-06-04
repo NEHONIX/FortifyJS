@@ -319,9 +319,9 @@ export async function createServerAsync(
 
     // Initialize cache
     const cacheStrategy = detectCacheStrategy(options);
-    console.log(
-        ` Auto-selected cache strategy: ${cacheStrategy.toUpperCase()}`
-    );
+    // console.log(
+    //     ` Auto-selected cache strategy: ${cacheStrategy.toUpperCase()}`
+    // );
 
     const cacheConfig: CacheConfig = {
         type: cacheStrategy,

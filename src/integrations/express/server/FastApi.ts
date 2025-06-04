@@ -104,9 +104,9 @@ export class UltraFastServer {
      */
     private createCache(): SecureCacheAdapter {
         const cacheStrategy = this.detectCacheStrategy();
-        console.log(
-            `Auto-selected cache strategy: ${cacheStrategy.toUpperCase()}`
-        );
+        // console.log(
+        //     `Auto-selected cache strategy: ${cacheStrategy.toUpperCase()}`
+        // );
 
         const cacheConfig: CacheConfig = {
             type: cacheStrategy,
@@ -543,13 +543,13 @@ export class UltraFastServer {
                     `Performance targets: <50ms set, <20ms get, <5ms cache hits`
                 );
                 console.log(
-                    `Cache ready: ${this.ready ? "Yes" : "Initializing..."}`
+                    `State: ${this.ready ? "Ready" : "Initializing..."}`
                 );
 
                 if (callback) callback();
             });
         };
 
-        this.app.isReady = () => this.ready;
+        this.app.isReady = () => this.ready; 
     }
 }

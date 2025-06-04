@@ -178,7 +178,7 @@ export class ExecutionEngine extends EventEmitter {
             await this.ultraFastCache.connect();
             this.cacheInitialized = true;
 
-            console.log(" execution cache initialized");
+            // console.log(" execution cache initialized");
         } catch (error) {
             console.warn(
                 "Failed to initialize  cache, continuing without cache:",

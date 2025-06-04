@@ -654,7 +654,7 @@ export function createOptimalCache(
     else if (hasRedis) strategy = "redis";
     else strategy = "memory";
 
-    console.log(`Auto-selected ${strategy.toUpperCase()} cache strategy`);
+    // console.log(`Auto-selected ${strategy.toUpperCase()} cache strategy`);
 
     switch (strategy) {
         case "hybrid":
