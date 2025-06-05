@@ -155,7 +155,7 @@ export class UltraFastFileWatcher extends EventEmitter {
                 this.showBanner();
             }
 
-            console.log("Starting  file watcher...");
+            // console.log("Starting  file watcher...");
 
             // Validate watch paths
             await this.validateWatchPaths();
@@ -186,15 +186,15 @@ export class UltraFastFileWatcher extends EventEmitter {
                 config: this.config,
             });
 
-            console.log(`File watcher started successfully!`);
-            console.log(`Watching ${this.config.watchPaths.length} paths`);
-            console.log(`Extensions: ${this.config.extensions.join(", ")}`);
-            console.log(`   Debounce: ${this.config.debounceMs}ms`);
-            console.log(
-                `   Batch changes: ${
-                    this.config.batchChanges ? "enabled" : "disabled"
-                }`
-            );
+            // console.log(`File watcher started successfully!`);
+            // console.log(`Watching ${this.config.watchPaths.length} paths`);
+            // console.log(`Extensions: ${this.config.extensions.join(", ")}`);
+            // console.log(`   Debounce: ${this.config.debounceMs}ms`);
+            // console.log(
+            //     `   Batch changes: ${
+            //         this.config.batchChanges ? "enabled" : "disabled"
+            //     }`
+            // );
 
             if (this.config.verbose) {
                 console.log(`   Paths: ${this.config.watchPaths.join(", ")}`);
@@ -748,7 +748,7 @@ export class UltraFastFileWatcher extends EventEmitter {
                     console.warn(`Skipping non-directory path: ${path}`);
                 }
             } catch {
-                console.warn(`Skipping non-existent path: ${path}`);
+                // console.warn(`Skipping non-existent path: ${path}`);
             }
         }
 
@@ -851,12 +851,12 @@ export class UltraFastFileWatcher extends EventEmitter {
      * Show startup banner
      */
     private showBanner(): void {
-        console.log("╔════════════════════════════════════════╗");
-        console.log("║                UF - Watcher            ║");
-        console.log("║        High-Performance File Monitor   ║");
-        console.log("║              Powered By Nehonix        ║");
-        console.log("╚════════════════════════════════════════╝");
-        console.log("");
+        // console.log("╔════════════════════════════════════════╗");
+        // console.log("║                UF - Watcher            ║");
+        // console.log("║        High-Performance File Monitor   ║");
+        // console.log("║              Powered By Nehonix        ║");
+        // console.log("╚════════════════════════════════════════╝");
+        // console.log("");
     }
 
     /**
