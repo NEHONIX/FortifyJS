@@ -235,7 +235,7 @@ results.push(
 // ============================================================================
 
 console.log("\n" + "=".repeat(60));
-console.log("⚡ CONCURRENT OPERATION BENCHMARKS");
+console.log("CONCURRENT OPERATION BENCHMARKS");
 console.log("=".repeat(60));
 
 const concurrentRandomStart = process.hrtime.bigint();

@@ -22,7 +22,7 @@ export type {
     ServerConfig,
     RouteConfig,
     CacheConfig,
-    SecurityConfig,
+    SecurityConfig, 
     PerformanceConfig,
 } from "./types/types";
 
