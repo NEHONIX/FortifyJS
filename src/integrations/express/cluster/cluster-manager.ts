@@ -1,6 +1,6 @@
 /**
  * FortifyJS Cluster Manager
- * Production-ready cluster management for Express applications with advanced monitoring
+ *  cluster management for Express applications with advanced monitoring
  */
 
 import * as cluster from "cluster";
@@ -13,6 +13,8 @@ import {
     WorkerMetrics,
     ClusterState,
     ClusterEvents,
+    PersistenceConfig,
+    PersistentClusterState,
 } from "../types/cluster";
 import { WorkerManager } from "./WorkerManager";
 import { HealthMonitor } from "./HealthMonitor";
@@ -20,6 +22,7 @@ import { LoadBalancer } from "./LoadBalancer";
 import { IPCManager } from "./IPCManager";
 import { MetricsCollector } from "./MetricsCollector";
 import { AutoScaler } from "./AutoScaler";
+import { ClusterPersistenceManager } from "./ClusterPersistenceManager";
 import {
     SecurityErrorLogger,
     createSecurityError,
@@ -29,7 +32,7 @@ import {
 import { DEFAULT_CLUSTER_CONFIGS } from "../server/const/Cluster.config";
 
 /**
- * Production-ready cluster manager with comprehensive monitoring and auto-scaling
+ *  cluster manager with comprehensive monitoring and auto-scaling
  */
 export class ClusterManager
     extends EventEmitter
@@ -43,6 +46,7 @@ export class ClusterManager
     private ipcManager: IPCManager;
     private metricsCollector: MetricsCollector;
     private autoScaler: AutoScaler;
+    private persistenceManager?: ClusterPersistenceManager;
     private errorLogger: SecurityErrorLogger;
     private startTime: Date = new Date();
     private isShuttingDown = false;
@@ -62,6 +66,13 @@ export class ClusterManager
         this.ipcManager = new IPCManager(this.config, this.errorLogger);
         this.metricsCollector = new MetricsCollector(this.config);
         this.autoScaler = new AutoScaler(this.config, this.errorLogger);
+
+        // Initialize persistence manager if configured
+        if (this.config.persistence?.enabled && this.config.persistence.type) {
+            this.persistenceManager = new ClusterPersistenceManager(
+                this.config.persistence as PersistenceConfig
+            );
+        }
 
         // Setup component integrations
         this.setupComponentIntegrations();
@@ -119,6 +130,9 @@ export class ClusterManager
 
         // Setup health monitor with worker manager integration
         this.healthMonitor.setWorkerManager(this.workerManager);
+
+        // Setup load balancer with IPC manager integration
+        this.loadBalancer.setIPCManager(this.ipcManager);
     }
 
     /**
@@ -390,6 +404,9 @@ export class ClusterManager
 
             // Stop all workers
             await this.workerManager.stopAllWorkers(graceful);
+
+            // Close persistence manager
+            await this.closePersistenceManager();
 
             this.state = "stopped";
             console.log("Cluster stopped successfully");
@@ -757,7 +774,8 @@ export class ClusterManager
     public async getLoadBalanceStatus(): Promise<{
         [workerId: string]: number;
     }> {
-        return this.loadBalancer.getLoadBalanceStatus();
+        const status = this.loadBalancer.getLoadBalanceStatus();
+        return status.connections;
     }
 
     /**
@@ -843,18 +861,41 @@ export class ClusterManager
      */
     public async saveState(): Promise<void> {
         try {
-            const clusterState = {
-                config: this.config,
+            // Create comprehensive persistent state
+            const persistentState: PersistentClusterState = {
                 state: this.state,
-                startTime: this.startTime,
-                workers: this.workerManager.getWorkerPool(),
-                metrics: await this.getMetrics(),
-                timestamp: new Date().toISOString(),
+                config: this.config,
+                workers: this.workerManager
+                    .getActiveWorkers()
+                    .map((worker) => ({
+                        id: worker.workerId,
+                        pid: worker.pid,
+                        status:
+                            worker.health.status === "healthy"
+                                ? ("running" as const)
+                                : ("stopped" as const),
+                        startTime: worker.lastRestart || new Date(),
+                        restarts: worker.restarts,
+                        metrics: worker,
+                    })),
+                metrics: this.metricsCollector.exportMetricsForPersistence(),
+                loadBalancer: {
+                    strategy:
+                        this.config.loadBalancing?.strategy || "round-robin",
+                    weights: {},
+                    distribution: {},
+                    historicalTrends: {
+                        requestsPerMinute: [],
+                        averageResponseTimes: [],
+                        errorRates: [],
+                    },
+                },
+                timestamp: new Date(),
+                version: "1.0.0",
             };
 
-            // In production, this would save to persistent storage (Redis, file system, etc.)
-            // For now, emit event for external handling
-            this.emit("cluster:state:saved", clusterState);
+            // Save to persistent storage
+            await this.saveClusterStateToPersistentStorage(persistentState);
         } catch (error: any) {
             const securityError = createSecurityError(
                 `Failed to save cluster state: ${error.message}`,
@@ -873,12 +914,16 @@ export class ClusterManager
      */
     public async restoreState(): Promise<void> {
         try {
-            // In production, this would restore from persistent storage
-            // For now, emit event for external handling
-            this.emit("cluster:state:restore_requested");
+            // Restore from persistent storage
+            const savedState =
+                await this.loadClusterStateFromPersistentStorage();
 
-            // Placeholder for actual restoration logic
-            // const savedState = await this.loadStateFromStorage();
+            if (savedState) {
+                await this.applyRestoredState(savedState);
+                console.log(" Cluster state restored from persistent storage");
+            } else {
+                console.log("No saved cluster state found, starting fresh");
+            }
             // if (savedState) {
             //     await this.applyRestoredState(savedState);
             // }
@@ -1159,6 +1204,134 @@ export class ClusterManager
         this.removeAllListeners();
 
         console.log("Force cleanup completed");
+    }
+
+    // ===== PERSISTENCE METHODS =====
+
+    /**
+     * Save cluster state to persistent storage
+     */
+    private async saveClusterStateToPersistentStorage(
+        clusterState: PersistentClusterState
+    ): Promise<void> {
+        if (!this.persistenceManager) {
+            // Fallback: emit event for external handling
+            this.emit("cluster:state:saved", clusterState);
+            return;
+        }
+
+        try {
+            await this.persistenceManager.saveClusterState(clusterState);
+        } catch (error: any) {
+            console.warn(`Failed to save cluster state: ${error.message}`);
+            // Emit event as fallback
+            this.emit("cluster:state:saved", clusterState);
+        }
+    }
+
+    /**
+     * Load cluster state from persistent storage
+     */
+    private async loadClusterStateFromPersistentStorage(): Promise<PersistentClusterState | null> {
+        if (!this.persistenceManager) {
+            // Fallback: emit event for external handling
+            this.emit("cluster:state:restore_requested");
+            return null;
+        }
+
+        try {
+            return await this.persistenceManager.loadClusterState();
+        } catch (error: any) {
+            console.warn(`Failed to load cluster state: ${error.message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Apply restored cluster state
+     */
+    private async applyRestoredState(
+        savedState: PersistentClusterState
+    ): Promise<void> {
+        try {
+            if (savedState.workers) {
+                // Restore worker configurations
+                for (const workerState of savedState.workers) {
+                    if (workerState.status === "running") {
+                        // Try to reconnect to existing worker or spawn new one
+                        await this.restoreOrSpawnWorker(workerState);
+                    }
+                }
+            }
+
+            if (savedState.config) {
+                // Apply saved configuration (merge with current)
+                this.config = { ...this.config, ...savedState.config };
+            }
+
+            if (savedState.metrics) {
+                // Restore metrics using the MetricsCollector
+                if (savedState.metrics.historicalData) {
+                    this.metricsCollector.restoreHistoricalData(
+                        savedState.metrics.historicalData
+                    );
+                }
+
+                if (savedState.metrics.workerHistory) {
+                    this.metricsCollector.restoreWorkerHistoricalData(
+                        savedState.metrics.workerHistory
+                    );
+                }
+
+                console.log("✔ Restored metrics from persistent storage");
+            }
+        } catch (error: any) {
+            console.warn(`Failed to apply restored state: ${error.message}`);
+        }
+    }
+
+    /**
+     * Restore or spawn worker from saved state
+     */
+    private async restoreOrSpawnWorker(workerState: any): Promise<void> {
+        try {
+            // Check if worker process still exists
+            const existingWorker = this.workerManager.getWorker(workerState.id);
+
+            if (!existingWorker) {
+                // Worker doesn't exist, spawn a new one
+                console.log(`Spawning new worker to replace ${workerState.id}`);
+                await this.addWorker();
+            } else {
+                console.log(
+                    `Worker ${workerState.id} already exists and running`
+                );
+            }
+        } catch (error: any) {
+            console.warn(
+                `Failed to restore worker ${workerState.id}: ${error.message}`
+            );
+        }
+    }
+
+    /**
+     * Get persistence manager statistics
+     */
+    public getPersistenceStats(): any {
+        if (!this.persistenceManager) {
+            return { enabled: false, type: "none" };
+        }
+
+        return this.persistenceManager.getStats();
+    }
+
+    /**
+     * Close persistence manager
+     */
+    private async closePersistenceManager(): Promise<void> {
+        if (this.persistenceManager) {
+            await this.persistenceManager.close();
+        }
     }
 }
 

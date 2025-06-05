@@ -7,6 +7,37 @@
 
 // =====  CLUSTER CONFIGURATION =====
 
+// Enhanced types for better type safety
+export interface WorkerHealth {
+    status: "healthy" | "warning" | "critical" | "down";
+    score: number; // 0-100, higher is better
+    lastCheck: number;
+    consecutiveFailures: number;
+}
+
+export interface WorkerPerformanceMetrics {
+    avgResponseTime: number;
+    throughput: number; // requests per second
+    errorRate: number; // 0-1
+    cpuUsage: number; // 0-100
+    memoryUsage: number; // 0-100
+    activeConnections: number;
+}
+
+export interface LoadBalancingStrategy {
+    name: string;
+    selector: (workers: WorkerMetrics[], request?: any) => string;
+    healthAware: boolean;
+    performanceAware: boolean;
+}
+
+export interface CircuitBreakerState {
+    failures: number;
+    lastFailure: number;
+    state: "closed" | "open" | "half-open";
+    nextAttempt: number;
+}
+
 export interface ClusterConfig {
     enabled?: boolean;
     workers?: number | "auto"; // "auto" = CPU cores
@@ -35,10 +66,19 @@ export interface ClusterConfig {
 
     // Load Balancing
     loadBalancing?: {
-        strategy?: "round-robin" | "least-connections" | "ip-hash" | "weighted";
+        strategy?:
+            | "round-robin"
+            | "least-connections"
+            | "ip-hash"
+            | "weighted"
+            | "adaptive"
+            | "least-response-time"
+            | "resource-based";
         weights?: number[]; // Worker weights for weighted strategy
         stickySession?: boolean;
         sessionAffinityKey?: string; // Key for session affinity (e.g., "userId")
+        circuitBreakerThreshold?: number; // Circuit breaker failure threshold
+        circuitBreakerTimeout?: number; // Circuit breaker timeout in ms
     };
 
     // Inter-Process Communication
@@ -175,6 +215,34 @@ export interface ClusterConfig {
             tcpNoDelay?: boolean;
             keepAlive?: boolean;
             keepAliveInitialDelay?: number;
+        };
+    };
+
+    // Persistence Configuration
+    persistence?: {
+        enabled?: boolean;
+        type?: "redis" | "file" | "memory" | "custom";
+        redis?: {
+            host?: string;
+            port?: number;
+            password?: string;
+            db?: number;
+            keyPrefix?: string;
+            ttl?: number;
+        };
+        file?: {
+            path?: string;
+            backup?: boolean;
+            maxBackups?: number;
+            compression?: boolean;
+        };
+        memory?: {
+            maxSize?: number;
+            ttl?: number;
+        };
+        custom?: {
+            saveHandler?: (state: any) => Promise<void>;
+            loadHandler?: () => Promise<any>;
         };
     };
 }
@@ -463,7 +531,14 @@ export interface WorkerPool {
 }
 
 export interface LoadBalancer {
-    strategy: "round-robin" | "least-connections" | "ip-hash" | "weighted";
+    strategy:
+        | "round-robin"
+        | "least-connections"
+        | "ip-hash"
+        | "weighted"
+        | "adaptive"
+        | "least-response-time"
+        | "resource-based";
     weights: Map<string, number>;
     connections: Map<string, number>;
     lastSelected: string;
@@ -553,9 +628,7 @@ export interface ClusterBuilder {
     withMonitoring(
         config: Partial<ClusterConfig["monitoring"]>
     ): ClusterBuilder;
-    withSecurity(
-        config: Partial<ClusterConfig["security"]>
-    ): ClusterBuilder;
+    withSecurity(config: Partial<ClusterConfig["security"]>): ClusterBuilder;
     withResilience(
         config: Partial<ClusterConfig["resilience"]>
     ): ClusterBuilder;
@@ -569,4 +642,80 @@ export interface ClusterBuilderFactory {
     create(): ClusterBuilder;
     fromConfig(config: Partial<ClusterConfig>): ClusterBuilder;
     forEnvironment(env: "development" | "production" | "test"): ClusterBuilder;
+}
+
+// ===== PERSISTENCE CONFIGURATION =====
+export interface PersistenceConfig {
+    enabled?: boolean;
+    type: "redis" | "file" | "memory" | "custom";
+    redis?: {
+        host: string;
+        port: number;
+        password?: string;
+        db?: number;
+        keyPrefix?: string;
+        ttl?: number;
+    };
+    file?: {
+        path: string;
+        backup: boolean;
+        maxBackups?: number;
+        compression?: boolean;
+    };
+    memory?: {
+        maxSize: number;
+        ttl?: number;
+    };
+    custom?: {
+        saveHandler?: (state: PersistentClusterState) => Promise<void>;
+        loadHandler?: () => Promise<PersistentClusterState | null>;
+    };
+}
+
+// ===== PERSISTENT CLUSTER STATE =====
+export interface PersistentClusterState {
+    state: ClusterState;
+    config: Partial<ClusterConfig>;
+    workers?: Array<{
+        id: string;
+        pid: number;
+        status: "running" | "stopped" | "restarting";
+        startTime: Date;
+        restarts: number;
+        metrics?: Partial<WorkerMetrics>;
+    }>;
+    metrics?: {
+        clusterMetrics: Partial<ClusterMetrics>;
+        historicalData: Array<{
+            timestamp: Date;
+            cpu: number;
+            memory: number;
+            requests: number;
+            errors: number;
+            responseTime: number;
+        }>;
+        workerHistory: Map<
+            string,
+            Array<{
+                timestamp: Date;
+                cpu: number;
+                memory: number;
+                requests: number;
+                errors: number;
+                responseTime: number;
+            }>
+        >;
+    };
+    loadBalancer?: {
+        strategy: string;
+        weights: { [workerId: string]: number };
+        distribution: { [workerId: string]: number };
+        historicalTrends: {
+            requestsPerMinute: Array<{ timestamp: Date; value: number }>;
+            averageResponseTimes: Array<{ timestamp: Date; value: number }>;
+            errorRates: Array<{ timestamp: Date; value: number }>;
+        };
+    };
+    timestamp: Date;
+    version: string;
 }

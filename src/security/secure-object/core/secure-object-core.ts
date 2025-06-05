@@ -1310,7 +1310,7 @@ export class SecureObject<
         // Purpose: Security-conscious data access
         // Behavior: Filters out sensitive keys by default
         // Result: ❌ password: undefined (filtered for security)
-        // With encryptSensitive: true: ✅ password: "[ENCRYPTED:...]" (encrypted but included)
+        // With encryptSensitive: true: ✔ password: "[ENCRYPTED:...]" (encrypted but included)
      */
     public getAll(
         options: SerializationOptions = {}
@@ -1351,7 +1351,7 @@ export class SecureObject<
 
         // Purpose: Standard JavaScript object conversion
         // Behavior: Returns ALL data including sensitive keys (like password)
-        // Result: ✅ password: "test123" (included)
+        // Result: ✔ password: "test123" (included)
 
         Sensitive keys can be handled using .add/removeSensitiveKeys()
      */

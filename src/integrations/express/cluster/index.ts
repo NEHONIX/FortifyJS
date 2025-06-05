@@ -1,6 +1,6 @@
 /**
  * FortifyJS Express Cluster Module
- * Production-ready cluster management system with advanced monitoring and auto-scaling
+ *  cluster management system with advanced monitoring and auto-scaling
  *
  * @version 1.0.0
  * @author FortifyJS Team

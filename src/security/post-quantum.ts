@@ -5,7 +5,7 @@
  * resistant to attacks by quantum computers. It implements versions
  * of lattice-based, hash-based, and code-based cryptography.
  *
- * Where possible, it uses standardized libraries for production-ready implementations.
+ * Where possible, it uses standardized libraries for  implementations.
  * Fallback simplified implementations are provided for educational purposes and
  * environments where the libraries are not available.
  */
@@ -416,7 +416,7 @@ export function ringLweGenerateKeypair(): KeyPair {
  * secure against quantum computer attacks.
  *
  * This implementation uses the crystals-kyber library, which provides a
- * production-ready implementation of the Kyber algorithm.
+ *  implementation of the Kyber algorithm.
  *
  * @param params - Parameters for the key generation
  * @returns Key pair with public and private keys

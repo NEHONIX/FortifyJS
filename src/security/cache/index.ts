@@ -58,7 +58,7 @@ import { FileCache } from "./cacheSys";
 /**
  * @fileoverview FortifyJS Unified Cache System - Enterprise-Grade Caching Solution
  *
- * A comprehensive, production-ready caching solution combining multiple strategies
+ * A comprehensive,  caching solution combining multiple strategies
  * with military-grade security and ultra-fast performance optimization.
  *
  * ## Cache Strategies
@@ -332,10 +332,11 @@ export const generateFilePath = (
 // ========================================
 
 /**
- * Default FileCache instance with production-ready configuration
+ * Default FileCache instance with lazy initialization
  *
  * Pre-configured file cache instance optimized for general use cases.
  * Features encryption, compression, and real disk space monitoring.
+ * Uses lazy initialization to avoid circular dependency issues.
  *
  * @example
  * ```typescript
@@ -356,7 +357,18 @@ export const generateFilePath = (
  *
  * @since 4.2.0
  */
-export const defaultFileCache = new FileCache();
+let _defaultFileCache: FileCache | null = null;
+export const defaultFileCache = new Proxy({} as FileCache, {
+    get(target, prop) {
+        if (!_defaultFileCache) {
+            _defaultFileCache = new FileCache();
+        }
+        const value = (_defaultFileCache as any)[prop];
+        return typeof value === "function"
+            ? value.bind(_defaultFileCache)
+            : value;
+    },
+});
 
 /**
  * Write data to file cache with automatic optimization
@@ -811,7 +823,9 @@ export const CACHE_BUILD_DATE = "2025-04-06";
  */
 export default {
     Cache,
-    FileCache,
+    get FileCache() {
+        return FileCache;
+    },
     SecureInMemoryCache,
     createOptimalCache,
     generateFilePath,

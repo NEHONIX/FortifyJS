@@ -65,20 +65,20 @@ const user = fObject(
         apiKey: "sk-1234567890",
     },
     {
-        enableMemoryTracking: true, // ✅ Automatic memory tracking
-        autoCleanup: true, // ✅ Automatic cleanup
-        enableEncryption: true, // ✅ Automatic encryption
+        enableMemoryTracking: true, // ✔ Automatic memory tracking
+        autoCleanup: true, // ✔ Automatic cleanup
+        enableEncryption: true, // ✔ Automatic encryption
     }
 );
 
 // Benefits:
-// ✅ Automatic memory registration and tracking
-// ✅ Proactive memory pressure handling
-// ✅ Automatic leak detection with warnings
-// ✅ Secure multi-pass buffer wiping
-// ✅ Memory pool optimization
-// ✅ Event-driven cleanup
-// ✅ Zero developer effort required
+// ✔ Automatic memory registration and tracking
+// ✔ Proactive memory pressure handling
+// ✔ Automatic leak detection with warnings
+// ✔ Secure multi-pass buffer wiping
+// ✔ Memory pool optimization
+// ✔ Event-driven cleanup
+// ✔ Zero developer effort required
 ```
 
 **fString - Military-Grade Protection:**
@@ -88,19 +88,19 @@ import { fString } "fortify2-js"
 
 // FortifyJS - Maximum security for sensitive strings
 const sensitiveData = fString("credit-card-number-1234-5678", {
-    protectionLevel: "maximum", // ✅ Maximum security
-    enableEncryption: true, // ✅ AES encryption
-    enableFragmentation: true, // ✅ Memory fragmentation
-    enableMemoryTracking: true, // ✅ Automatic tracking
+    protectionLevel: "maximum", // ✔ Maximum security
+    enableEncryption: true, // ✔ AES encryption
+    enableFragmentation: true, // ✔ Memory fragmentation
+    enableMemoryTracking: true, // ✔ Automatic tracking
 });
 
 // Benefits:
-// ✅ Automatic secure memory allocation
-// ✅ Multi-pass secure wiping (5 passes + random)
-// ✅ Memory fragmentation prevents reconstruction
-// ✅ Automatic encryption with key rotation
-// ✅ Leak detection and prevention
-// ✅ Pool-based memory reuse
+// ✔ Automatic secure memory allocation
+// ✔ Multi-pass secure wiping (5 passes + random)
+// ✔ Memory fragmentation prevents reconstruction
+// ✔ Automatic encryption with key rotation
+// ✔ Leak detection and prevention
+// ✔ Pool-based memory reuse
 ```
 
 ## Automatic Memory Management
@@ -120,12 +120,12 @@ const secureObj = fObject({
 });
 
 // Behind the scenes (AUTOMATIC):
-// ✅ Registered with advanced memory manager
-// ✅ Memory pressure monitoring started
-// ✅ Leak detection enabled
-// ✅ Buffer pools created and optimized
-// ✅ Secure wiping configured
-// ✅ Event listeners attached for proactive management
+// ✔ Registered with advanced memory manager
+// ✔ Memory pressure monitoring started
+// ✔ Leak detection enabled
+// ✔ Buffer pools created and optimized
+// ✔ Secure wiping configured
+// ✔ Event listeners attached for proactive management
 ```
 
 ### Memory Pressure Handling
@@ -134,11 +134,11 @@ const secureObj = fObject({
 
 ```typescript
 // When memory pressure exceeds 80%:
-// ✅ Automatic cleanup of unused buffers
-// ✅ Secure wiping before buffer release
-// ✅ Pool optimization and resizing
-// ✅ Proactive garbage collection
-// ✅ Event emission for external handlers
+// ✔ Automatic cleanup of unused buffers
+// ✔ Secure wiping before buffer release
+// ✔ Pool optimization and resizing
+// ✔ Proactive garbage collection
+// ✔ Event emission for external handlers
 
 // Developer sees:
 console.log("Memory pressure handled automatically");
@@ -152,18 +152,18 @@ console.log("Memory pressure handled automatically");
 
 ```typescript
 // FortifyJS automatically detects potential leaks:
-// ✅ Objects that haven't been accessed recently
-// ✅ Objects with high reference counts
-// ✅ Large objects that persist too long
-// ✅ Suspicious memory patterns
+// ✔ Objects that haven't been accessed recently
+// ✔ Objects with high reference counts
+// ✔ Large objects that persist too long
+// ✔ Suspicious memory patterns
 
 // Automatic warnings:
 // "Potential memory leak detected in fObject secure-object-1234"
 
 // Automatic remediation:
-// ✅ Cleanup recommendations
-// ✅ Automatic garbage collection
-// ✅ Pool optimization
+// ✔ Cleanup recommendations
+// ✔ Automatic garbage collection
+// ✔ Pool optimization
 ```
 
 ### Memory Pool Optimization
@@ -197,17 +197,17 @@ console.log("Memory pressure handled automatically");
 ```typescript
 const user = fObject({
     username: "admin",
-    password: "secret123", // ✅ Automatically detected as sensitive
-    apiKey: "sk-1234567890", // ✅ Automatically detected as sensitive
+    password: "secret123", // ✔ Automatically detected as sensitive
+    apiKey: "sk-1234567890", // ✔ Automatically detected as sensitive
     email: "admin@company.com",
-    sessionToken: "jwt-token", // ✅ Automatically detected as sensitive
+    sessionToken: "jwt-token", // ✔ Automatically detected as sensitive
 });
 
 // Automatic sensitive key management:
-// ✅ Passwords, API keys, tokens automatically marked sensitive
-// ✅ Automatic encryption for sensitive values
-// ✅ Secure serialization with sensitive data protection
-// ✅ Memory isolation for sensitive buffers
+// ✔ Passwords, API keys, tokens automatically marked sensitive
+// ✔ Automatic encryption for sensitive values
+// ✔ Secure serialization with sensitive data protection
+// ✔ Memory isolation for sensitive buffers
 ```
 
 **Advanced Memory Statistics:**
@@ -224,28 +224,28 @@ console.log({
 });
 
 // Automatic tracking:
-// ✅ Memory allocation per object
-// ✅ Buffer usage optimization
-// ✅ Age-based cleanup recommendations
-// ✅ Pool performance metrics
+// ✔ Memory allocation per object
+// ✔ Buffer usage optimization
+// ✔ Age-based cleanup recommendations
+// ✔ Pool performance metrics
 ```
 
 **Secure Data Operations:**
 
 ```typescript
 // All standard operations with automatic security
-user.set("newSecret", "confidential-data"); // ✅ Automatic secure storage
-const value = user.get("password"); // ✅ Automatic decryption
-user.delete("oldToken"); // ✅ Secure wiping
+user.set("newSecret", "confidential-data"); // ✔ Automatic secure storage
+const value = user.get("password"); // ✔ Automatic decryption
+user.delete("oldToken"); // ✔ Secure wiping
 
 // Advanced operations with security
 const filtered = user.filter((value, key) => !user.isSensitiveKey(key));
 const publicData = user.omit("password", "apiKey");
 const transformed = user.transform((value) => sanitize(value));
 
-// ✅ All operations maintain security context
-// ✅ Sensitive data remains encrypted
-// ✅ Memory is automatically managed
+// ✔ All operations maintain security context
+// ✔ Sensitive data remains encrypted
+// ✔ Memory is automatically managed
 ```
 
 **Event-Driven Security:**
@@ -261,10 +261,10 @@ user.addEventListener("gc", (event) => {
 });
 
 // Events automatically fired:
-// ✅ Memory pressure detection
-// ✅ Garbage collection completion
-// ✅ Leak detection warnings
-// ✅ Security violations
+// ✔ Memory pressure detection
+// ✔ Garbage collection completion
+// ✔ Leak detection warnings
+// ✔ Security violations
 ```
 
 ## fString Features
@@ -276,15 +276,15 @@ user.addEventListener("gc", (event) => {
 ```typescript
 const creditCard = fString("4532-1234-5678-9012", {
     protectionLevel: "maximum",
-    enableFragmentation: true, // ✅ Automatic memory fragmentation
+    enableFragmentation: true, // ✔ Automatic memory fragmentation
 });
 
 // Behind the scenes:
-// ✅ String split across multiple memory locations
-// ✅ Fragments encrypted with different keys
-// ✅ Memory locations randomized
-// ✅ Reconstruction requires all fragments
-// ✅ Automatic defragmentation on access
+// ✔ String split across multiple memory locations
+// ✔ Fragments encrypted with different keys
+// ✔ Memory locations randomized
+// ✔ Reconstruction requires all fragments
+// ✔ Automatic defragmentation on access
 ```
 
 **Multi-Pass Secure Wiping:**
@@ -293,15 +293,15 @@ const creditCard = fString("4532-1234-5678-9012", {
 const password = fString("super-secret-password");
 
 // When destroyed or cleaned up:
-// ✅ Pass 1: Fill with 0x00 (zeros)
-// ✅ Pass 2: Fill with 0xFF (ones)
-// ✅ Pass 3: Fill with 0xAA (alternating pattern)
-// ✅ Pass 4: Fill with 0x55 (inverse pattern)
-// ✅ Pass 5: Fill with 0x00 (zeros again)
-// ✅ Pass 6: Fill with cryptographic random data
-// ✅ Pass 7: Final zero pass
+// ✔ Pass 1: Fill with 0x00 (zeros)
+// ✔ Pass 2: Fill with 0xFF (ones)
+// ✔ Pass 3: Fill with 0xAA (alternating pattern)
+// ✔ Pass 4: Fill with 0x55 (inverse pattern)
+// ✔ Pass 5: Fill with 0x00 (zeros again)
+// ✔ Pass 6: Fill with cryptographic random data
+// ✔ Pass 7: Final zero pass
 
-password.destroy(); // ✅ Automatic secure wiping
+password.destroy(); // ✔ Automatic secure wiping
 ```
 
 **Advanced String Operations with Security:**
@@ -310,15 +310,15 @@ password.destroy(); // ✅ Automatic secure wiping
 const sensitiveText = fString("Confidential Document Content");
 
 // All operations maintain security:
-const upperCase = sensitiveText.toUpperCase(); // ✅ Secure transformation
-const substring = sensitiveText.substring(0, 12); // ✅ Secure extraction
+const upperCase = sensitiveText.toUpperCase(); // ✔ Secure transformation
+const substring = sensitiveText.substring(0, 12); // ✔ Secure extraction
 const replaced = sensitiveText.replace("Confidential", "Public");
 
 // Security features:
-// ✅ Intermediate results are also secure
-// ✅ Original data remains protected
-// ✅ Memory pools used for efficiency
-// ✅ Automatic cleanup of temporary buffers
+// ✔ Intermediate results are also secure
+// ✔ Original data remains protected
+// ✔ Memory pools used for efficiency
+// ✔ Automatic cleanup of temporary buffers
 ```
 
 **Enhanced Memory Statistics:**
@@ -335,10 +335,10 @@ console.log({
 });
 
 // Automatic monitoring:
-// ✅ Real-time memory usage tracking
-// ✅ Encryption status monitoring
-// ✅ Fragmentation effectiveness
-// ✅ Pool performance optimization
+// ✔ Real-time memory usage tracking
+// ✔ Encryption status monitoring
+// ✔ Fragmentation effectiveness
+// ✔ Pool performance optimization
 ```
 
 ## Security Advantages
@@ -372,11 +372,11 @@ let cardNumber = "4532-1234-5678-9012";
 const cardNumber = fString("4532-1234-5678-9012", {
     protectionLevel: "maximum",
 });
-// ✅ Automatic encryption
-// ✅ Memory fragmentation
-// ✅ Secure wiping on destroy
-// ✅ Leak detection
-// ✅ Pool-based efficiency
+// ✔ Automatic encryption
+// ✔ Memory fragmentation
+// ✔ Secure wiping on destroy
+// ✔ Leak detection
+// ✔ Pool-based efficiency
 ```
 
 **Scenario 2: API Key Management**
@@ -396,10 +396,10 @@ const config = fObject({
     apiKey: "sk-1234567890abcdef",
     secret: "super-secret-value",
 });
-// ✅ Automatic sensitive key detection
-// ✅ Automatic encryption
-// ✅ Memory pressure handling
-// ✅ Automatic cleanup
+// ✔ Automatic sensitive key detection
+// ✔ Automatic encryption
+// ✔ Memory pressure handling
+// ✔ Automatic cleanup
 ```
 
 ## Performance Benefits
@@ -420,9 +420,9 @@ for (let i = 0; i < 1000; i++) {
 // FortifyJS - Optimized
 for (let i = 0; i < 1000; i++) {
     const temp = fString("temporary string " + i);
-    // ✅ Pool-based allocation
-    // ✅ Buffer reuse (90%+ hit rate)
-    // ✅ Reduced GC pressure
+    // ✔ Pool-based allocation
+    // ✔ Buffer reuse (90%+ hit rate)
+    // ✔ Reduced GC pressure
     temp.destroy();
 }
 ```
@@ -441,10 +441,10 @@ console.log({
 });
 
 // Automatic optimizations:
-// ✅ Pool size adjustment based on usage
-// ✅ Strategy optimization (LIFO/FIFO/LRU)
-// ✅ Pressure-based cleanup
-// ✅ Age-based buffer retirement
+// ✔ Pool size adjustment based on usage
+// ✔ Strategy optimization (LIFO/FIFO/LRU)
+// ✔ Pressure-based cleanup
+// ✔ Age-based buffer retirement
 ```
 
 ## API Reference
@@ -542,7 +542,7 @@ const user = fObject({
 });
 
 // Automatic cleanup
-user.destroy(); // ✅ Secure wiping, memory cleanup, leak prevention
+user.destroy(); // ✔ Secure wiping, memory cleanup, leak prevention
 ```
 
 ### From Standard JavaScript Strings
@@ -571,8 +571,8 @@ const creditCard = fString("4532-1234-5678-9012", {
 });
 
 // Secure cleanup
-password.destroy(); // ✅ Multi-pass secure wiping
-creditCard.destroy(); // ✅ Fragment cleanup
+password.destroy(); // ✔ Multi-pass secure wiping
+creditCard.destroy(); // ✔ Fragment cleanup
 ```
 
 ### Configuration Options
@@ -631,7 +631,7 @@ const options = {
         const result = processSecureData(secureObj);
         return result;
     } finally {
-        secureObj.destroy(); // ✅ Always cleanup
+        secureObj.destroy(); // ✔ Always cleanup
     }
     ```
 

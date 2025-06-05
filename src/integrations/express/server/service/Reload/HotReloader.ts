@@ -160,7 +160,7 @@ export class HotReloader extends EventEmitter {
                         console.log(
                             `Child process started (PID: ${this.childProcess?.pid})`
                         );
-                    }
+                    } 
                     resolve();
                 });
 

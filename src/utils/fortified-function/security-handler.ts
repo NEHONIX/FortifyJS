@@ -14,7 +14,7 @@ export class SecurityHandler {
     private readonly hashUtil: typeof Hash;
     private readonly randomUtil: typeof SecureRandom;
 
-    constructor() { 
+    constructor() {
         this.hashUtil = Hash;
         this.randomUtil = SecureRandom;
     }
@@ -65,7 +65,8 @@ export class SecurityHandler {
         const serialized = this.safeStringify(args);
 
         // Use a fixed salt for deterministic cache keys
-        const fixedSalt = "FortifyJS-Cache-Salt-v1";
+        const fixedSalt =
+            "a99d0d44a7e59854473b3233fd5b2385e3f4be207c61f78beaa3a9d11836f57c";
 
         return this.hashUtil.createSecureHash(serialized, fixedSalt, {
             algorithm: "sha256",

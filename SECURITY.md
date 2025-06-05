@@ -6,7 +6,7 @@ We actively support the following versions of FortifyJS with security updates:
 
 | Version | Supported              |
 | ------- | ---------------------- |
-| 3.x.x   | ✅ Yes                 |
+| 3.x.x   | ✔ Yes                  |
 | 2.x.x   | ⚠️ Critical fixes only |
 | 1.x.x   | ❌ No                  |
 

@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "key": "test",
+    "createdAt": 1749119011379,
+    "lastAccessed": 1749119011379,
+    "expiresAt": 1749119311379,
+    "size": 20,
+    "accessCount": 0,
+    "compressed": false,
+    "encrypted": true,
+    "dataType": "object",
+    "version": 1
+  },
+  "data": "Lqil9UWFXNAJInqGa666/oQkzuA=",
+  "encryption": {
+    "iv": "d9lgpmrDzeu/tI5ZqrTUpw==",
+    "authTag": "7KHGPOFFb5yzXMG806T6xA==",
+    "key": "qAK0DGHeQtq029Qg4LHyTjHfp2FwH7Ax5pYgdIfJhw8="
+  }
+}

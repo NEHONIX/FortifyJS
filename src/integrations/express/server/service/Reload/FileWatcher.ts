@@ -16,7 +16,7 @@ import {
     WatcherHealth,
 } from "./types/fw.types";
 import { DEFAULT_FW_CONFIG } from "../../const/FileWatcher.config";
-
+ 
 export class UltraFastFileWatcher extends EventEmitter {
     private config: FileWatcherConfig;
     private watchers: Map<string, FSWatcher> = new Map();
@@ -852,7 +852,7 @@ export class UltraFastFileWatcher extends EventEmitter {
      */
     private showBanner(): void {
         console.log("╔════════════════════════════════════════╗");
-        console.log("║          UFW - UltraFast Watcher       ║");
+        console.log("║                UF - Watcher            ║");
         console.log("║        High-Performance File Monitor   ║");
         console.log("║              Powered By Nehonix        ║");
         console.log("╚════════════════════════════════════════╝");

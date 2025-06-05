@@ -1,7 +1,7 @@
 /***************************************************************************
  * FortifyJS - Secure Array Types
  *
- * This file contains type definitions for the SecureArray modular architecture
+ * This file contains type definitions for the SecureArray architecture
  *
  * @author Nehonix
  * @license MIT
@@ -84,7 +84,7 @@ export type {
     PasswordStrengthResult,
 } from "./types";
 
-// Modular SecureObject types
+// SecureObject types
 export type {
     SecureValue,
     SerializationOptions,
@@ -94,7 +94,7 @@ export type {
     SecureObjectOptions,
 } from "./security/secure-object";
 
-// Modular SecureString types
+// SecureString types
 export type {
     SecureStringOptions,
     SecureStringEvent,
@@ -107,7 +107,7 @@ export type {
     MemoryUsage,
 } from "./security/secure-string";
 
-// Modular SecureArray types
+// SecureArray types
 export type {
     SecureArrayValue,
     SecureArraySerializationOptions,
@@ -119,7 +119,7 @@ export type {
     FlexibleSecureArray,
 } from "./security/secure-array";
 
-// Modular FortifiedFunction types
+// FortifiedFunction types
 export type {
     FortifiedFunctionOptions,
     FunctionStats,
@@ -221,6 +221,8 @@ export * from "./security";
 
 // Utils
 export * from "./utils/encoding";
+export * from "./utils/patterns";
+export * from "./utils/detectInjection";
 // alias for password manager (useful for legacy code)
 /**
  * Fast password manager access but use default configuration
@@ -410,7 +412,7 @@ if (typeof module !== "undefined" && module.exports) {
     module.exports.SecureRandom = SecureRandom;
     module.exports.Random = SecureRandom;
 
-    // Export individual methods for direct access (using correct modular classes)
+    // Export individual methods for direct access (using correct classes)
     module.exports.createSecureCipheriv = RandomCrypto.createSecureCipheriv;
     module.exports.createSecureDecipheriv = RandomCrypto.createSecureDecipheriv;
     module.exports.generateSecureIV = RandomCrypto.generateSecureIV;

@@ -153,7 +153,7 @@ results.push(
 // ============================================================================
 
 console.log("\n" + "=".repeat(60));
-console.log("✅ HASH VERIFICATION BENCHMARKS");
+console.log("✔ HASH VERIFICATION BENCHMARKS");
 console.log("=".repeat(60));
 
 const testHash = Hash.createSecureHash(testData, salt32, {
@@ -323,10 +323,10 @@ Promise.all(concurrentPromises).then(() => {
         );
 
         console.log("\n🎯 CONCLUSION:");
-        console.log("✅ Modular architecture delivers excellent performance");
-        console.log("✅ All operations complete within acceptable timeframes");
-        console.log("✅ Memory usage is optimized and controlled");
-        console.log("✅ Concurrent operations scale well");
+        console.log("✔ Modular architecture delivers excellent performance");
+        console.log("✔ All operations complete within acceptable timeframes");
+        console.log("✔ Memory usage is optimized and controlled");
+        console.log("✔ Concurrent operations scale well");
 
         console.log("\n📋 NEXT PHASE: Documentation Updates");
     }, 100);

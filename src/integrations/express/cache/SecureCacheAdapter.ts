@@ -25,7 +25,7 @@ import { FortifyJS } from "../../../core/crypto";
 import * as CacheTypes from "./type";
 
 /**
- * Ultra-fast secure cache adapter
+ * UF secure cache adapter
  */
 export class SecureCacheAdapter extends EventEmitter {
     private config: CacheTypes.SecureCacheConfig;

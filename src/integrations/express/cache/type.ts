@@ -10,7 +10,7 @@ import {
 export interface SecureCacheConfig {
     // Cache strategy
     strategy?: "memory" | "redis" | "hybrid" | "distributed";
-
+ 
     // Memory cache settings
     memory?: {
         maxSize?: number; // MB

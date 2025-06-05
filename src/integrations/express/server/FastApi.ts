@@ -3,17 +3,21 @@ import { CacheUtils, createOptimalCache } from "../cache/CacheFactory";
 import { CacheConfig } from "../types/types";
 import { DEFAULT_OPTIONS } from "./const/default";
 import { RouteOptions, ServerOptions, UltraFastApp } from "../types/types";
-import express, {
-    Request,
-    NextFunction,
-    RequestHandler,
-} from "express";
+import express, { Request, NextFunction, RequestHandler } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
 import { ClusterManager } from "../cluster/cluster-manager";
 import { UltraFastFileWatcher } from "./service/Reload/FileWatcher";
 import { HotReloader } from "./service/Reload/HotReloader";
+// import { PluginRegistry } from "./plugins/PluginRegistry";
+// import { PluginEngine } from "./plugins/PluginEngine";
+import {
+    PluginExecutionContext,
+    PluginType,
+} from "./plugins/types/PluginTypes";
+import { PluginEngine } from "./plugins/PluginEngine";
+import { PluginRegistry } from "./plugins/PluginRegistry";
 
 /**
  * Ultra-Fast Express Server
@@ -30,6 +34,10 @@ export class UltraFastServer {
     private hotReloader?: HotReloader;
     private httpServer?: any;
     private isMainProcess = true;
+
+    // Plugin system
+    private pluginRegistry: PluginRegistry;
+    private pluginEngine: PluginEngine;
 
     constructor(
         userOptions: ServerOptions = {
@@ -50,11 +58,19 @@ export class UltraFastServer {
         this.cache = this.createCache();
         this.app.cache = this.cache;
 
+        // Initialize plugin system
+        this.pluginRegistry = new PluginRegistry(this.cache, this.cluster);
+        this.pluginEngine = new PluginEngine(
+            this.pluginRegistry,
+            this.cache,
+            this.cluster
+        );
+
         // Configure everything synchronously
         if (this.options.server?.enableMiddleware) {
             this.configureMiddleware();
         }
-        this.addEnhancedMethods();
+        this.addMethods();
         this.addMonitoringEndpoints();
         this.addStartMethod();
 
@@ -272,12 +288,62 @@ export class UltraFastServer {
             })
         );
 
-        // Performance tracking middleware
-        this.app.use((req: any, res, next) => {
+        // Plugin-powered performance tracking middleware
+        this.app.use(async (req: any, res: any, next: NextFunction) => {
             req.startTime = Date.now();
 
-            res.on("finish", () => {
+            // Execute pre-request plugins
+            const preRequestSuccess = await this.pluginEngine.executePlugins(
+                PluginType.PRE_REQUEST,
+                req,
+                res,
+                next
+            );
+
+            if (!preRequestSuccess) {
+                return; // Plugin stopped execution
+            }
+
+            // Execute security plugins
+            const securitySuccess = await this.pluginEngine.executePlugins(
+                PluginType.SECURITY,
+                req,
+                res,
+                next
+            );
+
+            if (!securitySuccess) {
+                return res
+                    .status(401)
+                    .json({ error: "Security validation failed" });
+            }
+
+            // Execute cache plugins
+            await this.pluginEngine.executePlugins(
+                PluginType.CACHE,
+                req,
+                res,
+                next
+            );
+
+            // Execute performance monitoring plugins
+            await this.pluginEngine.executePlugins(
+                PluginType.PERFORMANCE,
+                req,
+                res,
+                next
+            );
+
+            res.on("finish", async () => {
                 const responseTime = Date.now() - req.startTime;
+
+                // Execute post-response plugins
+                await this.pluginEngine.executePlugins(
+                    PluginType.POST_RESPONSE,
+                    req,
+                    res,
+                    next
+                );
 
                 // Log performance metrics
                 if (responseTime < 5) {
@@ -302,12 +368,12 @@ export class UltraFastServer {
     }
 
     /**
-     * Add enhanced methods to Express app
+     * Add methods to Express app
      */
-    private addEnhancedMethods(): void {
-        // console.log("Adding enhanced methods...");
+    private addMethods(): void {
+        // console.log("Adding methods...");
 
-        // Enhanced GET with caching
+        // GET with caching
         this.app.getWithCache = (
             path: string,
             routeOptions: RouteOptions,
@@ -317,7 +383,7 @@ export class UltraFastServer {
             this.app.get(path, cacheMiddleware, handler);
         };
 
-        // Enhanced POST with cache invalidation
+        // POST with cache invalidation
         this.app.postWithCache = (
             path: string,
             routeOptions: RouteOptions,
@@ -341,7 +407,7 @@ export class UltraFastServer {
             this.app.post(path, wrappedHandler);
         };
 
-        // Enhanced PUT with cache invalidation
+        // PUT with cache invalidation
         this.app.putWithCache = (
             path: string,
             routeOptions: RouteOptions,
@@ -365,7 +431,7 @@ export class UltraFastServer {
             this.app.put(path, wrappedHandler);
         };
 
-        // Enhanced DELETE with cache invalidation
+        // DELETE with cache invalidation
         this.app.deleteWithCache = (
             path: string,
             routeOptions: RouteOptions,
@@ -404,7 +470,7 @@ export class UltraFastServer {
             await CacheUtils.warmUp(this.cache, data);
         };
 
-        console.log("Enhanced methods added");
+        console.log("methods added");
     }
 
     /**
@@ -751,7 +817,210 @@ export class UltraFastServer {
             );
         }
 
+        // Plugin monitoring endpoints
+        this.addPluginMonitoringEndpoints(basePoint);
+
         console.log("Monitoring endpoints added");
+    }
+
+    /**
+     * Add plugin monitoring endpoints
+     */
+    private addPluginMonitoringEndpoints(basePoint: string): void {
+        // Plugin registry status endpoint
+        this.app.get(basePoint + "/health/plugins", async (req, res) => {
+            try {
+                const registryStats = this.getPluginRegistryStats();
+                const engineStats = this.getPluginEngineStats();
+
+                res.json({
+                    timestamp: new Date().toISOString(),
+                    plugins: {
+                        registry: registryStats,
+                        engine: engineStats,
+                        status: "healthy",
+                    },
+                });
+            } catch (error: any) {
+                res.status(500).json({
+                    error: "Failed to get plugin statistics",
+                    message: error.message,
+                });
+            }
+        });
+
+        // Individual plugin statistics endpoint
+        this.app.get(
+            basePoint + "/plugins/:pluginId/stats",
+            async (req: any, res: any) => {
+                try {
+                    const { pluginId } = req.params;
+                    const stats = this.getPluginStats(pluginId);
+
+                    if (!stats) {
+                        return res.status(404).json({
+                            error: "Plugin not found",
+                            pluginId,
+                        });
+                    }
+
+                    res.json({
+                        timestamp: new Date().toISOString(),
+                        pluginId,
+                        stats,
+                    });
+                } catch (error: any) {
+                    res.status(500).json({
+                        error: "Failed to get plugin statistics",
+                        message: error.message,
+                    });
+                }
+            }
+        );
+
+        // Plugin management endpoint - register plugin
+        this.app.post(
+            basePoint + "/plugins/register",
+            async (req: any, res: any) => {
+                try {
+                    const { pluginConfig } = req.body;
+
+                    if (!pluginConfig) {
+                        return res.status(400).json({
+                            error: "Plugin configuration is required",
+                        });
+                    }
+
+                    // Validate plugin configuration
+                    if (
+                        !pluginConfig.id ||
+                        !pluginConfig.name ||
+                        !pluginConfig.version
+                    ) {
+                        return res.status(400).json({
+                            error: "Plugin must have id, name, and version",
+                        });
+                    }
+
+                    // Check if plugin already exists
+                    const existingPlugin = this.getPlugin(pluginConfig.id);
+                    if (existingPlugin) {
+                        return res.status(409).json({
+                            error: "Plugin already registered",
+                            pluginId: pluginConfig.id,
+                        });
+                    }
+
+                    // For security, only allow registration of pre-approved plugin types
+                    const allowedPluginTypes = [
+                        "performance",
+                        "cache",
+                        "monitoring",
+                    ];
+                    if (!allowedPluginTypes.includes(pluginConfig.type)) {
+                        return res.status(403).json({
+                            error: "Plugin type not allowed for dynamic registration",
+                            allowedTypes: allowedPluginTypes,
+                        });
+                    }
+
+                    // Create a simple plugin instance from configuration
+                    const dynamicPlugin = {
+                        id: pluginConfig.id,
+                        name: pluginConfig.name,
+                        version: pluginConfig.version,
+                        type: pluginConfig.type,
+                        priority: pluginConfig.priority || 2,
+                        isAsync: pluginConfig.isAsync !== false,
+                        isCacheable: pluginConfig.isCacheable === true,
+                        maxExecutionTime: pluginConfig.maxExecutionTime || 1000,
+                        execute: async (context: any) => {
+                            // Simple execution logic for dynamic plugins
+                            const startTime = performance.now();
+
+                            // Basic plugin functionality based on type
+                            let result: any = { success: true };
+
+                            if (pluginConfig.type === "performance") {
+                                result.metrics = {
+                                    executionTime:
+                                        performance.now() - startTime,
+                                    timestamp: Date.now(),
+                                    route: context.req.path,
+                                };
+                            } else if (pluginConfig.type === "cache") {
+                                result.cacheKey = `dynamic:${context.req.path}`;
+                                result.cacheable = true;
+                            } else if (pluginConfig.type === "monitoring") {
+                                result.monitoring = {
+                                    requestId: context.executionId,
+                                    userAgent:
+                                        context.req.headers["user-agent"],
+                                    ip: context.req.ip,
+                                };
+                            }
+
+                            return {
+                                success: true,
+                                executionTime: performance.now() - startTime,
+                                data: result,
+                                shouldContinue: true,
+                            };
+                        },
+                    };
+
+                    // Register the dynamic plugin
+                    await this.registerPlugin(dynamicPlugin);
+
+                    res.json({
+                        success: true,
+                        message: `Plugin ${pluginConfig.id} registered successfully`,
+                        pluginId: pluginConfig.id,
+                        type: pluginConfig.type,
+                        registeredAt: new Date().toISOString(),
+                    });
+                } catch (error: any) {
+                    res.status(500).json({
+                        error: "Failed to register plugin",
+                        message: error.message,
+                    });
+                }
+            }
+        );
+
+        // Plugin management endpoint - unregister plugin
+        this.app.delete(basePoint + "/plugins/:pluginId", async (req, res) => {
+            try {
+                const { pluginId } = req.params;
+                await this.unregisterPlugin(pluginId);
+
+                res.json({
+                    success: true,
+                    message: `Plugin ${pluginId} unregistered successfully`,
+                });
+            } catch (error: any) {
+                res.status(500).json({
+                    error: "Failed to unregister plugin",
+                    message: error.message,
+                });
+            }
+        });
+
+        // Comprehensive server statistics endpoint
+        this.app.get(basePoint + "/stats/comprehensive", async (_req, res) => {
+            try {
+                const stats = await this.getServerStats();
+                res.json({
+                    timestamp: new Date().toISOString(),
+                    stats,
+                });
+            } catch (error: any) {
+                res.status(500).json({
+                    error: "Failed to get comprehensive statistics",
+                    message: error.message,
+                });
+            }
+        });
     }
 
     /**
@@ -789,10 +1058,7 @@ export class UltraFastServer {
                         address: () => ({ port: serverPort, address: host }),
                     };
                 } catch (error: any) {
-                    console.error(
-                        "Hot reload startup failed:",
-                        error.message
-                    );
+                    console.error("Hot reload startup failed:", error.message);
                     console.log("Falling back to regular mode...");
                     // Fall through to regular startup
                 }
@@ -1247,5 +1513,127 @@ export class UltraFastServer {
      */
     public getFileWatcherStats(): any {
         return this.fileWatcher?.getRestartStats() || null;
+    }
+
+    // ===== PLUGIN MANAGEMENT METHODS =====
+
+    /**
+     * Register a plugin with the server
+     */
+    public async registerPlugin(plugin: any): Promise<void> {
+        await this.pluginRegistry.register(plugin);
+    }
+
+    /**
+     * Unregister a plugin from the server
+     */
+    public async unregisterPlugin(pluginId: string): Promise<void> {
+        await this.pluginRegistry.unregister(pluginId);
+    }
+
+    /**
+     * Get plugin by ID
+     */
+    public getPlugin(pluginId: string): any {
+        return this.pluginRegistry.getPlugin(pluginId);
+    }
+
+    /**
+     * Get all registered plugins
+     */
+    public getAllPlugins(): any[] {
+        return this.pluginRegistry.getAllPlugins();
+    }
+
+    /**
+     * Get plugins by type
+     */
+    public getPluginsByType(type: PluginType): any[] {
+        return this.pluginRegistry.getPluginsByType(type);
+    }
+
+    /**
+     * Get plugin execution statistics
+     */
+    public getPluginStats(pluginId?: string): any {
+        if (pluginId) {
+            return this.pluginRegistry.getPluginStats(pluginId);
+        }
+        return this.pluginRegistry.getAllStats();
+    }
+
+    /**
+     * Get plugin registry statistics
+     */
+    public getPluginRegistryStats(): any {
+        return this.pluginRegistry.getRegistryStats();
+    }
+
+    /**
+     * Get plugin engine statistics
+     */
+    public getPluginEngineStats(): any {
+        return this.pluginEngine.getEngineStats();
+    }
+
+    /**
+     * Initialize built-in plugins
+     */
+    public async initializeBuiltinPlugins(): Promise<void> {
+        try {
+            // Import and register built-in plugins
+            const { JWTAuthPlugin } = await import(
+                "./plugins/builtin/JWTAuthPlugin"
+            );
+            const { ResponseTimePlugin } = await import(
+                "./plugins/builtin/ResponseTimePlugin"
+            );
+            const { SmartCachePlugin } = await import(
+                "./plugins/builtin/SmartCachePlugin"
+            );
+
+            // Register security plugins
+            await this.registerPlugin(new JWTAuthPlugin());
+
+            // Register performance plugins
+            await this.registerPlugin(new ResponseTimePlugin());
+
+            // Register cache plugins
+            await this.registerPlugin(new SmartCachePlugin());
+
+            console.log("Built-in plugins initialized successfully");
+        } catch (error: any) {
+            console.error(
+                "Failed to initialize built-in plugins:",
+                error.message
+            );
+        }
+    }
+
+    /**
+     * Get comprehensive server statistics including plugins
+     */
+    public async getServerStats(): Promise<any> {
+        const cacheStats = await this.cache.getStats();
+        const pluginRegistryStats = this.getPluginRegistryStats();
+        const pluginEngineStats = this.getPluginEngineStats();
+
+        return {
+            server: {
+                ready: this.ready,
+                uptime: process.uptime(),
+                memoryUsage: process.memoryUsage(),
+                cpuUsage: process.cpuUsage(),
+            },
+            cache: cacheStats,
+            plugins: {
+                registry: pluginRegistryStats,
+                engine: pluginEngineStats,
+                totalPlugins: pluginRegistryStats.totalPlugins,
+                averageExecutionTime: pluginRegistryStats.averageExecutionTime,
+            },
+            cluster: this.cluster ? await this.cluster.getMetrics() : null,
+            fileWatcher: this.getFileWatcherStats(),
+        };
     }
 }

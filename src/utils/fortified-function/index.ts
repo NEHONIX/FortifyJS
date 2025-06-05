@@ -73,7 +73,7 @@ import { FortifiedFunctionOptions, EnhancedFortifiedFunction } from "./types";
 /**
  * Zero-Configuration Smart Function Factory
  *
- * Creates production-ready fortified functions with enterprise-grade security,
+ * Creates  fortified functions with enterprise-grade security,
  * performance optimization, and intelligent caching enabled by default.
  * No manual configuration required for optimal performance.
  *
@@ -105,7 +105,7 @@ export function func<T extends any[], R>(
     options: Partial<FortifiedFunctionOptions> = {}
 ): EnhancedFortifiedFunction<T, R> {
     // Zero-config smart defaults - no manual configuration needed!
-    // All best practices are enabled by default for production-ready performance
+    // All best practices are enabled by default for  performance
     const fortifiedFunction = new FortifiedFunction(fn, options);
 
     // Create the enhanced function with all methods

@@ -1,4 +1,5 @@
 import { ServerOptions } from "../../ServerFactory";
+import { DEFAULT_FW_CONFIG } from "./FileWatcher.config";
 
 // Default configuration
 export const DEFAULT_OPTIONS: ServerOptions = {
@@ -45,4 +46,5 @@ export const DEFAULT_OPTIONS: ServerOptions = {
         jsonLimit: "10mb",
         urlEncodedLimit: "10mb",
     },
+    fileWatcher: DEFAULT_FW_CONFIG,
 };

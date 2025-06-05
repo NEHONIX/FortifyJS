@@ -20,7 +20,7 @@ async function testBasicFFunc() {
 
     // Test execution
     const result = await secureAdd(5, 3);
-    console.log("✅ Basic fFunc result:", result);
+    console.log("✔ Basic fFunc result:", result);
 
     return result === 8;
 }
@@ -45,7 +45,7 @@ async function testAdvancedFFunc() {
 
     // Test execution
     const result = await fortified.execute("sensitive data", "secret123");
-    console.log("✅ Advanced fFunc result:", result);
+    console.log("✔ Advanced fFunc result:", result);
 
     // Test stats
     const stats = fortified.getStats();
@@ -89,7 +89,7 @@ async function testCachedFFunc() {
     const result2 = await cachedFunc(10);
     console.timeEnd("Second call (cached)");
 
-    console.log("✅ Cached results:", { result1, result2 });
+    console.log("✔ Cached results:", { result1, result2 });
 
     return result1 === 100 && result2 === 100;
 }

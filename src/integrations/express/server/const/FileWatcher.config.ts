@@ -2,7 +2,7 @@ import { FileWatcherConfig } from "../service/Reload/types/fw.types";
 
 export const DEFAULT_FW_CONFIG: FileWatcherConfig = {
     enabled: true,
-    watchPaths: ["src", "lib"],
+    watchPaths: ["src", "lib", "core"],
     ignorePaths: [
         "node_modules",
         ".git",

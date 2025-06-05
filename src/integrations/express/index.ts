@@ -27,12 +27,5 @@ export type {
 } from "./types/types";
 
 // Quick start exports for immediate use
-export {
-    quickServer,
-    devServer,
-    prodServer,
-    microservice,
-    apiGateway,
-    customServer,
-} from "./quick-start";
+export * from "./quick-start";
 

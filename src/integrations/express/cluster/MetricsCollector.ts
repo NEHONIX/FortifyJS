@@ -604,5 +604,151 @@ export class MetricsCollector extends EventEmitter {
     public setWorkerManager(workerManager: any): void {
         this.workerManager = workerManager;
     }
+
+    /**
+     * Restore historical metrics data from persistent storage
+     */
+    public restoreHistoricalData(
+        historicalData: Array<{
+            timestamp: Date;
+            cpu: number;
+            memory: number;
+            requests: number;
+            errors: number;
+            responseTime: number;
+        }>
+    ): void {
+        // Restore cluster-level historical data
+        if (!this.metricsHistory.has("cluster")) {
+            this.metricsHistory.set("cluster", []);
+        }
+
+        const clusterHistory = this.metricsHistory.get("cluster")!;
+
+        // Convert historical data to MetricsSnapshot format
+        const snapshots: MetricsSnapshot[] = historicalData.map((data) => ({
+            timestamp: new Date(data.timestamp),
+            cpu: data.cpu,
+            memory: data.memory,
+            requests: data.requests,
+            errors: data.errors,
+            responseTime: data.responseTime,
+        }));
+
+        // Merge with existing data, avoiding duplicates
+        const existingTimestamps = new Set(
+            clusterHistory.map((s) => s.timestamp.getTime())
+        );
+        const newSnapshots = snapshots.filter(
+            (s) => !existingTimestamps.has(s.timestamp.getTime())
+        );
+
+        clusterHistory.push(...newSnapshots);
+
+        // Sort by timestamp and keep only last 1000 entries
+        clusterHistory.sort(
+            (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+        );
+        if (clusterHistory.length > 1000) {
+            clusterHistory.splice(0, clusterHistory.length - 1000);
+        }
+
+        console.log(
+            `Restored ${newSnapshots.length} historical metrics snapshots`
+        );
+    }
+
+    /**
+     * Restore worker-specific historical data
+     */
+    public restoreWorkerHistoricalData(
+        workerHistory: Map<
+            string,
+            Array<{
+                timestamp: Date;
+                cpu: number;
+                memory: number;
+                requests: number;
+                errors: number;
+                responseTime: number;
+            }>
+        >
+    ): void {
+        for (const [workerId, workerData] of workerHistory.entries()) {
+            if (!this.metricsHistory.has(workerId)) {
+                this.metricsHistory.set(workerId, []);
+            }
+
+            const workerHistoryArray = this.metricsHistory.get(workerId)!;
+
+            // Convert to MetricsSnapshot format
+            const snapshots: MetricsSnapshot[] = workerData.map((data) => ({
+                timestamp: new Date(data.timestamp),
+                cpu: data.cpu,
+                memory: data.memory,
+                requests: data.requests,
+                errors: data.errors,
+                responseTime: data.responseTime,
+            }));
+
+            // Merge with existing data, avoiding duplicates
+            const existingTimestamps = new Set(
+                workerHistoryArray.map((s) => s.timestamp.getTime())
+            );
+            const newSnapshots = snapshots.filter(
+                (s) => !existingTimestamps.has(s.timestamp.getTime())
+            );
+
+            workerHistoryArray.push(...newSnapshots);
+
+            // Sort by timestamp and keep only last 1000 entries
+            workerHistoryArray.sort(
+                (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+            );
+            if (workerHistoryArray.length > 1000) {
+                workerHistoryArray.splice(0, workerHistoryArray.length - 1000);
+            }
+        }
+
+        console.log(
+            `Restored historical data for ${workerHistory.size} workers`
+        );
+    }
+
+    /**
+     * Export current metrics for persistence
+     */
+    public exportMetricsForPersistence(): {
+        clusterMetrics: ClusterMetrics;
+        historicalData: Array<{
+            timestamp: Date;
+            cpu: number;
+            memory: number;
+            requests: number;
+            errors: number;
+            responseTime: number;
+        }>;
+        workerHistory: Map<
+            string,
+            Array<{
+                timestamp: Date;
+                cpu: number;
+                memory: number;
+                requests: number;
+                errors: number;
+                responseTime: number;
+            }>
+        >;
+    } {
+        return {
+            clusterMetrics: this.clusterMetrics,
+            historicalData: this.metricsHistory.get("cluster") || [],
+            workerHistory: new Map(
+                Array.from(this.metricsHistory.entries()).filter(
+                    ([key]) => key !== "cluster"
+                )
+            ),
+        };
+    }
 }
 

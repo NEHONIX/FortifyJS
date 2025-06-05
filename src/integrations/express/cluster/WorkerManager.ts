@@ -1,6 +1,6 @@
 /**
  * FortifyJS Worker Manager
- * Production-ready worker process lifecycle management with advanced monitoring
+ *  worker process lifecycle management with advanced monitoring
  */
 
 import * as cluster from "cluster";

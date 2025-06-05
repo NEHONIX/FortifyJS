@@ -1,4 +1,3 @@
-
 // Enhanced security imports with proper type safety
 export interface SodiumInterface {
     ready: Promise<void> | boolean;
@@ -60,7 +59,7 @@ export async function initializeSecurityLibraries(): Promise<void> {
                 sodium = sodiumLib.default as SodiumInterface;
                 libraryStatus.sodium = true;
                 // console.log(
-                //     "✅ libsodium-wrappers loaded successfully for SecureBuffer"
+                //     "✔ libsodium-wrappers loaded successfully for SecureBuffer"
                 // );
             }
         }
@@ -87,7 +86,7 @@ export async function initializeSecurityLibraries(): Promise<void> {
             } as NobleHashesInterface;
             libraryStatus.nobleHashes = true;
             // console.log(
-            //     "✅ @noble/hashes loaded successfully for SecureBuffer"
+            //     "✔ @noble/hashes loaded successfully for SecureBuffer"
             // );
         }
     } catch (e) {
@@ -109,7 +108,7 @@ export async function initializeSecurityLibraries(): Promise<void> {
             } as NobleCiphersInterface;
             libraryStatus.nobleCiphers = true;
             // console.log(
-            //     "✅ @noble/ciphers loaded successfully for SecureBuffer"
+            //     "✔ @noble/ciphers loaded successfully for SecureBuffer"
             // );
         }
     } catch (e) {
@@ -139,9 +138,4 @@ export function ensureLibrariesInitialized(): Promise<void> {
     return initializationPromise;
 }
 
-export {
-    sodium,
-    nobleHashes,
-    nobleCiphers,
-    libraryStatus,
-};
+export { sodium, nobleHashes, nobleCiphers, libraryStatus };

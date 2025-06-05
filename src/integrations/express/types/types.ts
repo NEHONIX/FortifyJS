@@ -435,6 +435,8 @@ export interface SessionConfig {
 
 // =====================server factory
 export interface ServerOptions {
+    // Environment variables
+    env?: "development" | "production" | "test";
     // Cache configuration
     cache?: {
         strategy?: "auto" | "memory" | "redis" | "hybrid" | "distributed";
@@ -499,7 +501,7 @@ export interface ServerOptions {
     };
     cluster?: {
         enabled?: boolean;
-        config?: ClusterConfig;
+        config?: Omit<ClusterConfig, "enabled">;
     };
 
     // File watcher configuration for auto-reload
@@ -582,5 +584,17 @@ export interface UltraFastApp extends Express {
     stopCluster?: (graceful?: boolean) => Promise<void>;
     broadcastToWorkers?: (message: any) => Promise<void>;
     sendToRandomWorker?: (message: any) => Promise<void>;
+
+    // Plugin management methods
+    registerPlugin?: (plugin: any) => Promise<void>;
+    unregisterPlugin?: (pluginId: string) => Promise<void>;
+    getPlugin?: (pluginId: string) => any;
+    getAllPlugins?: () => any[];
+    getPluginsByType?: (type: any) => any[];
+    getPluginStats?: (pluginId?: string) => any;
+    getPluginRegistryStats?: () => any;
+    getPluginEngineStats?: () => any;
+    initializeBuiltinPlugins?: () => Promise<void>;
+    getServerStats?: () => Promise<any>;
 }
 
