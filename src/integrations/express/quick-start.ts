@@ -4,7 +4,7 @@
  */
 
 import { createServer, createSecureServer } from "./server-factory";
-import { ServerConfig } from "./types";
+import { ServerConfig } from "./types/types";
 
 /**
  * Quick development server with sensible defaults

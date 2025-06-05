@@ -9,12 +9,13 @@
  * @description Zero-configuration, ultra-fast, secure Express server factory
  */
 
-export { createServer, createSecureServer } from "./server-factory";
-export { smartRoute, secureRoute, route } from "./smart-routes";
+export * from "./ServerFactory";
+export * from "./smart-routes";
 export { createOptimalCache } from "./cache/CacheFactory";
 export { SecurityMiddleware } from "./security-middleware";
 export { PerformanceMonitor } from "./performance-monitor";
-export { ClusterManager } from "./cluster-manager";
+// Cluster management system
+export * from "./cluster";
 
 // Types
 export type {
@@ -23,24 +24,7 @@ export type {
     CacheConfig,
     SecurityConfig,
     PerformanceConfig,
-    ClusterConfig,
-} from "./types";
-
-// Utilities (to be implemented)
-// export {
-//     createMiddleware,
-//     createAuthMiddleware,
-//     createRateLimitMiddleware,
-//     createCompressionMiddleware
-// } from './middleware-factory';
-
-// Analytics (to be implemented)
-// export {
-//     getServerMetrics,
-//     getRouteAnalytics,
-//     getCacheStatistics,
-//     getSecurityReport
-// } from './analytics';
+} from "./types/types";
 
 // Quick start exports for immediate use
 export {

@@ -65,7 +65,7 @@ export class ExecutionEngine extends EventEmitter {
             this.contextPool.push(this.createEmptyContext());
         }
 
-        console.log(" Ultra-fast execution pools pre-populated");
+        // console.log(" Ultra-fast execution pools pre-populated");
     }
 
     /**

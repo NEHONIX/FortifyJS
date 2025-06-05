@@ -3,9 +3,9 @@
  * Intelligent route handlers with automatic optimization, caching, and security
  */
 
-import { Request, Response, NextFunction } from 'express';
-import { RouteConfig, RouteHandler, MiddlewareFunction } from "./types";
-import { SecureCacheAdapter } from './cache/SecureCacheAdapter';
+import { Request, Response, NextFunction } from "express";
+import { RouteConfig, RouteHandler, MiddlewareFunction } from "./types/types";
+import { SecureCacheAdapter } from "./cache/SecureCacheAdapter";
 import { func } from "../../utils/fortified-function";
 import { FortifyJS } from "../../core/crypto";
 import { Validators } from "../../core/validators";
@@ -17,7 +17,7 @@ import { Hash } from "../../core/hash";
 export interface SmartRouteConfig {
     ttl?: number;
     tags?: string[];
-    strategy?: 'always' | 'conditional' | 'smart' | 'never';
+    strategy?: "always" | "conditional" | "smart" | "never";
     conditions?: {
         methods?: string[];
         statusCodes?: number[];
@@ -39,7 +39,7 @@ export interface SmartRouteConfig {
 /**
  * Create a smart route with automatic optimization
  */
-export function smartRoute(config: RouteConfig): MiddlewareFunction {
+function smartRoute(config: RouteConfig): MiddlewareFunction {
     const {
         path,
         method = "GET",
@@ -122,7 +122,7 @@ export function smartRoute(config: RouteConfig): MiddlewareFunction {
 /**
  * Create a secure route with maximum protection
  */
-export function secureRoute(
+export function Route(
     config: Omit<RouteConfig, "security"> & {
         security?: Partial<RouteConfig["security"]>;
     }
@@ -141,13 +141,7 @@ export function secureRoute(
     return smartRoute(secureConfig);
 }
 
-/**
- * Basic route function for backward compatibility
- */
-export function route(config: RouteConfig): MiddlewareFunction {
-    return smartRoute(config);
-}
-
+Route({ handler: (req, res) => {}, path: "" });
 /**
  * Create validation middleware
  */
@@ -159,26 +153,35 @@ function createValidationMiddleware(validation: any): MiddlewareFunction {
             if (validation.body && req.body) {
                 const result = validateSchema(req.body, validation.body);
                 if (!result.valid) {
-                    errors.push(...result.errors.map((e: string) => `Body: ${e}`));
+                    errors.push(
+                        ...result.errors.map((e: string) => `Body: ${e}`)
+                    );
                 }
             }
 
             if (validation.query && req.query) {
                 const result = validateSchema(req.query, validation.query);
                 if (!result.valid) {
-                    errors.push(...result.errors.map((e: string) => `Query: ${e}`));
+                    errors.push(
+                        ...result.errors.map((e: string) => `Query: ${e}`)
+                    );
                 }
             }
 
             if (validation.params && req.params) {
                 const result = validateSchema(req.params, validation.params);
                 if (!result.valid) {
-                    errors.push(...result.errors.map((e: string) => `Params: ${e}`));
+                    errors.push(
+                        ...result.errors.map((e: string) => `Params: ${e}`)
+                    );
                 }
             }
 
             if (errors.length > 0) {
-                return res.error(`Validation failed: ${errors.join(", ")}`, 400);
+                return res.error(
+                    `Validation failed: ${errors.join(", ")}`,
+                    400
+                );
             }
 
             next();
@@ -457,25 +460,29 @@ function verifyJWT(token: string): any {
 
 function sanitizeRequest(req: any): void {
     // Basic sanitization implementation
-    if (req.body && typeof req.body === 'object') {
+    if (req.body && typeof req.body === "object") {
         sanitizeObject(req.body);
     }
-    if (req.query && typeof req.query === 'object') {
+    if (req.query && typeof req.query === "object") {
         sanitizeObject(req.query);
     }
-    if (req.params && typeof req.params === 'object') {
+    if (req.params && typeof req.params === "object") {
         sanitizeObject(req.params);
     }
 }
 
 function sanitizeObject(obj: any): void {
     for (const key in obj) {
-        if (typeof obj[key] === 'string') {
-            obj[key] = obj[key].replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-            obj[key] = obj[key].replace(/javascript:/gi, '');
-            obj[key] = obj[key].replace(/on\w+\s*=/gi, '');
-        } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        if (typeof obj[key] === "string") {
+            obj[key] = obj[key].replace(
+                /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+                ""
+            );
+            obj[key] = obj[key].replace(/javascript:/gi, "");
+            obj[key] = obj[key].replace(/on\w+\s*=/gi, "");
+        } else if (typeof obj[key] === "object" && obj[key] !== null) {
             sanitizeObject(obj[key]);
         }
     }
 }
+

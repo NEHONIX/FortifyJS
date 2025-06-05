@@ -6,7 +6,11 @@
  */
 
 import { SecureCacheAdapter } from "./SecureCacheAdapter";
-import { CacheConfig, CacheBackendStrategy, CacheMetrics } from "../types";
+import {
+    CacheConfig,
+    CacheBackendStrategy,
+    CacheMetrics,
+} from "../types/types";
 import { SecureCacheConfig } from "./type";
 
 /**
@@ -828,5 +832,4 @@ export const CacheUtils = {
         return { migrated, failed };
     },
 };
-
 

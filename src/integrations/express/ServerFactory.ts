@@ -13,134 +13,24 @@ import express, {
 import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
-import { createOptimalCache, CacheUtils } from "../cache/CacheFactory";
-import { SecureCacheAdapter } from "../cache/SecureCacheAdapter";
-import { CacheConfig } from "../types";
-import { UltraFastServer } from "./FastApi";
-import { DEFAULT_OPTIONS } from "./const/default";
+import { CacheUtils } from "./cache/CacheFactory";
+import { SecureCacheAdapter } from "./cache/SecureCacheAdapter";
+import {
+    RouteOptions,
+    ServerConfig,
+    ServerOptions,
+    UltraFastApp,
+} from "./types/types";
 
-export interface ServerOptions {
-    // Cache configuration
-    cache?: {
-        strategy?: "auto" | "memory" | "redis" | "hybrid" | "distributed";
-        ttl?: number; // Default TTL in milliseconds
-        redis?: {
-            host?: string;
-            port?: number;
-            password?: string;
-            cluster?: boolean;
-            nodes?: Array<{ host: string; port: number }>;
-        };
-        memory?: {
-            maxSize?: number; // MB
-            algorithm?: "lru" | "lfu" | "fifo";
-        };
-        enabled?: boolean;
-    };
-
-    // Security configuration
-    security?: {
-        encryption?: boolean;
-        accessMonitoring?: boolean;
-        sanitization?: boolean;
-        auditLogging?: boolean;
-        cors?: boolean;
-        helmet?: boolean;
-    };
-
-    // Performance configuration
-    performance?: {
-        compression?: boolean;
-        batchSize?: number;
-        connectionPooling?: boolean;
-        asyncWrite?: boolean;
-        prefetch?: boolean;
-    };
-
-    // Monitoring configuration
-    monitoring?: {
-        enabled?: boolean;
-        healthChecks?: boolean;
-        metrics?: boolean;
-        detailed?: boolean;
-        alertThresholds?: {
-            memoryUsage?: number;
-            hitRate?: number;
-            errorRate?: number;
-            latency?: number;
-        };
-    };
-
-    // Server configuration
-    server?: {
-        port?: number;
-        host?: string;
-        trustProxy?: boolean;
-        jsonLimit?: string;
-        urlEncodedLimit?: string;
-        enableMiddleware?: boolean;
-    };
-}
-
-export interface RouteOptions {
-    cache?: {
-        enabled?: boolean;
-        ttl?: number;
-        key?: string | ((req: Request) => string);
-        tags?: string[];
-        invalidateOn?: string[];
-        strategy?: "memory" | "redis" | "hybrid";
-    };
-    security?: {
-        auth?: boolean;
-        roles?: string[];
-        encryption?: boolean;
-        sanitization?: boolean;
-    };
-    performance?: {
-        compression?: boolean;
-        timeout?: number;
-    };
-}
-
-export interface UltraFastApp extends Express {
-    cache: SecureCacheAdapter;
-    getWithCache: (
-        path: string,
-        options: RouteOptions,
-        handler: RequestHandler
-    ) => void;
-    postWithCache: (
-        path: string,
-        options: RouteOptions,
-        handler: RequestHandler
-    ) => void;
-    putWithCache: (
-        path: string,
-        options: RouteOptions,
-        handler: RequestHandler
-    ) => void;
-    deleteWithCache: (
-        path: string,
-        options: RouteOptions,
-        handler: RequestHandler
-    ) => void;
-    invalidateCache: (pattern: string) => Promise<void>;
-    getCacheStats: () => Promise<any>;
-    warmUpCache: (
-        data: Array<{ key: string; value: any; ttl?: number }>
-    ) => Promise<void>;
-    start: (port?: number, callback?: () => void) => void;
-    isReady: () => boolean;
-}
+// Re-export types for external use
+export type { ServerOptions, ServerConfig, RouteOptions, UltraFastApp };
+import { UltraFastServer } from "./server/FastApi";
 
 /**
  * Create ultra-fast Express server (zero-async)
  * Returns app instance ready to use immediately
  */
-export function createUltraFastServer(
-    options: ServerOptions = {}
-): UltraFastApp {
+export function createServer(options: ServerOptions = {}): UltraFastApp {
     const server = new UltraFastServer(options);
     return server.getApp();
 }
@@ -152,38 +42,6 @@ export function createServerInstance(
     options: ServerOptions = {}
 ): UltraFastServer {
     return new UltraFastServer(options);
-}
-
-// Export the main factory function as default
-export { createUltraFastServer as createServer };
-
-/**
- * Auto-detect optimal cache strategy based on environment
- */
-function detectCacheStrategy(
-    options: ServerOptions
-): "memory" | "redis" | "hybrid" {
-    if (options.cache?.strategy && options.cache.strategy !== "auto") {
-        return options.cache.strategy as "memory" | "redis" | "hybrid";
-    }
-
-    // Check for Redis availability
-    const hasRedis =
-        options.cache?.redis?.host ||
-        process.env.REDIS_URL ||
-        process.env.REDIS_HOST;
-
-    // Check memory constraints
-    const memoryLimit = options.cache?.memory?.maxSize || 100;
-    const isMemoryConstrained = memoryLimit < 50;
-
-    if (hasRedis && !isMemoryConstrained) {
-        return "hybrid"; // Best of both worlds
-    } else if (hasRedis) {
-        return "redis"; // Use Redis when memory constrained
-    } else {
-        return "memory"; // Fallback to memory
-    }
 }
 
 /**
@@ -290,89 +148,9 @@ function createCacheMiddleware(
 }
 
 /**
- * Legacy async createServer function (deprecated - use createServer instead)
- */
-export async function createServerAsync(
-    userOptions: ServerOptions = {}
-): Promise<UltraFastApp> {
-    // Merge with defaults
-    const options: ServerOptions = {
-        ...DEFAULT_OPTIONS,
-        ...userOptions,
-        cache: { ...DEFAULT_OPTIONS.cache, ...userOptions.cache },
-        security: { ...DEFAULT_OPTIONS.security, ...userOptions.security },
-        performance: {
-            ...DEFAULT_OPTIONS.performance,
-            ...userOptions.performance,
-        },
-        monitoring: {
-            ...DEFAULT_OPTIONS.monitoring,
-            ...userOptions.monitoring,
-        },
-        server: { ...DEFAULT_OPTIONS.server, ...userOptions.server },
-    };
-
-    console.log(" Creating ultra-fast Express server...");
-
-    // Create Express app
-    const app = express() as UltraFastApp;
-
-    // Initialize cache
-    const cacheStrategy = detectCacheStrategy(options);
-    // console.log(
-    //     ` Auto-selected cache strategy: ${cacheStrategy.toUpperCase()}`
-    // );
-
-    const cacheConfig: CacheConfig = {
-        type: cacheStrategy,
-        memory: options.cache?.memory,
-        redis: options.cache?.redis,
-        performance: {
-            batchSize: options.performance?.batchSize,
-            asyncWrite: options.performance?.asyncWrite,
-            prefetchEnabled: options.performance?.prefetch,
-            connectionPooling: options.performance?.connectionPooling,
-        },
-        security: {
-            encryption: options.security?.encryption,
-            accessMonitoring: options.security?.accessMonitoring,
-            sanitization: options.security?.sanitization,
-            auditLogging: options.security?.auditLogging,
-        },
-        monitoring: {
-            enabled: options.monitoring?.enabled,
-            detailed: options.monitoring?.detailed,
-            alertThresholds: options.monitoring?.alertThresholds,
-        },
-    };
-
-    const cache = createOptimalCache(cacheConfig);
-    await cache.connect();
-
-    app.cache = cache;
-
-    console.log(" Cache initialized successfully");
-
-    // Configure middleware
-    await configureMiddleware(app, options);
-
-    // Add enhanced methods
-    addEnhancedMethods(app, cache, options);
-
-    // Add monitoring endpoints
-    if (options.monitoring?.enabled) {
-        addMonitoringEndpoints(app, cache);
-    }
-
-    console.log("Ultra-fast Express server ready!");
-
-    return app;
-}
-
-/**
  * Configure Express middleware
  */
-async function configureMiddleware(app: Express, options: ServerOptions) {
+export async function UFSMiddleware(app: UltraFastApp, options: ServerOptions) {
     console.log("Configuring middleware...");
 
     // Trust proxy if configured
@@ -416,32 +194,6 @@ async function configureMiddleware(app: Express, options: ServerOptions) {
     );
 
     // Performance tracking middleware
-    app.use((req: any, res, next) => {
-        req.startTime = Date.now();
-
-        res.on("finish", () => {
-            const responseTime = Date.now() - req.startTime;
-
-            // Log performance metrics
-            if (responseTime < 5) {
-                console.log(
-                    `ULTRA-FAST: ${req.method} ${req.path} - ${responseTime}ms`
-                );
-            } else if (responseTime < 20) {
-                console.log(
-                    `FAST: ${req.method} ${req.path} - ${responseTime}ms`
-                );
-            } else if (responseTime > 100) {
-                console.log(
-                    `SLOW: ${req.method} ${req.path} - ${responseTime}ms`
-                );
-            }
-        });
-
-        next();
-    });
-
-    console.log("Middleware configured");
 }
 
 /**

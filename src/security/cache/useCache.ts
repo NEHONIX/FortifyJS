@@ -274,6 +274,7 @@ class SIMC extends EventEmitter {
     public shutdown(): void {
         this.ultraCache.shutdown();
         this.removeAllListeners();
+        process.exit(1)
     }
 }
 

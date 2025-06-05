@@ -1,9 +1,18 @@
 /**
  * FortifyJS Express Types
- * Comprehensive type definitions for the Express powerhouse
+ * Core type definitions for Express features (excluding cluster types)
  */
 
-import { Request, Response, NextFunction } from "express";
+import {
+    Request,
+    type Express,
+    Response,
+    NextFunction,
+    RequestHandler,
+} from "express";
+import { SecureCacheAdapter } from "../cache";
+import { Server as HttpServer } from "http";
+import { ClusterConfig } from "./cluster";
 
 // ===== CORE CONFIGURATION TYPES =====
 
@@ -12,11 +21,6 @@ export interface ServerConfig {
     port?: number;
     host?: string;
     environment?: "development" | "production" | "test";
-
-    // Performance settings
-    cluster?: boolean;
-    workers?: number;
-    maxMemory?: string; // e.g., '512MB', '1GB'
 
     // Security settings
     security?: SecurityConfig;
@@ -44,6 +48,12 @@ export interface ServerConfig {
 
     // Logging
     logging?: LoggingConfig;
+
+    //cluster
+    cluster?: {
+        enabled?: boolean;
+        config?: ClusterConfig;
+    };
 }
 
 export interface SecurityConfig {
@@ -62,6 +72,7 @@ export interface SecurityConfig {
         session?: SessionConfig;
     };
 }
+
 export interface CacheConfig {
     type?: "memory" | "redis" | "hybrid" | "distributed";
     redis?: RedisConfig;
@@ -199,7 +210,6 @@ export interface RouteConfig {
         params?: any;
         required?: string[];
     };
-    documentation?: RouteDocumentation;
 }
 
 export interface RouteCacheConfig {
@@ -348,7 +358,7 @@ export interface PaginationInfo {
     pages: number;
 }
 
-// Additional configuration interfaces
+// configuration interfaces
 export interface MiddlewareConfig {
     name: string;
     handler: MiddlewareFunction;
@@ -423,40 +433,154 @@ export interface SessionConfig {
     store?: "memory" | "redis" | "custom";
 }
 
-export interface RouteDocumentation {
-    summary?: string;
-    description?: string;
-    tags?: string[];
-    parameters?: ParameterDoc[];
-    responses?: ResponseDoc[];
-    examples?: ExampleDoc[];
+// =====================server factory
+export interface ServerOptions {
+    // Cache configuration
+    cache?: {
+        strategy?: "auto" | "memory" | "redis" | "hybrid" | "distributed";
+        ttl?: number; // Default TTL in milliseconds
+        redis?: {
+            host?: string;
+            port?: number;
+            password?: string;
+            cluster?: boolean;
+            nodes?: Array<{ host: string; port: number }>;
+        };
+        memory?: {
+            maxSize?: number; // MB
+            algorithm?: "lru" | "lfu" | "fifo";
+        };
+        enabled?: boolean;
+    };
+
+    // Security configuration
+    security?: {
+        encryption?: boolean;
+        accessMonitoring?: boolean;
+        sanitization?: boolean;
+        auditLogging?: boolean;
+        cors?: boolean;
+        helmet?: boolean;
+    };
+
+    // Performance configuration
+    performance?: {
+        compression?: boolean;
+        batchSize?: number;
+        connectionPooling?: boolean;
+        asyncWrite?: boolean;
+        prefetch?: boolean;
+    };
+
+    // Monitoring configuration
+    monitoring?: {
+        enabled?: boolean;
+        healthChecks?: boolean;
+        metrics?: boolean;
+        detailed?: boolean;
+        alertThresholds?: {
+            memoryUsage?: number;
+            hitRate?: number;
+            errorRate?: number;
+            latency?: number;
+        };
+    };
+
+    // Server configuration
+    server?: {
+        port?: number;
+        host?: string;
+        trustProxy?: boolean;
+        jsonLimit?: string;
+        urlEncodedLimit?: string;
+        enableMiddleware?: boolean;
+        logPerfomances?: boolean;
+        // cluster?: boolean;
+    };
+    cluster?: {
+        enabled?: boolean;
+        config?: ClusterConfig;
+    };
+
+    // File watcher configuration for auto-reload
+    fileWatcher?: {
+        enabled?: boolean;
+        watchPaths?: string[];
+        ignorePaths?: string[];
+        extensions?: string[];
+        debounceMs?: number;
+        restartDelay?: number;
+        maxRestarts?: number;
+        gracefulShutdown?: boolean;
+        verbose?: boolean;
+    };
 }
 
-export interface ParameterDoc {
-    name: string;
-    in: "query" | "path" | "body" | "header";
-    type: string;
-    required?: boolean;
-    description?: string;
+export interface RouteOptions {
+    cache?: {
+        enabled?: boolean;
+        ttl?: number;
+        key?: string | ((req: Request) => string);
+        tags?: string[];
+        invalidateOn?: string[];
+        strategy?: "memory" | "redis" | "hybrid";
+    };
+    security?: {
+        auth?: boolean;
+        roles?: string[];
+        encryption?: boolean;
+        sanitization?: boolean;
+    };
+    performance?: {
+        compression?: boolean;
+        timeout?: number;
+    };
 }
 
-export interface ResponseDoc {
-    status: number;
-    description: string;
-    schema?: any;
-}
+export interface UltraFastApp extends Express {
+    cache: SecureCacheAdapter;
+    getWithCache: (
+        path: string,
+        options: RouteOptions,
+        handler: RequestHandler
+    ) => void;
+    postWithCache: (
+        path: string,
+        options: RouteOptions,
+        handler: RequestHandler
+    ) => void;
+    putWithCache: (
+        path: string,
+        options: RouteOptions,
+        handler: RequestHandler
+    ) => void;
+    deleteWithCache: (
+        path: string,
+        options: RouteOptions,
+        handler: RequestHandler
+    ) => void;
+    invalidateCache: (pattern: string) => Promise<void>;
+    getCacheStats: () => Promise<any>;
+    warmUpCache: (
+        data: Array<{ key: string; value: any; ttl?: number }>
+    ) => Promise<void>;
+    start: (
+        port?: number,
+        callback?: () => void
+    ) => Promise<HttpServer> | HttpServer;
+    isReady: () => boolean;
 
-export interface ExampleDoc {
-    name: string;
-    request?: any;
-    response?: any;
-}
-
-export interface ClusterConfig {
-    enabled?: boolean;
-    workers?: number;
-    respawn?: boolean;
-    maxMemory?: string;
-    gracefulShutdown?: number;
+    // Cluster management methods (optional - only available when cluster is enabled)
+    scaleUp?: (count?: number) => Promise<void>;
+    scaleDown?: (count?: number) => Promise<void>;
+    autoScale?: () => Promise<void>;
+    getClusterMetrics?: () => Promise<any>;
+    getClusterHealth?: () => Promise<any>;
+    getAllWorkers?: () => any[];
+    getOptimalWorkerCount?: () => Promise<number>;
+    restartCluster?: () => Promise<void>;
+    stopCluster?: (graceful?: boolean) => Promise<void>;
+    broadcastToWorkers?: (message: any) => Promise<void>;
+    sendToRandomWorker?: (message: any) => Promise<void>;
 }
 

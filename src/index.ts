@@ -69,7 +69,7 @@ import * as fstringUtils from "./security/secure-string";
 import * as fArrayUtils from "./security/secure-array";
 import * as fFuncUtils from "./utils/fortified-function";
 import * as CacheUtils from "./security/cache";
-import * as serverUtils from "./integrations/express/server/ServerFactory";
+import * as serverUtils from "./integrations/express/ServerFactory";
 
 // Type exports
 export type {
@@ -381,7 +381,6 @@ export {
 //  Cache sys
 export * from "./security/cache";
 
-
 // Enhanced Cache Configuration Types
 export type {
     CacheConfig,
@@ -393,8 +392,8 @@ export type {
     CacheMetrics,
     RedisConfig,
     MemoryConfig,
-} from "./integrations/express/types";
-export * from "./integrations/express/server/ServerFactory";
+} from "./integrations/express/types/types";
+export * from "./integrations/express/ServerFactory";
 
 // For CommonJS compatibility
 if (typeof module !== "undefined" && module.exports) {

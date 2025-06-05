@@ -283,10 +283,10 @@ class UFSIMC extends EventEmitter {
                 );
             } else {
                 console.warn(
-                    "UFSIMC-WARNING: Using generated key. Set environment variables for production."
+                    "UFSIMC-WARNING: Using generated key. For production, set ENV variables: ENC_SECRET_KEY or (ENC_SECRET_SEED and ENC_SECRET_SALT)"
                 );
                 this.encryptionKey = SecureRandom.getRandomBytes(
-                    CONFIG.KEY_LENGTH
+                    CONFIG.KEY_LENGTH 
                 ).getBuffer();
             }
 

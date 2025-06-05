@@ -21,7 +21,16 @@ import * as crypto from "crypto";
 import { promisify } from "util";
 import zlib from "zlib";
 import { DEFAULT_FILE_CACHE_CONFIG } from "./config/cache.config";
-import checkDiskSpace from "check-disk-space";
+// Import check-disk-space with proper error handling
+let checkDiskSpace: any;
+try {
+    checkDiskSpace = require("check-disk-space");
+} catch (error) {
+    console.warn(
+        "check-disk-space package not available, using fallback disk monitoring"
+    );
+    checkDiskSpace = null;
+}
 
 /**
  * Comprehensive File Cache System
@@ -154,24 +163,40 @@ export class FileCache {
             );
 
             // Get real disk space information using check-disk-space
-            try {
-                const diskSpace = await checkDiskSpace(this.config.directory);
+            if (checkDiskSpace && typeof checkDiskSpace === "function") {
+                try {
+                    const diskSpace = await checkDiskSpace(
+                        this.config.directory
+                    );
 
-                // Update disk usage with real values
-                this.stats.diskUsage.used = directorySize; // Cache directory size
-                this.stats.diskUsage.available = diskSpace.free; // Available disk space
-                this.stats.diskUsage.percentage =
-                    diskSpace.size > 0
-                        ? ((diskSpace.size - diskSpace.free) / diskSpace.size) *
-                          100
-                        : 0; // Percentage of total disk used
-            } catch (diskSpaceError) {
-                console.warn(
-                    "Could not get real disk space, falling back to cache size limits:",
-                    diskSpaceError
-                );
+                    // Update disk usage with real values
+                    this.stats.diskUsage.used = directorySize; // Cache directory size
+                    this.stats.diskUsage.available = diskSpace.free; // Available disk space
+                    this.stats.diskUsage.percentage =
+                        diskSpace.size > 0
+                            ? ((diskSpace.size - diskSpace.free) /
+                                  diskSpace.size) *
+                              100
+                            : 0; // Percentage of total disk used
+                } catch (diskSpaceError) {
+                    console.warn(
+                        "Could not get disk space, falling back to cache size limits!",
+                        // diskSpaceError
+                    );
 
-                // Fallback to cache size limits if disk space check fails
+                    // Fallback to cache size limits if disk space check fails
+                    this.stats.diskUsage.used = directorySize;
+                    this.stats.diskUsage.available = Math.max(
+                        0,
+                        this.config.maxCacheSize - directorySize
+                    );
+                    this.stats.diskUsage.percentage =
+                        this.config.maxCacheSize > 0
+                            ? (directorySize / this.config.maxCacheSize) * 100
+                            : 0;
+                }
+            } else {
+                // Package not available, use fallback
                 this.stats.diskUsage.used = directorySize;
                 this.stats.diskUsage.available = Math.max(
                     0,

@@ -3,7 +3,7 @@
  * Intelligent caching system with Redis and Memory backends
  */
 
-import { CacheConfig, RedisConfig, MemoryConfig } from "./types";
+import { CacheConfig, RedisConfig, MemoryConfig } from "./types/types";
 import { Hash } from "../../core/hash";
 import { FortifyJS } from "../../core/crypto";
 import { SecureString } from "../../security/secure-string";

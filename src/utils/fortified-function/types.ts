@@ -29,6 +29,7 @@ export interface FortifiedFunctionOptions {
     cacheStrategy?: "lru" | "lfu" | "adaptive";
     cacheTTL?: number;
     maxCacheSize?: number;
+    errorHandling?: "graceful";
     precompile?: boolean;
     optimizeExecution?: boolean;
 

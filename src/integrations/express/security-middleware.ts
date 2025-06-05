@@ -3,7 +3,7 @@
  * Military-grade security middleware for Express applications
  */
 
-import { SecurityConfig } from "./types";
+import { SecurityConfig } from "./types/types";
 import { FortifyJS } from "../../core/crypto";
 import { Hash } from "../../core/hash";
 import { SecureObject } from "../../security/secure-object";

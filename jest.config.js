@@ -2,7 +2,7 @@ export default {
     preset: "ts-jest",
     testEnvironment: "node",
     extensionsToTreatAsEsm: [".ts"],
-    testMatch: ["**/__tests__/**/*.test.ts"],
+    testMatch: ["**/__tests__/**/*.test.ts", "**/tests/**/*.test.ts"],
     collectCoverageFrom: [
         "src/**/*.ts",
         "!src/**/*.d.ts",

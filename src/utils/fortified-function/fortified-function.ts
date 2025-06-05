@@ -59,6 +59,7 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
             cacheStrategy: "adaptive", // Adaptive strategy for best performance
             cacheTTL: 300000, // 5 minutes - balanced TTL
             maxCacheSize: 1000, // Reasonable cache size
+            errorHandling: "graceful", // Graceful error handling by default
             precompile: false,
             optimizeExecution: true, // Enable basic optimizations
 

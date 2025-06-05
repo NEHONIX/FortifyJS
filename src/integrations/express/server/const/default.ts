@@ -1,4 +1,4 @@
-import { ServerOptions } from "../ServerFactory";
+import { ServerOptions } from "../../ServerFactory";
 
 // Default configuration
 export const DEFAULT_OPTIONS: ServerOptions = {
