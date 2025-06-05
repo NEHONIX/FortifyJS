@@ -79,16 +79,35 @@ export class UltraFastServer {
         this.performanceProfiler = new PerformanceProfiler();
         this.executionPredictor = new ExecutionPredictor();
         this.requestPreCompiler = new RequestPreCompiler(this.cache, {
-            enabled: this.options.performance?.prefetch !== false,
-            learningPeriod: 60000, // 1 minute for faster learning
-            optimizationThreshold: 1, // Optimize after just 1 request
-            maxCompiledRoutes: 1000,
-            aggressiveOptimization: true, // ALWAYS aggressive
-            predictivePreloading: true, // ALWAYS preload
+            enabled: this.options.performance?.preCompilerEnabled !== false,
+            learningPeriod: this.options.performance?.learningPeriod || 60000, // 1 minute for faster learning
+            optimizationThreshold:
+                this.options.performance?.optimizationThreshold || 1, // Optimize after just 1 request
+            maxCompiledRoutes:
+                this.options.performance?.maxCompiledRoutes || 1000,
+            aggressiveOptimization:
+                this.options.performance?.aggressiveOptimization !== false, // Default to aggressive
+            predictivePreloading:
+                this.options.performance?.predictivePreloading !== false, // Default to enabled
+            // System info for library-agnostic responses
+            systemInfo: {
+                serviceName:
+                    this.options.server?.serviceName || "FastApi.ts Service",
+                version: this.options.server?.version || "1.0.0",
+                environment:
+                    this.options.env || process.env.NODE_ENV || "development",
+                customHealthData: this.options.performance?.customHealthData,
+                customStatusData: this.options.performance?.customStatusData,
+            },
         });
 
-        // ULTRA-FAST CACHE WARMING - Pre-populate cache with common responses
-        this.warmUpUltraFastCache();
+        // ULTRA-FAST CACHE WARMING - Pre-populate cache with common responses (if enabled)
+        if (
+            this.options.performance?.cacheWarmupEnabled !== false &&
+            this.options.performance?.warmupOnStartup !== false
+        ) {
+            this.warmUpUltraFastCache();
+        }
 
         // Initialize plugin system
         this.pluginRegistry = new PluginRegistry(this.cache, this.cluster);
@@ -146,9 +165,9 @@ export class UltraFastServer {
                 );
             } else {
                 // Child process: Don't initialize file watcher to avoid conflicts
-                console.log(
-                    "Running in child process mode (hot reload enabled)"
-                );
+                // console.log(
+                //     "Running in child process mode (hot reload enabled)"
+                // );
             }
         }
 
@@ -286,39 +305,89 @@ export class UltraFastServer {
      */
     private async warmUpUltraFastCache(): Promise<void> {
         try {
-            console.log("🔥 WARMING UP ULTRA-FAST CACHE...");
+            console.log(" WARMING UP ULTRA-FAST CACHE...");
 
-            // Pre-populate ultra-fast responses
+            // Get system info from configuration for library-agnostic responses
+            const systemInfo = {
+                serviceName:
+                    this.options.server?.serviceName || "FastApi.ts Service",
+                version: this.options.server?.version || "1.0.0",
+                environment:
+                    this.options.env || process.env.NODE_ENV || "development",
+            };
+
+            // Pre-populate ultra-fast responses with configurable data
             const ultraFastResponses = [
                 {
                     key: "ultra:GET:/health",
                     value: {
                         status: "ok",
                         timestamp: Date.now(),
+                        service: systemInfo.serviceName,
+                        version: systemInfo.version,
+                        environment: systemInfo.environment,
+                        uptime: process.uptime(),
                         cached: true,
+                        responseTime: "<1ms",
                     },
                     ttl: 3600000, // 1 hour
                 },
                 {
                     key: "ultra:GET:/ping",
-                    value: { pong: true, cached: true },
+                    value: {
+                        pong: true,
+                        timestamp: Date.now(),
+                        service: systemInfo.serviceName,
+                        cached: true,
+                    },
                     ttl: 3600000,
                 },
                 {
                     key: "ultra:GET:/status",
-                    value: { status: "healthy", cached: true },
-                    ttl: 3600000,
-                },
-                {
-                    key: "ultra:GET:/static/config",
                     value: {
-                        config: "static-data",
-                        version: "1.0.0",
+                        status: "healthy",
+                        timestamp: Date.now(),
+                        service: systemInfo.serviceName,
+                        version: systemInfo.version,
                         cached: true,
                     },
                     ttl: 3600000,
                 },
             ];
+
+            // Add custom health data if provided
+            if (this.options.performance?.customHealthData) {
+                try {
+                    const customHealthData =
+                        await this.options.performance.customHealthData();
+                    ultraFastResponses[0].value = {
+                        ...ultraFastResponses[0].value,
+                        ...customHealthData,
+                    };
+                } catch (error: any) {
+                    console.warn(
+                        "Custom health data generation failed during warmup:",
+                        error.message
+                    );
+                }
+            }
+
+            // Add custom status data if provided
+            if (this.options.performance?.customStatusData) {
+                try {
+                    const customStatusData =
+                        await this.options.performance.customStatusData();
+                    ultraFastResponses[2].value = {
+                        ...ultraFastResponses[2].value,
+                        ...customStatusData,
+                    };
+                } catch (error: any) {
+                    console.warn(
+                        "Custom status data generation failed during warmup:",
+                        error.message
+                    );
+                }
+            }
 
             // Warm up cache asynchronously
             const warmupPromises = ultraFastResponses.map(async (item) => {
@@ -326,19 +395,19 @@ export class UltraFastServer {
                     await this.cache.set(item.key, item.value, {
                         ttl: item.ttl,
                     });
-                    console.log(`✔ Warmed up: ${item.key}`);
+                    // console.log(`✔ Warmed up: ${item.key}`);
                 } catch (error: any) {
                     console.warn(
-                        `❌ Failed to warm up ${item.key}:`,
+                        `Failed to warm up ${item.key}:`,
                         error.message
                     );
                 }
             });
 
             await Promise.all(warmupPromises);
-            console.log(
-                "ULTRA-FAST CACHE WARMED UP - READY FOR <1MS RESPONSES!"
-            );
+            // console.log(
+            //     "ULTRA-FAST CACHE WARMED UP - READY FOR <1MS RESPONSES!"
+            // );
         } catch (error: any) {
             console.warn("Cache warmup failed:", error.message);
         }
@@ -952,6 +1021,11 @@ export class UltraFastServer {
             data: Array<{ key: string; value: any; ttl?: number }>
         ) => {
             await CacheUtils.warmUp(this.cache, data);
+        };
+
+        // Performance optimization methods
+        this.app.getRequestPreCompiler = () => {
+            return this.requestPreCompiler;
         };
 
         console.log("methods added");
@@ -1692,7 +1766,7 @@ export class UltraFastServer {
 
             // If cluster is enabled, use cluster manager
             if (this.cluster && this.options.cluster?.enabled) {
-                console.log("Starting FortifyJS cluster...");
+                console.log("Starting cluster...");
 
                 try {
                     // Start cluster manager

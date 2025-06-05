@@ -1309,7 +1309,7 @@ export class SecureObject<
         
         // Purpose: Security-conscious data access
         // Behavior: Filters out sensitive keys by default
-        // Result: ❌ password: undefined (filtered for security)
+        // Result:  password: undefined (filtered for security)
         // With encryptSensitive: true: ✔ password: "[ENCRYPTED:...]" (encrypted but included)
      */
     public getAll(

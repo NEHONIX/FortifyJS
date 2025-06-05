@@ -890,7 +890,7 @@ export class RequestPreCompiler {
      * Useful for testing or when you want immediate optimization without waiting for learning period
      */
     public forceCompileTemplates(): void {
-        console.log("🚀 Force compiling registered templates...");
+        console.log(" Force compiling registered templates...");
 
         // Create patterns from registered templates
         this.responseTemplates.forEach((template, key) => {
@@ -940,7 +940,7 @@ export class RequestPreCompiler {
         this.learningMode = false;
         this.compileOptimizedRoutes();
 
-        console.log("✅ Force compilation completed!");
+        console.log("✔ Force compilation completed!");
     }
 
     /**

@@ -12,6 +12,7 @@ export interface FortifiedFunctionOptions {
     // Security Options
     autoEncrypt?: boolean;
     secureParameters?: (string | number)[];
+    parameterValidation?: boolean;
     memoryWipeDelay?: number;
     stackTraceProtection?: boolean;
     smartSecurity?: boolean;

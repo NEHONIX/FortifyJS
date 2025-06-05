@@ -14,7 +14,7 @@ yarn install fortify2-js
 bun add fortify2-js
 ```
 
-## 🔥 Basic Usage
+## Basic Usage
 
 ### 1. Create Your First SecureArray
 

@@ -26,12 +26,26 @@ export const DEFAULT_OPTIONS: ServerOptions = {
         connectionPooling: true,
         asyncWrite: true,
         prefetch: true,
-        // Ultra-performance optimization settings
+        // Ultra-performance optimization settings (optimized for ≤1ms targets)
         ultraFastOptimization: true,
         requestClassification: true,
         predictivePreloading: true,
         aggressiveCaching: true,
         parallelProcessing: true,
+        // RequestPreCompiler optimal settings from testing
+        preCompilerEnabled: true,
+        learningPeriod: 60000, // 1 minute for faster learning
+        optimizationThreshold: 1, // Optimize after just 1 request
+        aggressiveOptimization: true, // Always use aggressive optimization
+        maxCompiledRoutes: 1000,
+        // ExecutionPredictor aggressive settings
+        ultraFastRulesEnabled: true,
+        staticRouteOptimization: true,
+        patternRecognitionEnabled: true,
+        // Cache warming settings
+        cacheWarmupEnabled: true,
+        warmupOnStartup: true,
+        precomputeCommonResponses: true,
     },
     monitoring: {
         enabled: true,

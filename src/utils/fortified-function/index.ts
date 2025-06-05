@@ -58,7 +58,7 @@ export { FortifiedFunction } from "./fortified-function";
 // Exportcomponents for advanced usage
 export { SecurityHandler } from "./security-handler";
 export { PerformanceMonitor } from "./performance-monitor";
-export { ExecutionEngine } from "./execution-engine";
+export { FuncExecutionEngine as ExecutionEngine } from "./execution-engine";
 export { PerformanceTimer } from "./performance-timer";
 
 // Export new smart components

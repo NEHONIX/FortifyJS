@@ -12,7 +12,7 @@ import {
 } from "./types";
 import { SecurityHandler } from "./security-handler";
 import { PerformanceMonitor } from "./performance-monitor";
-import { ExecutionEngine } from "./execution-engine";
+import { FuncExecutionEngine } from "./execution-engine";
 import { PerformanceTimer } from "./performance-timer";
 import { debugLog, generateSafeCacheKey } from "./safe-serializer";
 
@@ -24,7 +24,7 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
     private readonly options: Required<FortifiedFunctionOptions>;
     private readonly securityHandler: SecurityHandler;
     private readonly performanceMonitor: PerformanceMonitor;
-    private readonly executionEngine: ExecutionEngine;
+    private readonly executionEngine: FuncExecutionEngine;
     private performanceTimer: PerformanceTimer | null = null;
     private isDestroyed = false;
     private cleanupInterval?: NodeJS.Timeout;
@@ -45,6 +45,7 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
             // Security - Safe defaults for production
             autoEncrypt: false, // Explicit opt-in for encryption to avoid performance overhead
             secureParameters: [],
+            parameterValidation: true, // Enable parameter validation by default for security
             memoryWipeDelay: 0,
             stackTraceProtection: true, // Essential for debugging
             smartSecurity: false, // Disable advanced security by default for performance
@@ -104,7 +105,7 @@ export class FortifiedFunction<T extends any[], R> extends EventEmitter {
             : undefined;
 
         this.performanceMonitor = new PerformanceMonitor(cacheConfig);
-        this.executionEngine = new ExecutionEngine(
+        this.executionEngine = new FuncExecutionEngine(
             this.securityHandler,
             this.performanceMonitor
         );

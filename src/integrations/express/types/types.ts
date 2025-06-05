@@ -13,6 +13,7 @@ import {
 import { SecureCacheAdapter } from "../cache";
 import { Server as HttpServer } from "http";
 import { ClusterConfig } from "./cluster";
+import type { RequestPreCompiler } from "../server/optimization/RequestPreCompiler";
 
 // ===== CORE CONFIGURATION TYPES =====
 
@@ -472,6 +473,34 @@ export interface ServerOptions {
         connectionPooling?: boolean;
         asyncWrite?: boolean;
         prefetch?: boolean;
+
+        // Ultra-performance optimization settings (optimized for ≤1ms targets)
+        ultraFastOptimization?: boolean;
+        requestClassification?: boolean;
+        predictivePreloading?: boolean;
+        aggressiveCaching?: boolean;
+        parallelProcessing?: boolean;
+
+        // RequestPreCompiler optimal settings
+        preCompilerEnabled?: boolean;
+        learningPeriod?: number; // milliseconds
+        optimizationThreshold?: number; // requests before optimization
+        aggressiveOptimization?: boolean;
+        maxCompiledRoutes?: number;
+
+        // ExecutionPredictor settings
+        ultraFastRulesEnabled?: boolean;
+        staticRouteOptimization?: boolean;
+        patternRecognitionEnabled?: boolean;
+
+        // Cache warming settings
+        cacheWarmupEnabled?: boolean;
+        warmupOnStartup?: boolean;
+        precomputeCommonResponses?: boolean;
+
+        // Custom response generators for library-agnostic system
+        customHealthData?: () => any | Promise<any>;
+        customStatusData?: () => any | Promise<any>;
     };
 
     // Monitoring configuration
@@ -497,6 +526,9 @@ export interface ServerOptions {
         urlEncodedLimit?: string;
         enableMiddleware?: boolean;
         logPerfomances?: boolean;
+        // Service identification for optimization system
+        serviceName?: string;
+        version?: string;
         // cluster?: boolean;
     };
     cluster?: {
@@ -571,6 +603,9 @@ export interface UltraFastApp extends Express {
         callback?: () => void
     ) => Promise<HttpServer> | HttpServer;
     isReady: () => boolean;
+
+    // Performance optimization methods
+    getRequestPreCompiler: () => RequestPreCompiler;
 
     // Cluster management methods (optional - only available when cluster is enabled)
     scaleUp?: (count?: number) => Promise<void>;

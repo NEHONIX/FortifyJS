@@ -278,7 +278,7 @@ export class ClusterManager
         this.state = "starting";
 
         try {
-            console.log("Starting FortifyJS cluster...");
+            console.log("Starting cluster...");
 
             // Determine if we're in master or worker process
             const clusterModule = require("cluster");
