@@ -551,28 +551,6 @@ export class FortifyJS {
         StatsTracker.getInstance().resetStats();
     }
 
-    /**
-     * Create middleware for Express.js
-     * @param options - Middleware options
-     * @returns Express middleware function
-     */
-    /**
-     * Express.js Middleware for FortifyJS
-     *
-     * Features:
-     * - CSRF Protection
-     * - Secure Headers
-     * - Rate Limiting
-     * - Tamper-Evident Logging
-     * - Customizable and extensible
-     *
-     * @param options MiddlewareOptions
-     * @returns Express middleware function
-     */
-    public static middleware(options: MiddlewareOptions = {}): any {
-        return middleware(options);
-    }
-
     // ===== ADVANCED SECURITY FEATURES =====
 
     /**

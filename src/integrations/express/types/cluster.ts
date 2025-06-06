@@ -719,3 +719,35 @@ export interface PersistentClusterState {
     timestamp: Date;
     version: string;
 }
+
+//scaling
+
+export interface ScalingDecision {
+    action: "scale-up" | "scale-down" | "no-action";
+    targetWorkers: number;
+    reason: string;
+    confidence: number;
+    metrics: {
+        cpu: number;
+        memory: number;
+        responseTime: number;
+        queueLength: number;
+    };
+}
+
+export interface ScalingHistory {
+    timestamp: Date;
+    action: "scale-up" | "scale-down";
+    fromWorkers: number;
+    toWorkers: number;
+    reason: string;
+    success: boolean;
+}
+export interface MetricsSnapshot {
+    timestamp: Date;
+    cpu: number;
+    memory: number;
+    requests: number;
+    errors: number;
+    responseTime: number;
+}

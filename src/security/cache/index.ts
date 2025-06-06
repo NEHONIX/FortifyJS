@@ -44,8 +44,16 @@ import {
     FileCacheStrategy,
 } from "./types/cache.type";
 
+// UFSIMC type definitions
+import {
+    UltraStats,
+    UltraCacheOptions,
+    UltraMemoryCacheEntry,
+} from "./types/UFSIMC.type";
+
 // Cache implementation
 import { SecureInMemoryCache } from "./useCache";
+import { UltraFastSecureInMemoryCache } from "./UFSIMC";
 
 // Configuration
 import { DEFAULT_FILE_CACHE_CONFIG } from "./config/cache.config";
@@ -184,6 +192,26 @@ export const Cache = new SecureInMemoryCache();
 export { SecureInMemoryCache };
 
 /**
+ * UltraFastSecureInMemoryCache class for ultra-high performance caching
+ *
+ * Advanced ultra-fast cache with military-grade encryption, intelligent
+ * memory management, and performance optimizations. Ideal for high-throughput
+ * applications requiring maximum performance with security.
+ *
+ * @example
+ * ```typescript
+ * import { UltraFastSecureInMemoryCache } from "fortify2-js";
+ *
+ * const ultraCache = new UltraFastSecureInMemoryCache(10000);
+ * await ultraCache.set('high-freq-data', data, { priority: 10 });
+ * const stats = ultraCache.getUltraStats;
+ * ```
+ *
+ * @since 4.2.3
+ */
+export { UltraFastSecureInMemoryCache };
+
+/**
  * FileCache class for persistent storage
  *
  * Enterprise-grade file-based cache with real disk space monitoring,
@@ -227,6 +255,9 @@ export type {
     FileCacheMetadata,
     FileCacheCleanupOptions,
     FileCacheStrategy,
+    UltraStats,
+    UltraCacheOptions,
+    UltraMemoryCacheEntry,
 };
 
 // ========================================
@@ -793,10 +824,9 @@ export const deleteFileCache = removeFileCache;
  * @since 4.2.2
  */
 const handleGracefulShutdown = () => {
-    console.log("Shutting down FortifyJS cache system gracefully...");
+    console.log("Shutting down FortifyJS CS gracefully...");
     try {
         Cache.shutdown();
-        console.log("Cache system shutdown complete");
     } catch (error) {
         console.error("Error during cache shutdown:", error);
     }

@@ -106,6 +106,9 @@ class SIMC extends EventEmitter {
             totalSize: ultraStats.memoryUsage.used,
             entryCount: ultraStats.entryCount,
             hitRate: ultraStats.hitRate,
+            totalAccesses: ultraStats.totalAccesses,
+            size: ultraStats.size,
+            capacity: ultraStats.capacity,
             memoryUsage: {
                 used: ultraStats.memoryUsage.used,
                 limit: ultraStats.memoryUsage.limit,
@@ -274,7 +277,7 @@ class SIMC extends EventEmitter {
     public shutdown(): void {
         this.ultraCache.shutdown();
         this.removeAllListeners();
-        process.exit(1)
+        process.exit(1);
     }
 }
 

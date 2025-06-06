@@ -7,14 +7,19 @@ import { EventEmitter } from "events";
 import * as cluster from "cluster";
 import * as http from "http";
 import pidusage from "pidusage";
-import { ClusterConfig, WorkerMetrics, HealthChecker } from "../types/cluster";
+import {
+    ClusterConfig,
+    WorkerMetrics,
+    HealthChecker,
+} from "../../types/cluster";
 import {
     SecurityErrorLogger,
     createSecurityError,
     ErrorType,
     ErrorSeverity,
-} from "../../../utils/errorHandler";
-import { func } from "../../../utils/fortified-function";
+} from "../../../../utils/errorHandler";
+import { func } from "../../../../utils/fortified-function";
+import { logger } from "../../server/utils/Logger";
 
 /**
  * Intelligent health monitoring with predictive analytics and auto-recovery
@@ -133,7 +138,7 @@ export class HealthMonitor extends EventEmitter {
             this.healthChecker.interval
         );
 
-        console.log(
+        logger.info( "cluster",
             `Health monitoring started (interval: ${this.healthChecker.interval}ms)`
         );
     }
@@ -147,7 +152,7 @@ export class HealthMonitor extends EventEmitter {
             this.monitoringInterval = undefined;
         }
         this.isMonitoring = false;
-        console.log("Health monitoring stopped");
+        logger.info( "cluster","Health monitoring stopped");
     }
 
     /**

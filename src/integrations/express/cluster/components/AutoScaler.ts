@@ -9,38 +9,18 @@ import { performance } from "perf_hooks";
 import pidusage from "pidusage";
 import {
     ClusterConfig,
-    WorkerMetrics,
     AutoScaler as AutoScalerInterface,
-} from "../types/cluster";
+    ScalingDecision,
+    ScalingHistory,
+} from "../../types/cluster";
 import {
     SecurityErrorLogger,
     createSecurityError,
     ErrorType,
     ErrorSeverity,
-} from "../../../utils/errorHandler";
-import { func } from "../../../utils/fortified-function";
-
-interface ScalingDecision {
-    action: "scale-up" | "scale-down" | "no-action";
-    targetWorkers: number;
-    reason: string;
-    confidence: number;
-    metrics: {
-        cpu: number;
-        memory: number;
-        responseTime: number;
-        queueLength: number;
-    };
-}
-
-interface ScalingHistory {
-    timestamp: Date;
-    action: "scale-up" | "scale-down";
-    fromWorkers: number;
-    toWorkers: number;
-    reason: string;
-    success: boolean;
-}
+} from "../../../../utils/errorHandler";
+import { func } from "../../../../utils/fortified-function";
+import { logger } from "../../server/utils/Logger";
 
 /**
  * Advanced auto-scaler with machine learning-inspired decision making
@@ -432,7 +412,8 @@ export class AutoScaler extends EventEmitter {
             // Check if we're in a runtime that supports cluster.fork (Node.js vs Bun)
             if (typeof clusterModule.fork !== "function") {
                 // Fallback for Bun or other runtimes that don't support cluster.fork
-                console.log(
+                logger.debug(
+                    "other",
                     `Runtime doesn't support cluster.fork, simulating ${actualCount} workers`
                 );
                 for (let i = 0; i < actualCount; i++) {
@@ -534,7 +515,8 @@ export class AutoScaler extends EventEmitter {
                 typeof clusterModule.workers !== "object"
             ) {
                 // Fallback for Bun or other runtimes
-                console.log(
+                logger.debug(
+                    "other",
                     `Runtime doesn't support cluster.workers, simulating scale down of ${actualCount} workers`
                 );
 
@@ -542,7 +524,8 @@ export class AutoScaler extends EventEmitter {
                 this.currentWorkerCount = targetCount;
 
                 this.emit("cluster:scaled", "scale-down", targetCount);
-                console.log(
+                logger.debug(
+                    "other",
                     `Successfully simulated scaling down to ${targetCount} workers`
                 );
                 return;
@@ -583,7 +566,8 @@ export class AutoScaler extends EventEmitter {
 
                         workerObj.once("error", (error: Error) => {
                             clearTimeout(timeout);
-                            console.warn(
+                            logger.warn(
+                                "other",
                                 `Worker ${workerObj.id} error during shutdown:`,
                                 error.message
                             );
@@ -607,7 +591,10 @@ export class AutoScaler extends EventEmitter {
             await Promise.all(stopPromises);
 
             this.emit("cluster:scaled", "scale-down", targetCount);
-            console.log(`Successfully scaled down to ${targetCount} workers`);
+            logger.debug(
+                "other",
+                `Successfully scaled down to ${targetCount} workers`
+            );
         } catch (error: any) {
             throw new Error(`Failed to scale down workers: ${error.message}`);
         }
@@ -923,7 +910,7 @@ export class AutoScaler extends EventEmitter {
     public enable(): void {
         this.autoScaler.enabled = true;
         this.startScalingEvaluation();
-        console.log("Auto-scaling enabled");
+        logger.debug("other", "Auto-scaling enabled");
     }
 
     /**
@@ -932,7 +919,7 @@ export class AutoScaler extends EventEmitter {
     public disable(): void {
         this.autoScaler.enabled = false;
         this.stopScaling();
-        console.log("Auto-scaling disabled");
+        logger.debug("other", "Auto-scaling disabled");
     }
 
     /**

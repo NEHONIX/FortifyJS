@@ -7,14 +7,15 @@ import * as cluster from "cluster";
 import * as os from "os";
 import { EventEmitter } from "events";
 import pidusage from "pidusage";
-import { ClusterConfig, WorkerMetrics, WorkerPool } from "../types/cluster";
+import { ClusterConfig, WorkerMetrics, WorkerPool } from "../../types/cluster";
 import {
     SecurityErrorLogger,
     createSecurityError,
     ErrorType,
     ErrorSeverity,
-} from "../../../utils/errorHandler";
-import { func } from "../../../utils/fortified-function";
+} from "../../../../utils/errorHandler";
+import { func } from "../../../../utils/fortified-function";
+import { logger } from "../../server/utils/Logger";
 
 /**
  * Advanced worker process manager with intelligent lifecycle management
@@ -551,7 +552,7 @@ export class WorkerManager extends EventEmitter {
             try {
                 const worker = require("cluster").fork();
                 const workerId = this.getWorkerId(worker);
-                console.log(
+                logger.info( "cluster",
                     `Started worker ${
                         i + 1
                     }/${workerCount} (ID: ${workerId}, PID: ${
@@ -654,7 +655,7 @@ export class WorkerManager extends EventEmitter {
                 const mockWorkerId = `simulated_worker_${Date.now()}_${Math.random()
                     .toString(36)
                     .substring(2, 11)}`;
-                console.log(
+                logger.info( "cluster",
                     `Runtime doesn't support cluster.fork, simulating worker: ${mockWorkerId}`
                 );
                 return mockWorkerId;

@@ -16,13 +16,13 @@ import {
     PersistenceConfig,
     PersistentClusterState,
 } from "../types/cluster";
-import { WorkerManager } from "./WorkerManager";
-import { HealthMonitor } from "./HealthMonitor";
-import { LoadBalancer } from "./LoadBalancer";
-import { IPCManager } from "./IPCManager";
-import { MetricsCollector } from "./MetricsCollector";
-import { AutoScaler } from "./AutoScaler";
-import { ClusterPersistenceManager } from "./ClusterPersistenceManager";
+import { WorkerManager } from "./components/WorkerManager";
+import { HealthMonitor } from "./components/HealthMonitor";
+import { LoadBalancer } from "./components/LoadBalancer";
+import { IPCManager } from "./components/IPCManager";
+import { MetricsCollector } from "./components/MetricsCollector";
+import { AutoScaler } from "./components/AutoScaler";
+import { ClusterPersistenceManager } from "./components/ClusterPersistenceManager";
 import {
     SecurityErrorLogger,
     createSecurityError,
@@ -30,6 +30,7 @@ import {
     ErrorSeverity,
 } from "../../../utils/errorHandler";
 import { DEFAULT_CLUSTER_CONFIGS } from "../server/const/Cluster.config";
+import { logger } from "../server/utils/Logger";
 
 /**
  *  cluster manager with comprehensive monitoring and auto-scaling
@@ -253,13 +254,13 @@ export class ClusterManager
      * Handle critical errors with recovery strategies
      */
     private async handleCriticalError(errorType: string): Promise<void> {
-        console.error(`Critical error detected: ${errorType}`);
+        logger.error( "cluster",`Critical error detected: ${errorType}`);
 
         try {
             // Attempt graceful recovery
             await this.restart();
         } catch (error) {
-            console.error("Failed to recover from critical error:", error);
+            logger.error( "cluster","Failed to recover from critical error:", error);
             process.exit(1);
         }
     }
@@ -271,20 +272,20 @@ export class ClusterManager
      */
     public async start(): Promise<void> {
         if (this.state === "running") {
-            console.log("Cluster is already running");
+            logger.debug("cluster", "Cluster is already running");
             return;
         }
 
         this.state = "starting";
 
         try {
-            console.log("Starting cluster...");
+            // logger.debug( "cluster","Starting cluster...");
 
             // Determine if we're in master or worker process
             const clusterModule = require("cluster");
 
             if (clusterModule.isMaster) {
-                console.log("Starting as cluster master process");
+                logger.debug("cluster", "Starting as cluster master process");
 
                 // Start monitoring components
                 this.healthMonitor.startMonitoring();
@@ -301,18 +302,19 @@ export class ClusterManager
                 // Setup graceful shutdown
                 this.setupGracefulShutdown();
 
-                console.log(
+                logger.debug(
+                    "cluster",
                     `Cluster master started with ${workerCount} workers`
                 );
             } else {
-                console.log(`Worker ${process.pid} started`);
+                logger.debug("cluster", `Worker ${process.pid} started`);
 
                 // Worker-specific initialization
                 this.setupWorkerProcess();
             }
 
             this.state = "running";
-            console.log("FortifyJS cluster started successfully");
+            // logger.debug( "cluster","FortifyJS cluster started successfully");
         } catch (error: any) {
             this.state = "error";
             const securityError = createSecurityError(
@@ -338,12 +340,12 @@ export class ClusterManager
 
         // Setup worker-specific error handling
         process.on("uncaughtException", (error) => {
-            console.error("Worker uncaught exception:", error);
+            logger.error( "cluster","Worker uncaught exception:", error);
             process.exit(1);
         });
 
         process.on("unhandledRejection", (reason, promise) => {
-            console.error(
+            logger.error( "cluster",
                 "Worker unhandled rejection at:",
                 promise,
                 "reason:",
@@ -367,12 +369,15 @@ export class ClusterManager
      */
     private setupGracefulShutdown(): void {
         const gracefulShutdown = async (signal: string) => {
-            console.log(`Received ${signal}, starting graceful shutdown...`);
+            logger.debug(
+                "cluster",
+                `Received ${signal}, starting graceful shutdown...`
+            );
             try {
                 await this.stop();
                 process.exit(0);
             } catch (error) {
-                console.error("Error during graceful shutdown:", error);
+                logger.error( "cluster","Error during graceful shutdown:", error);
                 process.exit(1);
             }
         };
@@ -386,14 +391,15 @@ export class ClusterManager
      */
     public async stop(graceful: boolean = true): Promise<void> {
         if (this.state === "stopped" || this.state === "stopping") {
-            console.log("Cluster is already stopped or stopping");
+            logger.debug("cluster", "Cluster is already stopped or stopping");
             return;
         }
 
         this.state = "stopping";
 
         try {
-            console.log(
+            logger.debug(
+                "cluster",
                 `Stopping cluster ${graceful ? "gracefully" : "forcefully"}...`
             );
 
@@ -409,7 +415,7 @@ export class ClusterManager
             await this.closePersistenceManager();
 
             this.state = "stopped";
-            console.log("Cluster stopped successfully");
+            logger.debug("cluster", "Cluster stopped successfully");
         } catch (error: any) {
             this.state = "error";
             const securityError = createSecurityError(
@@ -431,13 +437,16 @@ export class ClusterManager
         if (workerId) {
             // Restart specific worker using WorkerManager
             try {
-                console.log(`Restarting worker ${workerId}...`);
+                logger.debug("cluster", `Restarting worker ${workerId}...`);
 
                 // Use WorkerManager to restart the specific worker
                 const newWorkerId = await this.replaceWorker(workerId);
 
                 this.emit("worker:restarted", newWorkerId, "manual_restart");
-                console.log(`Worker ${workerId} restarted as ${newWorkerId}`);
+                logger.debug(
+                    "cluster",
+                    `Worker ${workerId} restarted as ${newWorkerId}`
+                );
             } catch (error: any) {
                 const securityError = createSecurityError(
                     `Failed to restart worker ${workerId}: ${error.message}`,
@@ -452,11 +461,11 @@ export class ClusterManager
         } else {
             // Restart entire cluster
             try {
-                console.log("Restarting entire cluster...");
+                logger.debug("cluster", "Restarting entire cluster...");
                 await this.stop(true);
                 await new Promise((resolve) => setTimeout(resolve, 2000)); // Brief pause
                 await this.start();
-                console.log("Cluster restarted successfully");
+                logger.debug("cluster", "Cluster restarted successfully");
             } catch (error: any) {
                 const securityError = createSecurityError(
                     `Failed to restart cluster: ${error.message}`,
@@ -485,7 +494,7 @@ export class ClusterManager
         this.healthMonitor.stopMonitoring();
         this.autoScaler.disable();
 
-        console.log("Cluster paused");
+        logger.debug("cluster", "Cluster paused");
     }
 
     /**
@@ -502,7 +511,7 @@ export class ClusterManager
         this.healthMonitor.startMonitoring();
         this.autoScaler.enable();
 
-        console.log("Cluster resumed");
+        logger.debug("cluster", "Cluster resumed");
     }
 
     // ===== WORKER MANAGEMENT METHODS =====
@@ -586,7 +595,7 @@ export class ClusterManager
      * Replace worker with a new one
      */
     public async replaceWorker(workerId: string): Promise<string> {
-        console.log(`Replacing worker ${workerId}...`);
+        logger.debug("cluster", `Replacing worker ${workerId}...`);
 
         // Start new worker first
         const newWorkerId = await this.addWorker();
@@ -705,7 +714,7 @@ export class ClusterManager
     public startMonitoring(): void {
         this.healthMonitor.startMonitoring();
         this.metricsCollector.startCollection();
-        console.log("Monitoring systems started");
+        logger.debug("cluster", "Monitoring systems started");
     }
 
     /**
@@ -714,7 +723,7 @@ export class ClusterManager
     public stopMonitoring(): void {
         this.healthMonitor.stopMonitoring();
         this.metricsCollector.stopCollection();
-        console.log("Monitoring systems stopped");
+        logger.debug("cluster", "Monitoring systems stopped");
     }
 
     /**
@@ -920,9 +929,15 @@ export class ClusterManager
 
             if (savedState) {
                 await this.applyRestoredState(savedState);
-                console.log(" Cluster state restored from persistent storage");
+                logger.debug(
+                    "cluster",
+                    " Cluster state restored from persistent storage"
+                );
             } else {
-                console.log("No saved cluster state found, starting fresh");
+                logger.debug(
+                    "cluster",
+                    "No saved cluster state found, starting fresh"
+                );
             }
             // if (savedState) {
             //     await this.applyRestoredState(savedState);
@@ -1028,7 +1043,7 @@ export class ClusterManager
      * Enable profiling for worker
      */
     public async enableProfiling(workerId: string): Promise<void> {
-        console.log(`Enabling profiling for worker ${workerId}`);
+        logger.debug("cluster", `Enabling profiling for worker ${workerId}`);
         await this.sendToWorker(workerId, { type: "enable_profiling" });
     }
 
@@ -1036,7 +1051,7 @@ export class ClusterManager
      * Disable profiling for worker
      */
     public async disableProfiling(workerId: string): Promise<void> {
-        console.log(`Disabling profiling for worker ${workerId}`);
+        logger.debug("cluster", `Disabling profiling for worker ${workerId}`);
         await this.sendToWorker(workerId, { type: "disable_profiling" });
     }
 
@@ -1045,7 +1060,8 @@ export class ClusterManager
      */
     public async takeHeapSnapshot(workerId: string): Promise<string> {
         const snapshotPath = `/tmp/heap-snapshot-${workerId}-${Date.now()}.heapsnapshot`;
-        console.log(
+        logger.debug(
+            "cluster",
             `Taking heap snapshot for worker ${workerId}: ${snapshotPath}`
         );
 
@@ -1065,7 +1081,8 @@ export class ClusterManager
         port?: number
     ): Promise<void> {
         const debugPort = port || 9229;
-        console.log(
+        logger.debug(
+            "cluster",
             `Enabling debug mode for worker ${workerId} on port ${debugPort}`
         );
 
@@ -1079,7 +1096,7 @@ export class ClusterManager
      * Disable debug mode for worker
      */
     public async disableDebugMode(workerId: string): Promise<void> {
-        console.log(`Disabling debug mode for worker ${workerId}`);
+        logger.debug("cluster", `Disabling debug mode for worker ${workerId}`);
         await this.sendToWorker(workerId, { type: "disable_debug" });
     }
 
@@ -1091,7 +1108,7 @@ export class ClusterManager
     public async performRollingUpdate(
         updateFn: () => Promise<void>
     ): Promise<void> {
-        console.log("Starting rolling update...");
+        logger.debug("cluster", "Starting rolling update...");
 
         const workers = this.getAllWorkers();
         const maxUnavailable =
@@ -1117,14 +1134,14 @@ export class ClusterManager
             await new Promise((resolve) => setTimeout(resolve, 5000));
         }
 
-        console.log("Rolling update completed");
+        logger.debug("cluster", "Rolling update completed");
     }
 
     /**
      * Drain worker connections
      */
     public async drainWorker(workerId: string): Promise<void> {
-        console.log(`Draining worker ${workerId}...`);
+        logger.debug("cluster", `Draining worker ${workerId}...`);
 
         await this.sendToWorker(workerId, { type: "drain_connections" });
 
@@ -1158,12 +1175,15 @@ export class ClusterManager
      */
     public async resetCircuitBreaker(workerId?: string): Promise<void> {
         if (workerId) {
-            console.log(`Resetting circuit breaker for worker ${workerId}`);
+            logger.debug(
+                "cluster",
+                `Resetting circuit breaker for worker ${workerId}`
+            );
             await this.sendToWorker(workerId, {
                 type: "reset_circuit_breaker",
             });
         } else {
-            console.log("Resetting cluster circuit breaker");
+            logger.debug("cluster", "Resetting cluster circuit breaker");
             // Reset all worker circuit breakers
             const workers = this.getAllWorkers();
             for (const worker of workers) {
@@ -1180,7 +1200,7 @@ export class ClusterManager
      * Cleanup cluster resources
      */
     public async cleanup(): Promise<void> {
-        console.log("Cleaning up cluster resources...");
+        logger.debug("cluster", "Cleaning up cluster resources...");
 
         await this.stop(true);
 
@@ -1189,21 +1209,21 @@ export class ClusterManager
         this.metricsCollector.stopCollection();
         this.autoScaler.stopScaling();
 
-        console.log("Cluster cleanup completed");
+        logger.debug("cluster", "Cluster cleanup completed");
     }
 
     /**
      * Force cleanup cluster resources
      */
     public async forceCleanup(): Promise<void> {
-        console.log("Force cleaning up cluster resources...");
+        logger.debug("cluster", "Force cleaning up cluster resources...");
 
         await this.stop(false);
 
         // Force cleanup
         this.removeAllListeners();
 
-        console.log("Force cleanup completed");
+        logger.debug("cluster", "Force cleanup completed");
     }
 
     // ===== PERSISTENCE METHODS =====
@@ -1223,7 +1243,10 @@ export class ClusterManager
         try {
             await this.persistenceManager.saveClusterState(clusterState);
         } catch (error: any) {
-            console.warn(`Failed to save cluster state: ${error.message}`);
+            logger.warn(
+                "cluster",
+                `Failed to save cluster state: ${error.message}`
+            );
             // Emit event as fallback
             this.emit("cluster:state:saved", clusterState);
         }
@@ -1242,7 +1265,10 @@ export class ClusterManager
         try {
             return await this.persistenceManager.loadClusterState();
         } catch (error: any) {
-            console.warn(`Failed to load cluster state: ${error.message}`);
+            logger.warn(
+                "cluster",
+                `Failed to load cluster state: ${error.message}`
+            );
             return null;
         }
     }
@@ -1283,10 +1309,16 @@ export class ClusterManager
                     );
                 }
 
-                console.log("✔ Restored metrics from persistent storage");
+                logger.debug(
+                    "cluster",
+                    "✔ Restored metrics from persistent storage"
+                );
             }
         } catch (error: any) {
-            console.warn(`Failed to apply restored state: ${error.message}`);
+            logger.warn(
+                "cluster",
+                `Failed to apply restored state: ${error.message}`
+            );
         }
     }
 
@@ -1300,15 +1332,20 @@ export class ClusterManager
 
             if (!existingWorker) {
                 // Worker doesn't exist, spawn a new one
-                console.log(`Spawning new worker to replace ${workerState.id}`);
+                logger.debug(
+                    "cluster",
+                    `Spawning new worker to replace ${workerState.id}`
+                );
                 await this.addWorker();
             } else {
-                console.log(
+                logger.debug(
+                    "cluster",
                     `Worker ${workerState.id} already exists and running`
                 );
             }
         } catch (error: any) {
-            console.warn(
+            logger.warn(
+                "cluster",
                 `Failed to restore worker ${workerState.id}: ${error.message}`
             );
         }

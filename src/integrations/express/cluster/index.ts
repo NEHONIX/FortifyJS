@@ -16,16 +16,16 @@ import {
     ClusterFactory,
     clusterFactory,
     createClusterForEnvironment,
-} from "./ClusterFactory";
+} from "./components/ClusterFactory";
 
 // Core cluster management
 export { ClusterManager } from "./cluster-manager";
-export { WorkerManager } from "./WorkerManager";
-export { HealthMonitor } from "./HealthMonitor";
-export { LoadBalancer } from "./LoadBalancer";
-export { IPCManager } from "./IPCManager";
-export { MetricsCollector } from "./MetricsCollector";
-export { AutoScaler } from "./AutoScaler";
+export { WorkerManager } from "./components/WorkerManager";
+export { HealthMonitor } from "./components/HealthMonitor";
+export { LoadBalancer } from "./components/LoadBalancer";
+export { IPCManager } from "./components/IPCManager";
+export { MetricsCollector } from "./components/MetricsCollector";
+export { AutoScaler } from "./components/AutoScaler";
 
 // Factory and builder patterns
 export {
@@ -37,7 +37,7 @@ export {
     createCluster,
     createClusterForEnvironment,
     buildCluster,
-} from "./ClusterFactory";
+} from "./components/ClusterFactory";
 
 // Type definitions (re-export from types)
 export type {

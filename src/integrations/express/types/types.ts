@@ -14,6 +14,7 @@ import { SecureCacheAdapter } from "../cache";
 import { Server as HttpServer } from "http";
 import { ClusterConfig } from "./cluster";
 import type { RequestPreCompiler } from "../server/optimization/RequestPreCompiler";
+import { OptimizedRoute } from "./UFOptimizer.type";
 
 // ===== CORE CONFIGURATION TYPES =====
 
@@ -22,6 +23,17 @@ export interface ServerConfig {
     port?: number;
     host?: string;
     environment?: "development" | "production" | "test";
+
+    // Auto port switching configuration
+    autoPortSwitch?: {
+        enabled?: boolean;
+        maxAttempts?: number; // Maximum number of ports to try (default: 10)
+        startPort?: number; // Starting port for auto-switching (defaults to main port)
+        portRange?: [number, number]; // Port range to search within [min, max]
+        strategy?: "increment" | "random" | "predefined"; // Port selection strategy
+        predefinedPorts?: number[]; // List of predefined ports to try
+        onPortSwitch?: (originalPort: number, newPort: number) => void; // Callback when port is switched
+    };
 
     // Security settings
     security?: SecurityConfig;
@@ -394,6 +406,171 @@ export interface RouteRateLimitConfig extends RateLimitConfig {
     skip?: (req: Request) => boolean;
 }
 
+// ===== MIDDLEWARE SYSTEM TYPES =====
+
+export type MiddlewarePriority = "critical" | "high" | "normal" | "low";
+
+export interface MiddlewareConfiguration {
+    rateLimit?: boolean | RateLimitMiddlewareOptions;
+    cors?: boolean | CorsMiddlewareOptions;
+    compression?: boolean | CompressionMiddlewareOptions;
+    security?: boolean | SecurityMiddlewareOptions;
+    helmet?: boolean;
+    customHeaders?: Record<string, string>;
+    enableOptimization?: boolean;
+    enableCaching?: boolean;
+    enablePerformanceTracking?: boolean;
+}
+
+export interface SecurityMiddlewareOptions {
+    helmet?: boolean | any;
+    cors?: boolean | CorsMiddlewareOptions;
+    rateLimit?: boolean | RateLimitMiddlewareOptions;
+    customHeaders?: Record<string, string>;
+    csrfProtection?: boolean;
+    contentSecurityPolicy?: boolean | any;
+    hsts?: boolean | any;
+}
+
+export interface CompressionMiddlewareOptions {
+    enabled?: boolean;
+    level?: number;
+    threshold?: number;
+    filter?: (req: Request, res: Response) => boolean;
+    chunkSize?: number;
+    windowBits?: number;
+    memLevel?: number;
+    strategy?: number;
+}
+
+export interface RateLimitMiddlewareOptions {
+    enabled?: boolean;
+    windowMs?: number;
+    max?: number;
+    message?: string;
+    standardHeaders?: boolean;
+    legacyHeaders?: boolean;
+    keyGenerator?: (req: Request) => string;
+    skip?: (req: Request) => boolean;
+    onLimitReached?: (req: Request, res: Response) => void;
+}
+
+export interface CorsMiddlewareOptions {
+    enabled?: boolean;
+    origin?:
+        | string
+        | string[]
+        | boolean
+        | ((
+              origin: string,
+              callback: (err: Error | null, allow?: boolean) => void
+          ) => void);
+    methods?: string[];
+    allowedHeaders?: string[];
+    exposedHeaders?: string[];
+    credentials?: boolean;
+    maxAge?: number;
+    preflightContinue?: boolean;
+    optionsSuccessStatus?: number;
+}
+
+export interface MiddlewareInfo {
+    name: string;
+    priority: MiddlewarePriority;
+    enabled: boolean;
+    order: number;
+    routes?: string[];
+    executionCount: number;
+    averageExecutionTime: number;
+    lastExecuted?: Date;
+    cacheEnabled?: boolean;
+    optimized?: boolean;
+}
+
+export interface MiddlewareStats {
+    totalMiddleware: number;
+    enabledMiddleware: number;
+    totalExecutions: number;
+    averageExecutionTime: number;
+    cacheHitRate: number;
+    optimizationRate: number;
+    byPriority: Record<MiddlewarePriority, number>;
+    byType: Record<string, MiddlewareInfo>;
+    performance: {
+        fastestMiddleware: string;
+        slowestMiddleware: string;
+        mostUsedMiddleware: string;
+        cacheEfficiency: number;
+    };
+}
+
+export interface CustomMiddleware {
+    name: string;
+    handler: RequestHandler;
+    priority?: MiddlewarePriority;
+    routes?: string[];
+    enabled?: boolean;
+    cacheable?: boolean;
+    ttl?: number;
+    metadata?: Record<string, any>;
+}
+
+export interface MiddlewareExecutionContext {
+    requestId: string;
+    startTime: number;
+    middleware: MiddlewareInfo;
+    req: Request;
+    res: Response;
+    cached?: boolean;
+    optimized?: boolean;
+    executionPath: "critical" | "fast" | "standard";
+}
+
+export interface MiddlewareManager {
+    register: (
+        middleware: CustomMiddleware | RequestHandler,
+        options?: {
+            name?: string;
+            priority?: MiddlewarePriority;
+            routes?: string[];
+            cacheable?: boolean;
+            ttl?: number;
+        }
+    ) => string; // Returns middleware ID
+    unregister: (id: string) => boolean;
+    enable: (id: string) => boolean;
+    disable: (id: string) => boolean;
+    getInfo: (id?: string) => MiddlewareInfo | MiddlewareInfo[];
+    getStats: () => MiddlewareStats;
+    clear: () => void;
+    optimize: () => Promise<void>;
+    createCacheMiddleware: (options?: {
+        ttl?: number;
+        keyGenerator?: (req: any) => string;
+    }) => RequestHandler;
+}
+
+export interface MiddlewareAPIInterface {
+    register: (
+        middleware: CustomMiddleware | RequestHandler,
+        options?: {
+            name?: string;
+            priority?: MiddlewarePriority;
+            routes?: string[];
+            cacheable?: boolean;
+            ttl?: number;
+        }
+    ) => MiddlewareAPIInterface;
+    unregister: (id: string) => MiddlewareAPIInterface;
+    enable: (id: string) => MiddlewareAPIInterface;
+    disable: (id: string) => MiddlewareAPIInterface;
+    getInfo: (id?: string) => MiddlewareInfo | MiddlewareInfo[];
+    getStats: () => MiddlewareStats;
+    getConfig: () => MiddlewareConfiguration;
+    clear: () => MiddlewareAPIInterface;
+    optimize: () => Promise<MiddlewareAPIInterface>;
+}
+
 export interface CompressionConfig {
     enabled?: boolean;
     level?: number;
@@ -474,8 +651,8 @@ export interface ServerOptions {
         asyncWrite?: boolean;
         prefetch?: boolean;
 
-        // Ultra-performance optimization settings (optimized for ≤1ms targets)
-        ultraFastOptimization?: boolean;
+        // Ultra-performance optimization settings (optimized for ≤7ms targets)
+        optimizationEnabled?: boolean;
         requestClassification?: boolean;
         predictivePreloading?: boolean;
         aggressiveCaching?: boolean;
@@ -530,6 +707,17 @@ export interface ServerOptions {
         serviceName?: string;
         version?: string;
         // cluster?: boolean;
+
+        // Auto port switching configuration
+        autoPortSwitch?: {
+            enabled?: boolean;
+            maxAttempts?: number; // Maximum number of ports to try (default: 10)
+            startPort?: number; // Starting port for auto-switching (defaults to main port)
+            portRange?: [number, number]; // Port range to search within [min, max]
+            strategy?: "increment" | "random" | "predefined"; // Port selection strategy
+            predefinedPorts?: number[]; // List of predefined ports to try
+            onPortSwitch?: (originalPort: number, newPort: number) => void; // Callback when port is switched
+        };
     };
     cluster?: {
         enabled?: boolean;
@@ -547,6 +735,57 @@ export interface ServerOptions {
         maxRestarts?: number;
         gracefulShutdown?: boolean;
         verbose?: boolean;
+    };
+
+    // Middleware configuration
+    middleware?: MiddlewareConfiguration;
+
+    // Logging configuration
+    logging?: {
+        enabled?: boolean; // Master switch for all logging (default: true)
+        level?: "silent" | "error" | "warn" | "info" | "debug" | "verbose"; // Log level (default: "info")
+
+        // Component-specific logging controls
+        components?: {
+            server?: boolean; // Server startup/shutdown logs
+            cache?: boolean; // Cache initialization and operations
+            cluster?: boolean; // Cluster management logs
+            performance?: boolean; // Performance optimization logs
+            fileWatcher?: boolean; // File watcher logs
+            plugins?: boolean; // Plugin system logs
+            security?: boolean; // Security warnings and logs
+            monitoring?: boolean; // Monitoring and metrics logs
+            routes?: boolean; // Route compilation and handling logs
+            other?: boolean;
+            middleware?: boolean;
+        };
+
+        // Specific log type controls
+        types?: {
+            startup?: boolean; // Component initialization logs
+            warnings?: boolean; // Warning messages (like UFSIMC warnings)
+            errors?: boolean; // Error messages (always shown unless silent)
+            performance?: boolean; // Performance measurements
+            debug?: boolean; // Debug information
+            hotReload?: boolean; // Hot reload notifications
+            portSwitching?: boolean; // Auto port switching logs
+        };
+
+        // Output formatting
+        format?: {
+            timestamps?: boolean; // Show timestamps (default: false)
+            colors?: boolean; // Use colors in output (default: true)
+            prefix?: boolean; // Show component prefixes (default: true)
+            compact?: boolean; // Use compact format (default: false)
+        };
+
+        // Custom logger function
+        customLogger?: (
+            level: string,
+            component: string,
+            message: string,
+            ...args: any[]
+        ) => void;
     };
 }
 
@@ -569,6 +808,104 @@ export interface RouteOptions {
         compression?: boolean;
         timeout?: number;
     };
+}
+
+// Port management types
+export type RedirectMode = "transparent" | "message" | "redirect";
+
+export interface RedirectStats {
+    totalRequests: number;
+    successfulRedirects: number;
+    failedRedirects: number;
+    averageResponseTime: number;
+    lastRequestTime?: Date;
+    startTime: Date;
+    uptime: number;
+    requestTimes: number[];
+}
+
+export interface RedirectOptions {
+    /**
+     * Redirect behavior mode
+     * - transparent: Proxy requests seamlessly (default)
+     * - message: Show custom message with new URL
+     * - redirect: Send HTTP 301/302 redirect responses
+     */
+    mode?: RedirectMode;
+
+    /**
+     * Custom message to display when mode is 'message'
+     */
+    customMessage?: string;
+
+    /**
+     * HTTP status code for redirect mode (301 or 302)
+     */
+    redirectStatusCode?: 301 | 302;
+
+    /**
+     * Enable/disable redirect logging
+     */
+    enableLogging?: boolean;
+
+    /**
+     * Enable/disable usage statistics tracking
+     */
+    enableStats?: boolean;
+
+    /**
+     * Auto-disconnect after specified time (in milliseconds)
+     */
+    autoDisconnectAfter?: number;
+
+    /**
+     * Auto-disconnect after specified number of requests
+     */
+    autoDisconnectAfterRequests?: number;
+
+    /**
+     * Custom response headers to add to all responses
+     */
+    customHeaders?: Record<string, string>;
+
+    /**
+     * Custom HTML template for message mode
+     */
+    customHtmlTemplate?: string;
+
+    /**
+     * Timeout for proxy requests in milliseconds
+     */
+    proxyTimeout?: number;
+
+    /**
+     * Enable CORS headers for cross-origin requests
+     */
+    enableCors?: boolean;
+
+    /**
+     * Custom error message for failed redirects
+     */
+    customErrorMessage?: string;
+
+    /**
+     * Rate limiting for redirect requests
+     */
+    rateLimit?: {
+        maxRequests: number;
+        windowMs: number;
+    };
+}
+
+export interface RedirectServerInstance {
+    fromPort: number;
+    toPort: number;
+    options: RedirectOptions;
+    server: any;
+    stats: RedirectStats;
+    disconnect: () => Promise<boolean>;
+    getStats: () => RedirectStats;
+    updateOptions: (newOptions: Partial<RedirectOptions>) => void;
 }
 
 export interface UltraFastApp extends Express {
@@ -604,8 +941,48 @@ export interface UltraFastApp extends Express {
     ) => Promise<HttpServer> | HttpServer;
     isReady: () => boolean;
 
+    // Port management methods
+    getPort: () => number;
+    forceClosePort: (port: number) => Promise<boolean>;
+    redirectFromPort: (
+        fromPort: number,
+        toPort: number,
+        options?: RedirectOptions
+    ) => Promise<RedirectServerInstance | boolean>;
+
+    // Advanced redirect management methods
+    getRedirectInstance: (fromPort: number) => RedirectServerInstance | null;
+    getAllRedirectInstances: () => RedirectServerInstance[];
+    disconnectRedirect: (fromPort: number) => Promise<boolean>;
+    disconnectAllRedirects: () => Promise<boolean>;
+    getRedirectStats: (fromPort: number) => RedirectStats | null;
+
     // Performance optimization methods
     getRequestPreCompiler: () => RequestPreCompiler;
+
+    // Ultra-fast optimization methods
+    registerRouteTemplate?: (template: OptimizedRoute) => void;
+    unregisterRouteTemplate?: (route: string | RegExp, method?: string) => void;
+    registerOptimizationPattern?: (pattern: OptimizedRoute) => void;
+    getOptimizerStats?: () => any;
+
+    // Middleware management methods
+    middleware: (config?: MiddlewareConfiguration) => MiddlewareAPIInterface;
+    useSecure: (middleware: RequestHandler | RequestHandler[]) => UltraFastApp;
+    usePerformance: (
+        middleware: RequestHandler | RequestHandler[]
+    ) => UltraFastApp;
+    useCached: (
+        middleware: RequestHandler | RequestHandler[],
+        ttl?: number
+    ) => UltraFastApp;
+    getMiddleware: (name?: string) => MiddlewareInfo | MiddlewareInfo[];
+    removeMiddleware: (name: string) => boolean;
+    enableSecurity: (options?: SecurityMiddlewareOptions) => UltraFastApp;
+    enableCompression: (options?: CompressionMiddlewareOptions) => UltraFastApp;
+    enableRateLimit: (options?: RateLimitMiddlewareOptions) => UltraFastApp;
+    enableCors: (options?: CorsMiddlewareOptions) => UltraFastApp;
+    getMiddlewareStats: () => MiddlewareStats;
 
     // Cluster management methods (optional - only available when cluster is enabled)
     scaleUp?: (count?: number) => Promise<void>;

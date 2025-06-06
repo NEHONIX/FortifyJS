@@ -8,14 +8,15 @@ import * as cluster from "cluster";
 import * as crypto from "crypto";
 import * as msgpack from "msgpack-lite";
 import stringify from "fast-json-stable-stringify";
-import { ClusterConfig } from "../types/cluster";
+import { ClusterConfig } from "../../types/cluster";
 import {
     SecurityErrorLogger,
     createSecurityError,
     ErrorType,
     ErrorSeverity,
-} from "../../../utils/errorHandler";
-import { func } from "../../../utils/fortified-function";
+} from "../../../../utils/errorHandler";
+import { func } from "../../../../utils/fortified-function";
+import { logger } from "../../server/utils/Logger";
 
 interface IPCMessage {
     id: string;
@@ -86,7 +87,10 @@ export class IPCManager extends EventEmitter {
         // Initialize message queues for workers
         this.initializeMessageQueues();
 
-        console.log("IPC Manager initialized with secure communication");
+        logger.info(
+            "cluster",
+            "IPC Manager initialized with secure communication"
+        );
     }
 
     /**
@@ -181,7 +185,7 @@ export class IPCManager extends EventEmitter {
                 if (this.looksLikeFortifyMessage(deserializedMessage)) {
                     // Debug logging to understand what messages are failing
                     if (process.env.DEBUG_IPC) {
-                        console.log("🔍 Invalid FortifyJS message:", {
+                        logger.info("cluster", "Invalid FortifyJS message:", {
                             original: message,
                             deserialized: deserializedMessage,
                             hasId: !!deserializedMessage?.id,

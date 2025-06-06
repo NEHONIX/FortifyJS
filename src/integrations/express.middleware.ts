@@ -228,3 +228,4 @@ export function middleware(options: MiddlewareOptions = {}): any {
 type Req = any;
 type Res = any;
 type Next = any;
+

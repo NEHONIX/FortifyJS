@@ -5,17 +5,15 @@
 
 import { EventEmitter } from "events";
 import * as os from "os";
-import { ClusterConfig, WorkerMetrics, ClusterMetrics } from "../types/cluster";
-import { func } from "../../../utils/fortified-function";
+import {
+    ClusterConfig,
+    WorkerMetrics,
+    ClusterMetrics,
+    MetricsSnapshot,
+} from "../../types/cluster";
+import { func } from "../../../../utils/fortified-function";
+import { logger } from "../../server/utils/Logger";
 
-interface MetricsSnapshot {
-    timestamp: Date;
-    cpu: number;
-    memory: number;
-    requests: number;
-    errors: number;
-    responseTime: number;
-}
 
 /**
  * Comprehensive metrics collector with real-time monitoring and analytics
@@ -117,7 +115,7 @@ export class MetricsCollector extends EventEmitter {
             });
         }, interval);
 
-        console.log(`Metrics collection started (interval: ${interval}ms)`);
+        logger.info( "cluster",`Metrics collection started (interval: ${interval}ms)`);
     }
 
     /**
@@ -129,7 +127,7 @@ export class MetricsCollector extends EventEmitter {
             this.collectionInterval = undefined;
         }
         this.isCollecting = false;
-        console.log("Metrics collection stopped");
+        logger.info( "cluster","Metrics collection stopped");
     }
 
     /**
@@ -229,7 +227,7 @@ export class MetricsCollector extends EventEmitter {
                 try {
                     const value = metricFunction(worker.workerId);
                     // Store custom metric (could be extended to store in worker metrics)
-                    console.log(
+                    logger.info( "cluster",
                         `Custom metric ${metricName} for ${worker.workerId}: ${value}`
                     );
                 } catch (error) {
@@ -653,7 +651,7 @@ export class MetricsCollector extends EventEmitter {
             clusterHistory.splice(0, clusterHistory.length - 1000);
         }
 
-        console.log(
+        logger.info( "cluster",
             `Restored ${newSnapshots.length} historical metrics snapshots`
         );
     }
@@ -710,7 +708,7 @@ export class MetricsCollector extends EventEmitter {
             }
         }
 
-        console.log(
+        logger.info( "cluster",
             `Restored historical data for ${workerHistory.size} workers`
         );
     }

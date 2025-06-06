@@ -4,7 +4,7 @@
  * High-performance JWT authentication plugin leveraging FortifyJS security utilities
  * with <2ms execution time for token validation and user authentication.
  */
-
+ 
 import { SecurityPlugin } from "../core/SecurityPlugin";
 import {
     PluginPriority,

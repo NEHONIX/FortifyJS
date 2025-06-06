@@ -38,7 +38,7 @@ import express, {
     Request,
     NextFunction,
     RequestHandler,
-} from "express"; 
+} from "express";
 import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
@@ -53,7 +53,7 @@ import {
 
 // Re-export types for external use
 export type { ServerOptions, ServerConfig, RouteOptions, UltraFastApp };
-import { UltraFastServer } from "./server/FastApi";
+import { UltraFastServer } from "./server/FastServer";
 
 /**
  * Create ultra-fast Express server (zero-async)
@@ -108,7 +108,7 @@ function generateCacheKey(
 /**
  * Create cache middleware for routes
  */
-function createCacheMiddleware(
+export function createCacheMiddleware(
     cache: SecureCacheAdapter,
     options: RouteOptions = {}
 ): RequestHandler {
@@ -226,226 +226,5 @@ export async function UFSMiddleware(app: UltraFastApp, options: ServerOptions) {
     );
 
     // Performance tracking middleware
-}
-
-/**
- * Add enhanced methods to Express app
- */
-function addEnhancedMethods(
-    app: UltraFastApp,
-    cache: SecureCacheAdapter,
-    options: ServerOptions
-) {
-    // console.log("Adding enhanced methods...");
-
-    // Enhanced GET with caching
-    app.getWithCache = function (
-        path: string,
-        routeOptions: RouteOptions,
-        handler: RequestHandler
-    ) {
-        const cacheMiddleware = createCacheMiddleware(cache, routeOptions);
-        this.get(path, cacheMiddleware, handler);
-    };
-
-    // Enhanced POST with cache invalidation
-    app.postWithCache = function (
-        path: string,
-        routeOptions: RouteOptions,
-        handler: RequestHandler
-    ) {
-        const wrappedHandler: RequestHandler = async (req, res, next) => {
-            try {
-                await handler(req, res, next);
-
-                // Invalidate cache if specified
-                if (routeOptions.cache?.invalidateOn) {
-                    // Use tags for invalidation since pattern invalidation isn't available
-                    await cache.invalidateByTags(
-                        routeOptions.cache.invalidateOn
-                    );
-                }
-            } catch (error: any) {
-                next(error);
-            }
-        };
-
-        this.post(path, wrappedHandler);
-    };
-
-    // Enhanced PUT with cache invalidation
-    app.putWithCache = function (
-        path: string,
-        routeOptions: RouteOptions,
-        handler: RequestHandler
-    ) {
-        const wrappedHandler: RequestHandler = async (req, res, next) => {
-            try {
-                await handler(req, res, next);
-
-                // Invalidate cache if specified
-                if (routeOptions.cache?.invalidateOn) {
-                    await cache.invalidateByTags(
-                        routeOptions.cache.invalidateOn
-                    );
-                }
-            } catch (error: any) {
-                next(error);
-            }
-        };
-
-        this.put(path, wrappedHandler);
-    };
-
-    // Enhanced DELETE with cache invalidation
-    app.deleteWithCache = function (
-        path: string,
-        routeOptions: RouteOptions,
-        handler: RequestHandler
-    ) {
-        const wrappedHandler: RequestHandler = async (req, res, next) => {
-            try {
-                await handler(req, res, next);
-
-                // Invalidate cache if specified
-                if (routeOptions.cache?.invalidateOn) {
-                    await cache.invalidateByTags(
-                        routeOptions.cache.invalidateOn
-                    );
-                }
-            } catch (error: any) {
-                next(error);
-            }
-        };
-
-        this.delete(path, wrappedHandler);
-    };
-
-    // Cache management methods
-    app.invalidateCache = async function (pattern: string) {
-        // Use tags for invalidation since pattern invalidation isn't available
-        await cache.invalidateByTags([pattern]);
-    };
-
-    app.getCacheStats = async function () {
-        return await cache.getStats();
-    };
-
-    app.warmUpCache = async function (
-        data: Array<{ key: string; value: any; ttl?: number }>
-    ) {
-        await CacheUtils.warmUp(cache, data);
-    };
-
-    console.log("Enhanced methods added");
-}
-
-/**
- * Add monitoring endpoints
- */
-function addMonitoringEndpoints(app: Express, cache: SecureCacheAdapter) {
-    console.log("Adding monitoring endpoints...");
-    const basePoint = "/fortify";
-
-    // Health check endpoint
-    app.get(basePoint + "/health", async (req, res) => {
-        try {
-            const health = cache.getHealth();
-            const stats = await cache.getStats();
-
-            const healthStatus = {
-                status: health.status,
-                timestamp: new Date().toISOString(),
-                uptime: process.uptime(),
-                cache: {
-                    connected: health.details.redisConnected || true,
-                    hitRate: stats.memory.hitRate,
-                    memoryUsage: stats.memory.memoryUsage?.percentage || 0,
-                    operations: stats.performance.totalOperations,
-                },
-                performance: {
-                    averageResponseTime: stats.performance.averageResponseTime,
-                    totalOperations: stats.performance.totalOperations,
-                    networkLatency: stats.performance.networkLatency,
-                },
-            };
-
-            const statusCode =
-                health.status === "healthy"
-                    ? 200
-                    : health.status === "degraded"
-                    ? 200
-                    : 503;
-
-            res.status(statusCode).json(healthStatus);
-        } catch (error: any) {
-            res.status(503).json({
-                status: "unhealthy",
-                error: error.message,
-                timestamp: new Date().toISOString(),
-            });
-        }
-    });
-
-    // Cache statistics endpoint
-    app.get(basePoint + "/health/cache", async (req, res) => {
-        try {
-            const stats = await cache.getStats();
-            res.json({
-                timestamp: new Date().toISOString(),
-                cache: stats,
-            });
-        } catch (error: any) {
-            res.status(500).json({
-                error: "Failed to get cache statistics",
-                message: error.message,
-            });
-        }
-    });
-
-    // Cache management endpoints
-    app.post(basePoint + "/admin/cache/clear", async (req, res) => {
-        try {
-            await cache.clear();
-            res.json({
-                success: true,
-                message: "Cache cleared successfully",
-                timestamp: new Date().toISOString(),
-            });
-        } catch (error: any) {
-            res.status(500).json({
-                success: false,
-                error: error.message,
-            });
-        }
-    });
-
-    app.post(basePoint + "/admin/cache/invalidate", async (req, res) => {
-        try {
-            const { tags } = req.body;
-            if (tags && Array.isArray(tags)) {
-                await cache.invalidateByTags(tags);
-                res.json({
-                    success: true,
-                    message: `Invalidated cache entries with tags: ${tags.join(
-                        ", "
-                    )}`,
-                    tags,
-                });
-            } else {
-                res.status(400).json({
-                    success: false,
-                    error: "Tags array is required",
-                });
-            }
-        } catch (error: any) {
-            res.status(500).json({
-                success: false,
-                error: error.message,
-            });
-        }
-    });
-
-    console.log("Monitoring endpoints added");
 }
 

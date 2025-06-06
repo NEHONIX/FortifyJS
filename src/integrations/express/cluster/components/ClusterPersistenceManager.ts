@@ -6,13 +6,14 @@
 import { EventEmitter } from "events";
 import { existsSync } from "fs";
 import { join } from "path";
-import { func } from "../../../utils/fortified-function";
-import { PersistenceConfig, PersistentClusterState } from "../types/cluster";
-import { FileCache } from "../../../security/cache/cacheSys";
-import { Cache } from "../../../security/cache";
-import { SecureCacheAdapter as SCA } from "../cache";
-import { FileCacheOptions } from "../../../security/cache/types/cache.type";
-
+import { func } from "../../../../utils/fortified-function";
+import { PersistenceConfig, PersistentClusterState } from "../../types/cluster";
+import { FileCache } from "../../../../security/cache/cacheSys";
+import { Cache } from "../../../../security/cache";
+import { SecureCacheAdapter as SCA } from "../../cache";
+import { FileCacheOptions } from "../../../../security/cache/types/cache.type";
+import { logger } from "../../server/utils/Logger";
+ 
 //SCA = SecureCacheAdapter
 
 export class ClusterPersistenceManager extends EventEmitter {
@@ -44,7 +45,7 @@ export class ClusterPersistenceManager extends EventEmitter {
                     await this.initializeMemoryStorage();
                     break;
                 case "custom":
-                    console.log("Using custom persistence handlers");
+                    logger.info( "cluster","Using custom persistence handlers");
                     break;
                 default:
                     throw new Error(
@@ -52,7 +53,7 @@ export class ClusterPersistenceManager extends EventEmitter {
                     );
             }
 
-            console.log(
+            logger.info( "cluster",
                 `Cluster persistence initialized (${this.config.type})`
             );
         } catch (error: any) {
@@ -104,7 +105,7 @@ export class ClusterPersistenceManager extends EventEmitter {
                 },
             });
 
-            console.log(
+            logger.info( "cluster",
                 `Redis storage initialized with SCA: ${redisConfig.host}:${redisConfig.port}`
             );
         } catch (error: any) {
@@ -135,7 +136,7 @@ export class ClusterPersistenceManager extends EventEmitter {
 
         this.fileCache = new FileCache(cacheOptions);
 
-        console.log(
+        logger.info( "cluster",
             `File storage initialized with FileCache: ${fileConfig.path}`
         );
     }
@@ -154,7 +155,7 @@ export class ClusterPersistenceManager extends EventEmitter {
             this.cleanupMemoryStorage();
         }, 60000); // Every minute
 
-        console.log(
+        logger.info( "cluster",
             `Memory storage initialized (max: ${memoryConfig.maxSize} entries)`
         );
     }
@@ -245,7 +246,7 @@ export class ClusterPersistenceManager extends EventEmitter {
         // Use SCA for ultra-fast, secure Redis operations
         await this.SCA.set(key, state, { ttl });
 
-        console.log("✔ Cluster state saved to Redis using SCA");
+        logger.info( "cluster","✔ Cluster state saved to Redis using SCA");
     }
 
     /**
@@ -261,7 +262,7 @@ export class ClusterPersistenceManager extends EventEmitter {
             const data = await this.SCA.get(key);
 
             if (data) {
-                console.log("✔ Cluster state loaded from Redis using SCA");
+                logger.info( "cluster","✔ Cluster state loaded from Redis using SCA");
                 return data as PersistentClusterState;
             }
 
@@ -287,7 +288,7 @@ export class ClusterPersistenceManager extends EventEmitter {
             ttl: 0, // No expiration for cluster state
         });
 
-        console.log("✔ Cluster state saved using FileCache");
+        logger.info( "cluster","✔ Cluster state saved using FileCache");
     }
 
     /**
@@ -303,7 +304,7 @@ export class ClusterPersistenceManager extends EventEmitter {
             const cachedData = await this.fileCache.get(cacheKey);
 
             if (cachedData && cachedData.data) {
-                console.log("✔ Cluster state loaded from FileCache");
+                logger.info( "cluster","✔ Cluster state loaded from FileCache");
                 return cachedData.data as PersistentClusterState;
             }
 
@@ -330,7 +331,7 @@ export class ClusterPersistenceManager extends EventEmitter {
             compress: true,
         });
 
-        console.log("✔ Cluster state saved to secure memory cache");
+        logger.info( "cluster","✔ Cluster state saved to secure memory cache");
     }
 
     /**
@@ -343,7 +344,7 @@ export class ClusterPersistenceManager extends EventEmitter {
             const cachedData = await this.memoryCache.get(key);
 
             if (cachedData) {
-                console.log("✔ Cluster state loaded from secure memory cache");
+                logger.info( "cluster","✔ Cluster state loaded from secure memory cache");
                 return cachedData as PersistentClusterState;
             }
 
@@ -367,7 +368,7 @@ export class ClusterPersistenceManager extends EventEmitter {
             // FileCache has built-in cleanup mechanisms
             // We can trigger cache cleanup and get stats
             const stats = await this.fileCache.getStats();
-            console.log(
+            logger.info( "cluster",
                 `✔ Cache cleanup completed. Current cache files: ${stats.fileCount}, Total size: ${stats.totalSize} bytes`
             );
         } catch (error) {
@@ -383,7 +384,7 @@ export class ClusterPersistenceManager extends EventEmitter {
             // FortifyJS Cache handles TTL and size limits automatically
             // We can get stats to monitor cache health
             const stats = this.memoryCache.getStats;
-            console.log(
+            logger.info( "cluster",
                 `✔ Memory cache cleanup completed. Hit rate: ${stats.hitRate}%, Entries: ${stats.entryCount}`
             );
         } catch (error) {
@@ -518,7 +519,7 @@ export class ClusterPersistenceManager extends EventEmitter {
                 await this.fileCache.clear();
             }
 
-            console.log(
+            logger.info( "cluster",
                 "✔ Cluster persistence manager closed with all cache systems cleaned up"
             );
         } catch (error) {

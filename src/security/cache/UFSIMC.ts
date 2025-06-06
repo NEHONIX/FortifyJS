@@ -14,154 +14,17 @@ import {
     MemoryCacheEntry,
 } from "./types/cache.type";
 import { CONFIG } from "./config/cache.config";
+import { FastLRU } from "./FastLRU";
+import type {
+    UltraStats,
+    UltraCacheOptions,
+    UltraMemoryCacheEntry,
+} from "./types/UFSIMC.type";
 
-// Performance-optimized data structures
-class FastLRU {
-    private capacity: number;
-    private size = 0;
-    private head: LRUNode;
-    private tail: LRUNode;
-    private map = new Map<string, LRUNode>();
-
-    constructor(capacity: number) {
-        this.capacity = capacity;
-        this.head = new LRUNode("", null);
-        this.tail = new LRUNode("", null);
-        this.head.next = this.tail;
-        this.tail.prev = this.head;
-    }
-
-    get(key: string): LRUNode | undefined {
-        const node = this.map.get(key);
-        if (node) {
-            this.moveToHead(node);
-            return node;
-        }
-        return undefined;
-    }
-
-    put(
-        key: string,
-        entry: MemoryCacheEntry | UltraMemoryCacheEntry
-    ): LRUNode | null {
-        const existingNode = this.map.get(key);
-        if (existingNode) {
-            existingNode.entry = entry;
-            this.moveToHead(existingNode);
-            return null;
-        }
-
-        const newNode = new LRUNode(key, entry);
-        this.map.set(key, newNode);
-        this.addToHead(newNode);
-        this.size++;
-
-        if (this.size > this.capacity) {
-            const tail = this.removeTail();
-            if (tail) {
-                this.map.delete(tail.key);
-                this.size--;
-                return tail;
-            }
-        }
-        return null;
-    }
-
-    delete(key: string): boolean {
-        const node = this.map.get(key);
-        if (node) {
-            this.removeNode(node);
-            this.map.delete(key);
-            this.size--;
-            return true;
-        }
-        return false;
-    }
-
-    clear(): void {
-        this.map.clear();
-        this.size = 0;
-        this.head.next = this.tail;
-        this.tail.prev = this.head;
-    }
-
-    private addToHead(node: LRUNode): void {
-        node.prev = this.head;
-        node.next = this.head.next;
-        this.head.next!.prev = node;
-        this.head.next = node;
-    }
-
-    private removeNode(node: LRUNode): void {
-        node.prev!.next = node.next;
-        node.next!.prev = node.prev;
-    }
-
-    private moveToHead(node: LRUNode): void {
-        this.removeNode(node);
-        this.addToHead(node);
-    }
-
-    private removeTail(): LRUNode | null {
-        const lastNode = this.tail.prev;
-        if (lastNode && lastNode !== this.head) {
-            this.removeNode(lastNode);
-            return lastNode;
-        }
-        return null;
-    }
-
-    getKeys(): string[] {
-        return Array.from(this.map.keys());
-    }
-
-    getSize(): number {
-        return this.size;
-    }
-}
-
-class LRUNode {
-    key: string;
-    entry: MemoryCacheEntry | UltraMemoryCacheEntry | null;
-    prev: LRUNode | null = null;
-    next: LRUNode | null = null;
-
-    constructor(
-        key: string,
-        entry: MemoryCacheEntry | UltraMemoryCacheEntry | null
-    ) {
-        this.key = key;
-        this.entry = entry;
-    }
-}
-
-// Enhanced cache entry with performance optimizations
-interface UltraMemoryCacheEntry extends MemoryCacheEntry {
-    hotness: number; // Access frequency score
-    priority: number; // User-defined priority
-    tags: Set<string>; // For tag-based operations
-    metadata: Record<string, any>; // User metadata
-    checksum: string; // Data integrity check
-}
-
-// Advanced cache options
-interface UltraCacheOptions extends CacheOptions {
-    priority?: number; // 1-10, higher = more important
-    tags?: string[]; // Tags for grouping/batch operations
-    metadata?: Record<string, any>; // User-defined metadata
-    skipEncryption?: boolean; // For performance-critical data
-    skipCompression?: boolean; // Skip compression for small data
-    onEvict?: (key: string, value: CachedData) => void; // Eviction callback
-}
-
-// Performance metrics
-interface UltraStats extends CacheStats {
-    averageAccessTime: number;
-    compressionRatio: number;
-    encryptionOverhead: number;
-    hotKeys: string[];
-    coldKeys: string[];
-    tagStats: Map<string, number>;
+// Simple logger interface for UFSIMC
+interface SimpleLogger {
+    warn(component: string, message: string, ...args: any[]): void;
+    securityWarning(message: string, ...args: any[]): void;
 }
 
 /**
@@ -189,6 +52,9 @@ class UFSIMC extends EventEmitter {
             limit: CONFIG.MAX_CACHE_SIZE_MB * 1024 * 1024,
             percentage: 0,
         },
+        totalAccesses: 0,
+        size: 0,
+        capacity: CONFIG.MAX_ENTRIES,
         averageAccessTime: 0,
         compressionRatio: 0,
         encryptionOverhead: 0,
@@ -216,8 +82,15 @@ class UFSIMC extends EventEmitter {
     private integrityCheck = true;
     private anomalyThreshold = 1000;
 
-    constructor(maxEntries: number = CONFIG.MAX_ENTRIES) {
+    // Logger instance
+    private logger?: SimpleLogger;
+
+    constructor(
+        maxEntries: number = CONFIG.MAX_ENTRIES,
+        logger?: SimpleLogger
+    ) {
         super();
+        this.logger = logger;
         this.lru = new FastLRU(maxEntries);
         this.initializeEncryption();
         this.startMaintenanceTasks();
@@ -282,11 +155,15 @@ class UFSIMC extends EventEmitter {
                     "sha256"
                 );
             } else {
-                console.warn(
-                    "UFSIMC-WARNING: Using generated key. For production, set ENV variables: ENC_SECRET_KEY or (ENC_SECRET_SEED and ENC_SECRET_SALT)"
-                );
+                const warningMsg =
+                    "UFSIMC-WARNING: Using generated key. For production, set ENV variables: ENC_SECRET_KEY or (ENC_SECRET_SEED and ENC_SECRET_SALT)";
+                if (this.logger) {
+                    this.logger.securityWarning(warningMsg);
+                } else {
+                    console.warn(warningMsg);
+                }
                 this.encryptionKey = SecureRandom.getRandomBytes(
-                    CONFIG.KEY_LENGTH 
+                    CONFIG.KEY_LENGTH
                 ).getBuffer();
             }
 
@@ -362,7 +239,11 @@ class UFSIMC extends EventEmitter {
                 return { data: compressedString, compressed: true, ratio };
             }
         } catch (error) {
-            console.warn("Compression failed:", error);
+            if (this.logger) {
+                this.logger.warn("cache", "Compression failed:", error);
+            } else {
+                console.warn("Compression failed:", error);
+            }
         }
 
         return { data, compressed: false, ratio: 1 };
@@ -564,15 +445,27 @@ class UFSIMC extends EventEmitter {
             };
 
             // Handle eviction with callback
-            const evictedNode = this.lru.put(hashedKey, entry);
-            if (evictedNode?.entry && options.onEvict) {
+            const evictedEntry = this.lru.put(hashedKey, entry);
+            if (evictedEntry && options.onEvict) {
                 try {
                     const evictedData = await this.decryptAndDecompress(
-                        evictedNode.entry
+                        evictedEntry as UltraMemoryCacheEntry
                     );
-                    options.onEvict(evictedNode.key, JSON.parse(evictedData));
+                    // Find the original key for the evicted entry
+                    const originalKey = this.findOriginalKey(hashedKey);
+                    if (originalKey) {
+                        options.onEvict(originalKey, JSON.parse(evictedData));
+                    }
                 } catch (error) {
-                    console.warn("Eviction callback failed:", error);
+                    if (this.logger) {
+                        this.logger.warn(
+                            "cache",
+                            "Eviction callback failed:",
+                            error
+                        );
+                    } else {
+                        console.warn("Eviction callback failed:", error);
+                    }
                 }
             }
 
@@ -590,7 +483,7 @@ class UFSIMC extends EventEmitter {
             }
 
             // Update stats
-            this.updateStatsAfterSet(entry.size, evictedNode ? 1 : 0);
+            this.updateStatsAfterSet(entry.size, evictedEntry ? 1 : 0);
             this.recordAccessTime(startTime);
 
             return true;
@@ -608,7 +501,7 @@ class UFSIMC extends EventEmitter {
 
         try {
             const hashedKey = this.validateAndHashKey(key);
-            const node = this.lru.get(hashedKey);
+            const node = this.lru.getNode(hashedKey);
 
             if (!node?.entry) {
                 this.stats.misses++;
@@ -771,7 +664,7 @@ class UFSIMC extends EventEmitter {
         const keys = this.lru.getKeys();
 
         for (const hashedKey of keys) {
-            const node = this.lru.get(hashedKey);
+            const node = this.lru.getNode(hashedKey);
             if (node?.entry) {
                 try {
                     const decrypted = await this.decryptAndDecompress(
@@ -786,11 +679,23 @@ class UFSIMC extends EventEmitter {
                             tags: Array.from(
                                 (node.entry as UltraMemoryCacheEntry).tags
                             ),
-                            expiresAt: node.entry.expiresAt,
+                            expiresAt: (node.entry as UltraMemoryCacheEntry)
+                                .expiresAt,
                         };
                     }
                 } catch (error) {
-                    console.warn(`Failed to export key ${hashedKey}:`, error);
+                    if (this.logger) {
+                        this.logger.warn(
+                            "cache",
+                            `Failed to export key ${hashedKey}:`,
+                            error
+                        );
+                    } else {
+                        console.warn(
+                            `Failed to export key ${hashedKey}:`,
+                            error
+                        );
+                    }
                 }
             }
         }
@@ -851,7 +756,7 @@ class UFSIMC extends EventEmitter {
         const keyHotness: Array<{ key: string; hotness: number }> = [];
 
         for (const hashedKey of keys) {
-            const node = this.lru.get(hashedKey);
+            const node = this.lru.getNode(hashedKey);
             if (node?.entry) {
                 const entry = node.entry as UltraMemoryCacheEntry;
                 const originalKey = this.findOriginalKey(hashedKey);
@@ -873,7 +778,7 @@ class UFSIMC extends EventEmitter {
         // Move hot items to higher priority
         const keys = this.lru.getKeys();
         for (const hashedKey of keys) {
-            const node = this.lru.get(hashedKey);
+            const node = this.lru.getNode(hashedKey);
             if (node?.entry) {
                 const entry = node.entry as UltraMemoryCacheEntry;
                 if (entry.hotness > 50 && entry.priority < 8) {
@@ -887,7 +792,7 @@ class UFSIMC extends EventEmitter {
         // Gradually reduce hotness to identify truly hot vs temporarily hot items
         const keys = this.lru.getKeys();
         for (const hashedKey of keys) {
-            const node = this.lru.get(hashedKey);
+            const node = this.lru.getNode(hashedKey);
             if (node?.entry) {
                 const entry = node.entry as UltraMemoryCacheEntry;
                 entry.hotness = Math.max(0, entry.hotness * 0.9);
@@ -985,8 +890,11 @@ class UFSIMC extends EventEmitter {
         let cleaned = 0;
 
         for (const hashedKey of keys) {
-            const node = this.lru.get(hashedKey);
-            if (node?.entry && now > node.entry.expiresAt) {
+            const node = this.lru.getNode(hashedKey);
+            if (
+                node?.entry &&
+                now > (node.entry as UltraMemoryCacheEntry).expiresAt
+            ) {
                 const entry = node.entry as UltraMemoryCacheEntry;
                 this.lru.delete(hashedKey);
                 this.cleanupIndexes(hashedKey, entry);
@@ -1009,7 +917,7 @@ class UFSIMC extends EventEmitter {
             let processed = 0;
 
             for (const hashedKey of keys) {
-                const node = this.lru.get(hashedKey);
+                const node = this.lru.getNode(hashedKey);
                 if (!node?.entry) continue;
 
                 const entry = node.entry as UltraMemoryCacheEntry;
@@ -1097,7 +1005,7 @@ class UFSIMC extends EventEmitter {
             for (const hashedKey of keys) {
                 if (this.stats.totalSize <= targetSize) break;
 
-                const node = this.lru.get(hashedKey);
+                const node = this.lru.getNode(hashedKey);
                 if (node?.entry) {
                     const entry = node.entry as UltraMemoryCacheEntry;
                     if (entry.hotness < 10) {
@@ -1232,7 +1140,7 @@ class UFSIMC extends EventEmitter {
         const keys = this.lru.getKeys();
 
         for (const hashedKey of keys) {
-            const node = this.lru.get(hashedKey);
+            const node = this.lru.getNode(hashedKey);
             if (!node?.entry) continue;
 
             const entry = node.entry as UltraMemoryCacheEntry;
@@ -1253,7 +1161,18 @@ class UFSIMC extends EventEmitter {
                         prefetched++;
                     }
                 } catch (error) {
-                    console.warn(`Prefetch failed for ${originalKey}:`, error);
+                    if (this.logger) {
+                        this.logger.warn(
+                            "cache",
+                            `Prefetch failed for ${originalKey}:`,
+                            error
+                        );
+                    } else {
+                        console.warn(
+                            `Prefetch failed for ${originalKey}:`,
+                            error
+                        );
+                    }
                 }
             }
         }
@@ -1277,7 +1196,7 @@ class UFSIMC extends EventEmitter {
         const keys = this.lru.getKeys().slice(0, 100); // Sample first 100 entries
 
         for (const hashedKey of keys) {
-            const node = this.lru.get(hashedKey);
+            const node = this.lru.getNode(hashedKey);
             if (node?.entry) {
                 const entry = node.entry as UltraMemoryCacheEntry;
                 const originalKey = this.findOriginalKey(hashedKey);
@@ -1311,7 +1230,7 @@ class UFSIMC extends EventEmitter {
         const keys = this.lru.getKeys();
 
         for (const hashedKey of keys) {
-            const node = this.lru.get(hashedKey);
+            const node = this.lru.getNode(hashedKey);
             if (!node?.entry) continue;
 
             const entry = node.entry as UltraMemoryCacheEntry;
@@ -1342,7 +1261,7 @@ class UFSIMC extends EventEmitter {
     public delete(key: string): boolean {
         try {
             const hashedKey = this.validateAndHashKey(key);
-            const node = this.lru.get(hashedKey);
+            const node = this.lru.getNode(hashedKey);
 
             if (node?.entry) {
                 const entry = node.entry as UltraMemoryCacheEntry;
@@ -1385,11 +1304,11 @@ class UFSIMC extends EventEmitter {
     public has(key: string): boolean {
         try {
             const hashedKey = this.validateAndHashKey(key);
-            const node = this.lru.get(hashedKey);
+            const node = this.lru.getNode(hashedKey);
 
             if (!node?.entry) return false;
 
-            if (Date.now() > node.entry.expiresAt) {
+            if (Date.now() > (node.entry as UltraMemoryCacheEntry).expiresAt) {
                 this.delete(key);
                 return false;
             }
@@ -1423,6 +1342,9 @@ class UFSIMC extends EventEmitter {
                 limit: CONFIG.MAX_CACHE_SIZE_MB * 1024 * 1024,
                 percentage: 0,
             },
+            totalAccesses: 0,
+            size: 0,
+            capacity: CONFIG.MAX_ENTRIES,
             averageAccessTime: 0,
             compressionRatio: 0,
             encryptionOverhead: 0,

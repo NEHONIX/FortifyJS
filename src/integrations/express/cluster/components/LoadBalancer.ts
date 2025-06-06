@@ -14,7 +14,8 @@ import {
     WorkerPerformanceMetrics,
     LoadBalancingStrategy,
     CircuitBreakerState,
-} from "../types/cluster";
+} from "../../types/cluster";
+import { logger } from "../../server/utils/Logger";
 
 /**
  * Advanced load balancer with multiple strategies and intelligent routing
@@ -947,7 +948,7 @@ export class LoadBalancer extends EventEmitter {
         // Recalculate adaptive weights
         this.updateAdaptiveWeights();
 
-        console.log(
+        logger.info( "cluster",
             `Load redistributed across workers using ${this.loadBalancer.strategy} strategy`
         );
         this.emit("load:redistributed", {
@@ -1464,7 +1465,7 @@ export class LoadBalancer extends EventEmitter {
 
         this.removeAllListeners();
 
-        console.log(" Load Balancer destroyed");
+        logger.info( "cluster"," Load Balancer destroyed");
     }
 }
 

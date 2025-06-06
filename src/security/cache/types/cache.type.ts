@@ -26,6 +26,9 @@ export interface CacheStats {
         limit: number;
         percentage: number;
     };
+    totalAccesses: number;
+    size: number;
+    capacity: number;
 }
 
 export interface CacheOptions {
@@ -50,7 +53,7 @@ export type SecurityEvent =
  * Options for file-based cache operations
  */
 export interface FileCacheOptions extends CacheOptions {
-    maxCacheSize: number
+    maxCacheSize: number;
     /** Directory to store cache files (default: .data/cache) */
     directory?: string;
     /** File extension for cache files (default: .cache) */

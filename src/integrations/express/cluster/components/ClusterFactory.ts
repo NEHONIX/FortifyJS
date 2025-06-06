@@ -10,9 +10,9 @@ import {
     ClusterFactory as ClusterFactoryInterface,
     ClusterBuilder,
     ClusterBuilderFactory,
-} from "../types/cluster";
-import { ClusterManager } from "./cluster-manager";
-
+} from "../../types/cluster";
+import { ClusterManager } from "../cluster-manager";
+ 
 /**
  * Factory for creating cluster managers with intelligent configuration
  */

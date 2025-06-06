@@ -26,8 +26,8 @@ export const DEFAULT_OPTIONS: ServerOptions = {
         connectionPooling: true,
         asyncWrite: true,
         prefetch: true,
-        // Ultra-performance optimization settings (optimized for ≤1ms targets)
-        ultraFastOptimization: true,
+        // Ultra-performance optimization settings (optimized for ≤7ms targets)
+        optimizationEnabled: true,
         requestClassification: true,
         predictivePreloading: true,
         aggressiveCaching: true,
@@ -60,11 +60,46 @@ export const DEFAULT_OPTIONS: ServerOptions = {
         },
     },
     server: {
-        port: 3000,
+        enableMiddleware: true,
+        port: 8085,
         host: "localhost",
         trustProxy: false,
         jsonLimit: "10mb",
         urlEncodedLimit: "10mb",
+        autoPortSwitch: {
+            enabled: false,
+            maxAttempts: 10,
+            strategy: "random",
+        },
     },
     fileWatcher: DEFAULT_FW_CONFIG,
+    logging: {
+        components: {
+            server: true,
+            cache: false, // Disable cache logs
+            cluster: true,
+            performance: false, // Disable performance logs
+            fileWatcher: true,
+            plugins: false, // Disable plugin logs
+            security: false, // Disable security warnings
+            monitoring: false,
+            routes: false,
+            middleware: false,
+        },
+        types: {
+            startup: true,
+            warnings: false, // No UFSIMC warnings!
+            errors: true,
+            performance: false,
+            debug: false,
+            hotReload: true,
+            portSwitching: true,
+        },
+        format: {
+            prefix: true,
+            colors: true,
+            compact: false,
+            timestamps: false,
+        },
+    },
 };
