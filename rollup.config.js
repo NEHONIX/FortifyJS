@@ -24,6 +24,8 @@ export default [
         plugins: [
             resolve({
                 preferBuiltins: true, // Prefer Node.js built-ins
+                browser: false, // Target Node.js
+                exportConditions: ["node"], // Use Node.js exports
             }),
             commonjs(),
             json(),
@@ -43,21 +45,53 @@ export default [
                 ],
             }),
         ],
-        external: [
-            ...Object.keys(pkg.dependencies || {}),
-            ...Object.keys(pkg.peerDependencies || {}),
-            // Add Node.js built-ins
-            "crypto",
-            "fs",
-            "path",
-            "os",
-            "http",
-            "https",
-            "events",
-            "stream",
-            "buffer",
-            "util",
-        ],
+        external: (id) => {
+            // Make ALL dependencies external (don't bundle them)
+            if (id.includes("node_modules")) return true;
+            if (
+                Object.keys(pkg.dependencies || {}).some(
+                    (dep) => id === dep || id.startsWith(dep + "/")
+                )
+            )
+                return true;
+            if (
+                Object.keys(pkg.peerDependencies || {}).some(
+                    (dep) => id === dep || id.startsWith(dep + "/")
+                )
+            )
+                return true;
+
+            // Node.js built-ins
+            const builtins = [
+                "crypto",
+                "fs",
+                "path",
+                "os",
+                "http",
+                "https",
+                "events",
+                "stream",
+                "buffer",
+                "util",
+                "url",
+                "querystring",
+                "zlib",
+                "child_process",
+                "cluster",
+                "dgram",
+                "dns",
+                "net",
+                "tls",
+                "readline",
+                "repl",
+                "vm",
+                "worker_threads",
+                "perf_hooks",
+            ];
+            if (builtins.includes(id)) return true;
+
+            return false;
+        },
     },
     // CommonJS build - Modular output
     {
@@ -71,9 +105,11 @@ export default [
             preserveModules: true, // Keep modular structure
             preserveModulesRoot: "src", // Preserve src structure
         },
-        plugins: [
+        plugins: [ 
             resolve({
                 preferBuiltins: true, // Prefer Node.js built-ins
+                browser: false, // Target Node.js
+                exportConditions: ["node"], // Use Node.js exports
             }),
             commonjs(),
             json(),
@@ -93,21 +129,53 @@ export default [
                 ],
             }),
         ],
-        external: [
-            ...Object.keys(pkg.dependencies || {}),
-            ...Object.keys(pkg.peerDependencies || {}),
-            // Add Node.js built-ins
-            "crypto",
-            "fs",
-            "path",
-            "os",
-            "http",
-            "https",
-            "events",
-            "stream",
-            "buffer",
-            "util",
-        ],
+        external: (id) => {
+            // Make ALL dependencies external (don't bundle them)
+            if (id.includes("node_modules")) return true;
+            if (
+                Object.keys(pkg.dependencies || {}).some(
+                    (dep) => id === dep || id.startsWith(dep + "/")
+                )
+            )
+                return true;
+            if (
+                Object.keys(pkg.peerDependencies || {}).some(
+                    (dep) => id === dep || id.startsWith(dep + "/")
+                )
+            )
+                return true;
+
+            // Node.js built-ins
+            const builtins = [
+                "crypto",
+                "fs",
+                "path",
+                "os",
+                "http",
+                "https",
+                "events",
+                "stream",
+                "buffer",
+                "util",
+                "url",
+                "querystring",
+                "zlib",
+                "child_process",
+                "cluster",
+                "dgram",
+                "dns",
+                "net",
+                "tls",
+                "readline",
+                "repl",
+                "vm",
+                "worker_threads",
+                "perf_hooks",
+            ];
+            if (builtins.includes(id)) return true;
+
+            return false;
+        },
     },
     // TypeScript declarations
     {

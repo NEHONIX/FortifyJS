@@ -1,2 +1,113 @@
-private
-react
+# Development files
+src/
+tests/
+test/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+private/
+react/
+
+# Build tools & configs
+tsconfig.json
+tsconfig.*.json
+webpack.config.js
+rollup.config.js
+vite.config.js
+esbuild.config.js
+.babelrc
+.eslintrc*
+.prettierrc*
+
+# Development dependencies
+node_modules/
+.npm/
+.yarn/
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+azure-pipelines.yml
+
+# Documentation source
+docs/
+documentation/
+*.md.backup
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory
+coverage/
+.nyc_output/
+
+# Cache directories
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+.eslintcache
+
+# Environment files
+.env*
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Backup files
+*.backup
+*.bak
+*.back.txt
+
+# Development scripts
+scripts/dev/
+scripts/test/
+
+# Example/demo files
+examples/
+demo/
+benchmarks/
+perf/
+
+# Build artifacts to exclude
+dist/test/
+dist/tests/
+dist/examples/
+dist/benchmarks/
+dist/private/
+dist/**/*.map
+dist/**/*.d.ts.map
