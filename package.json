@@ -1,9 +1,9 @@
 {
     "name": "fortify2-js",
-    "version": "4.5.0",
+    "version": "4.5.2",
     "description": "MOST POWERFUL JavaScript Security Library! Military-grade cryptography + 19 enhanced object methods + quantum-resistant algorithms + perfect TypeScript support. More powerful than Lodash with built-in security.",
-    "main": "./dist/index.cjs",
-    "module": "./dist/index.esm.js",
+    "main": "./dist/cjs/index.js",
+    "module": "./dist/esm/index.js",
     "types": "./dist/index.d.ts",
     "type": "module",
     "files": [
@@ -12,7 +12,8 @@
         "LICENSE"
     ],
     "scripts": {
-        "build": "rollup -c rollup.config.js",
+        "build": "node --max-old-space-size=4096 node_modules/rollup/dist/bin/rollup -c rollup.config.js",
+        "build:memory": "node --max-old-space-size=6144 node_modules/rollup/dist/bin/rollup -c rollup.config.js",
         "dev": "rollup -c rollup.config.js -w",
         "test": "jest",
         "test:watch": "jest --watch",
@@ -28,8 +29,8 @@
     },
     "exports": {
         ".": {
-            "import": "./dist/index.esm.js",
-            "require": "./dist/index.cjs",
+            "import": "./dist/esm/index.js",
+            "require": "./dist/cjs/index.js",
             "types": "./dist/index.d.ts"
         },
         "./package.json": "./package.json"
@@ -37,6 +38,14 @@
     "keywords": [
         "javascript",
         "typescript",
+        "server",
+        "fast server",
+        "express",
+        "express js",
+        "javascript server",
+        "typescript server",
+        "ts server",
+        "js server",
         "security",
         "cryptography",
         "object-enhancement",
@@ -86,6 +95,9 @@
         "post-quantum",
         "buffer",
         "logging",
+        "console-interception",
+        "log-export",
+        "silent-logging",
         "audit",
         "compliance",
         "observability",
@@ -226,3 +238,4 @@
         "ws": "^8.18.2"
     }
 }
+

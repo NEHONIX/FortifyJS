@@ -10,23 +10,32 @@ const pkg = JSON.parse(
 );
 
 export default [
-    // ESM build
+    // ESM build - Modular output
     {
         input: "src/index.ts",
         output: {
-            file: "dist/index.esm.js",
+            dir: "dist/esm",
             format: "es",
             sourcemap: true,
             exports: "named",
-            inlineDynamicImports: true, // Inline dynamic imports to avoid chunking
+            preserveModules: true, // Keep modular structure
+            preserveModulesRoot: "src", // Preserve src structure
         },
         plugins: [
-            resolve(),
+            resolve({
+                preferBuiltins: true, // Prefer Node.js built-ins
+            }),
             commonjs(),
             json(),
             typescript({
                 tsconfig: "./tsconfig.json",
+                declaration: false, // We'll generate declarations separately
+                declarationMap: false, // Disable declaration maps
+                outDir: undefined, // Let Rollup handle output directory
                 exclude: [
+                    "/private/**",
+                    "**/private/*",
+                    "src/integrations/react/**/*",
                     "**/private/**/*",
                     "**/node_modules/**/*",
                     "**/*.test.ts",
@@ -37,27 +46,46 @@ export default [
         external: [
             ...Object.keys(pkg.dependencies || {}),
             ...Object.keys(pkg.peerDependencies || {}),
+            // Add Node.js built-ins
+            "crypto",
+            "fs",
+            "path",
+            "os",
+            "http",
+            "https",
+            "events",
+            "stream",
+            "buffer",
+            "util",
         ],
     },
-    // CommonJS build - Fixed configuration
+    // CommonJS build - Modular output
     {
         input: "src/index.ts",
         output: {
-            file: "dist/index.cjs",
+            dir: "dist/cjs",
             format: "cjs",
             sourcemap: true,
-            exports: "auto", // Changed from "named" to "auto"
-            esModule: false, // Added to ensure proper CJS behavior
-            inlineDynamicImports: true, // Inline dynamic imports to avoid chunking
+            exports: "auto",
+            esModule: false,
+            preserveModules: true, // Keep modular structure
+            preserveModulesRoot: "src", // Preserve src structure
         },
         plugins: [
-            resolve(),
+            resolve({
+                preferBuiltins: true, // Prefer Node.js built-ins
+            }),
             commonjs(),
             json(),
             typescript({
                 tsconfig: "./tsconfig.json",
                 declaration: false, // Prevent duplicate declarations
+                declarationMap: false, // Disable declaration maps
+                outDir: undefined, // Let Rollup handle output directory
                 exclude: [
+                    "/private/**",
+                    "**/private/*",
+                    "src/integrations/react/**/*",
                     "**/private/**/*",
                     "**/node_modules/**/*",
                     "**/*.test.ts",
@@ -68,6 +96,17 @@ export default [
         external: [
             ...Object.keys(pkg.dependencies || {}),
             ...Object.keys(pkg.peerDependencies || {}),
+            // Add Node.js built-ins
+            "crypto",
+            "fs",
+            "path",
+            "os",
+            "http",
+            "https",
+            "events",
+            "stream",
+            "buffer",
+            "util",
         ],
     },
     // TypeScript declarations

@@ -1,3 +1,4 @@
+// this file was auto created while testing FW
 
 interface User {
     id: number;
