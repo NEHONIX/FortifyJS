@@ -3,11 +3,34 @@ import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import json from "@rollup/plugin-json";
 import dts from "rollup-plugin-dts";
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { dirname } from "path";
 
 const pkg = JSON.parse(
     readFileSync(new URL("./package.json", import.meta.url), "utf8")
 );
+
+// Plugin to copy package.json files for proper module resolution
+function copyPackageJson(type, dir) {
+    return {
+        name: "copy-package-json",
+        generateBundle() {
+            const packageJsonContent = JSON.stringify({ type }, null, 2);
+            const outputPath = `${dir}/package.json`;
+
+            try {
+                mkdirSync(dirname(outputPath), { recursive: true });
+                writeFileSync(outputPath, packageJsonContent);
+                console.log(`✅ Created ${outputPath} with type: ${type}`);
+            } catch (error) {
+                console.warn(
+                    `⚠️ Failed to create ${outputPath}:`,
+                    error.message
+                );
+            }
+        },
+    };
+}
 
 export default [
     // ESM build - Modular output
@@ -44,6 +67,7 @@ export default [
                     "**/*.spec.ts",
                 ],
             }),
+            copyPackageJson("module", "dist/esm"),
         ],
         external: (id) => {
             // Make ALL dependencies external (don't bundle them)
@@ -105,7 +129,7 @@ export default [
             preserveModules: true, // Keep modular structure
             preserveModulesRoot: "src", // Preserve src structure
         },
-        plugins: [ 
+        plugins: [
             resolve({
                 preferBuiltins: true, // Prefer Node.js built-ins
                 browser: false, // Target Node.js
@@ -128,6 +152,7 @@ export default [
                     "**/*.spec.ts",
                 ],
             }),
+            copyPackageJson("commonjs", "dist/cjs"),
         ],
         external: (id) => {
             // Make ALL dependencies external (don't bundle them)

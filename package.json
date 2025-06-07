@@ -1,6 +1,6 @@
 {
     "name": "fortify2-js",
-    "version": "4.5.3",
+    "version": "4.5.4",
     "description": "MOST POWERFUL JavaScript Security Library! Military-grade cryptography + 19 enhanced object methods + quantum-resistant algorithms + perfect TypeScript support. More powerful than Lodash with built-in security.",
     "main": "./dist/cjs/index.js",
     "module": "./dist/esm/index.js",
@@ -8,7 +8,9 @@
     "type": "module",
     "files": [
         "dist/cjs/index.js",
+        "dist/cjs/package.json",
         "dist/esm/index.js",
+        "dist/esm/package.json",
         "dist/index.d.ts",
         "dist/cjs/core",
         "dist/cjs/security",
@@ -41,9 +43,20 @@
     },
     "exports": {
         ".": {
-            "import": "./dist/esm/index.js",
-            "require": "./dist/cjs/index.js",
-            "types": "./dist/index.d.ts"
+            "types": "./dist/index.d.ts",
+            "import": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/esm/index.js"
+            },
+            "require": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/cjs/index.js"
+            },
+            "node": {
+                "import": "./dist/esm/index.js",
+                "require": "./dist/cjs/index.js"
+            },
+            "default": "./dist/cjs/index.js"
         },
         "./package.json": "./package.json"
     },
