@@ -738,7 +738,7 @@ export interface ServerOptions {
     };
     cluster?: {
         enabled?: boolean;
-        config?: DeepPartial<Omit<ClusterConfig, "enabled">>;
+        config?: Omit<ClusterConfig, "enabled">;
     };
 
     // File watcher configuration for auto-reload
@@ -1132,5 +1132,6 @@ export interface UltraFastApp extends Express {
     initializeBuiltinPlugins?: () => Promise<void>;
     getServerStats?: () => Promise<any>;
 }
+
 
 

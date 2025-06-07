@@ -28,7 +28,8 @@
     "exclude": [
         "node_modules",
         "dist",
-        "/private//*",
+        "/private/**",
+        "**/private/*",
         "src/integrations/react/**/*",
         "**/*.test.ts",
         "**/*.spec.ts"
