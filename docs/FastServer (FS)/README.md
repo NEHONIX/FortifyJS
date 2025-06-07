@@ -1,4 +1,4 @@
-# FastServer Documentation
+#Fortify FastServer (FFS)Documentation
 
 ## Overview
 
@@ -15,6 +15,7 @@ FastServer (FS) is a high-performance Express.js server implementation built on 
 -   **Port Management**: Get running port, force close ports, and set up redirections
 -   **Hot Reload**: Development-friendly file watching with instant restarts
 -   **Comprehensive Logging**: Granular logging control with component-specific settings
+-   **🆕 Enhanced Console Interception**: Advanced console output control with multiple display modes
 -   **Security**: Built-in encryption, rate limiting, and security monitoring
 -   **Modular Architecture**: Component-based design for maintainability and extensibility
 
@@ -36,6 +37,15 @@ const app = createServer({
     cache: {
         enabled: true,
         strategy: "memory",
+    },
+    logging: {
+        consoleInterception: {
+            enabled: true,
+            preserveOriginal: {
+                mode: "both", // Show both original and intercepted logs
+                customPrefix: "[MYAPP]",
+            },
+        },
     },
 });
 
@@ -67,6 +77,8 @@ console.log(`Server running on port: ${app.getPort()}`);
 // await app.redirectFromPort(3001, app.getPort());  // Redirect traffic
 ```
 
+-   For full documentation see [port-management.md](./port-management.md)
+
 ## Documentation Structure
 
 ### Core Documentation
@@ -83,6 +95,7 @@ console.log(`Server running on port: ${app.getPort()}`);
 -   [Clustering](./clustering.md) - Auto-scaling cluster management
 -   [Performance Optimization](./performance.md) - Ultra-fast performance tuning
 -   [Logging System](./logging.md) - Granular logging control system
+-   [Console Interception](./console/console-interception.md) - Advanced console output control
 
 ### Practical Examples
 

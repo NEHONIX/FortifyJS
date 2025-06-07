@@ -1,6 +1,4 @@
 ```ts
-import { createServer, func, Hash } from "fortify2-js";
-
 const app = createServer({
     performance: {
         optimizationEnabled: true,

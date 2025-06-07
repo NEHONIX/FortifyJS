@@ -17,6 +17,7 @@ import { PortManager, PortSwitchResult } from "./utils/PortManager";
 import { Logger, initializeLogger } from "./utils/Logger";
 import { MiddlewareManager } from "./components/fastapi/middlewares/middlewareManager";
 import { RedirectManager } from "./components/fastapi/RedirectManager";
+import { ConsoleInterceptor } from "./components/fastapi/console/ConsoleInterceptor";
 import { Port } from "./utils/forceClosePort";
 
 /**
@@ -44,6 +45,7 @@ export class UltraFastServer {
     private clusterManager!: ClusterManagerComponent;
     private fileWatcherManager!: FileWatcherManager;
     private redirectManager!: RedirectManager;
+    private consoleInterceptor!: ConsoleInterceptor;
 
     constructor(
         userOptions: ServerOptions = {
@@ -72,6 +74,7 @@ export class UltraFastServer {
         this.routeManager.addMethods();
         this.monitoringManager.addMonitoringEndpoints();
         this.addStartMethod();
+        this.addConsoleInterceptionMethods();
 
         // Initialize cache in background
         this.initPromise = this.cacheManager.initializeCache();
@@ -211,6 +214,21 @@ export class UltraFastServer {
         // Initialize RedirectManager (lightweight component)
         this.redirectManager = new RedirectManager(this.logger);
 
+        // Initialize ConsoleInterceptor (logging enhancement)
+        this.consoleInterceptor = new ConsoleInterceptor(
+            this.logger,
+            this.options.logging
+        );
+
+        // Start console interception if enabled
+        if (this.options.logging?.consoleInterception?.enabled) {
+            this.consoleInterceptor.start();
+            this.logger.info(
+                "console",
+                "Console interception system activated"
+            );
+        }
+
         // Add file watcher monitoring endpoints if enabled
         if (this.options.fileWatcher?.enabled) {
             this.fileWatcherManager.addFileWatcherMonitoringEndpoints(
@@ -229,17 +247,25 @@ export class UltraFastServer {
     }
 
     /**
-     * Check if cache is fully initialized
-     */
-    public isReady(): boolean {
-        return this.ready;
-    }
-
-    /**
-     * Wait for full initialization
+     * Wait for full initialization (cache, console interceptor, and all components)
      */
     public async waitForReady(): Promise<void> {
+        // Wait for cache initialization
         await this.initPromise;
+
+        // Wait for console interceptor to be ready if enabled
+        if (
+            this.options.logging?.consoleInterception?.enabled &&
+            this.consoleInterceptor
+        ) {
+            // Give console interceptor a moment to fully initialize
+            await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+
+        // Mark as ready
+        this.ready = true;
+
+        this.logger.debug("server", "All components initialized and ready");
     }
 
     /**
@@ -247,6 +273,13 @@ export class UltraFastServer {
      */
     public getRequestPreCompiler() {
         return this.performanceManager.getRequestPreCompiler();
+    }
+
+    /**
+     * Get the ConsoleInterceptor instance for configuration
+     */
+    public getConsoleInterceptor() {
+        return this.consoleInterceptor;
     }
 
     /**
@@ -456,12 +489,19 @@ export class UltraFastServer {
                                         } workers`
                                     );
 
-                                    // Start file watcher if enabled (child process only)
+                                    // Start file watcher if enabled
                                     if (
-                                        this.fileWatcherManager.getFileWatcher() &&
-                                        !this.fileWatcherManager.isInMainProcess()
+                                        this.fileWatcherManager.getFileWatcher()
                                     ) {
-                                        await this.fileWatcherManager.startFileWatcher();
+                                        if (
+                                            this.fileWatcherManager.isInMainProcess()
+                                        ) {
+                                            // Main process: start with hot reload
+                                            await this.fileWatcherManager.startFileWatcherWithHotReload();
+                                        } else {
+                                            // Child process: start regular file watcher
+                                            await this.fileWatcherManager.startFileWatcher();
+                                        }
                                     }
 
                                     if (callback) callback();
@@ -513,12 +553,15 @@ export class UltraFastServer {
                     // Set HTTP server reference for file watcher restarts
                     this.fileWatcherManager.setHttpServer(this.httpServer);
 
-                    // Start file watcher if enabled (child process only)
-                    if (
-                        this.fileWatcherManager.getFileWatcher() &&
-                        !this.fileWatcherManager.isInMainProcess()
-                    ) {
-                        await this.fileWatcherManager.startFileWatcher();
+                    // Start file watcher if enabled
+                    if (this.fileWatcherManager.getFileWatcher()) {
+                        if (this.fileWatcherManager.isInMainProcess()) {
+                            // Main process: start with hot reload
+                            await this.fileWatcherManager.startFileWatcherWithHotReload();
+                        } else {
+                            // Child process: start regular file watcher
+                            await this.fileWatcherManager.startFileWatcher();
+                        }
                     }
 
                     if (callback) callback();
@@ -528,7 +571,7 @@ export class UltraFastServer {
             return this.httpServer;
         };
 
-        this.app.isReady = () => this.ready;
+        this.app.waitForReady = () => this.waitForReady();
 
         // Add port management methods
         this.app.getPort = () => this.getPort();
@@ -697,6 +740,135 @@ export class UltraFastServer {
             },
             cluster: await this.clusterManager.getClusterStats(),
             fileWatcher: this.getFileWatcherStats(),
+        };
+    }
+
+    // ===== CONSOLE INTERCEPTION METHODS =====
+
+    /**
+     * Add console interception methods to the Express app
+     */
+    private addConsoleInterceptionMethods(): void {
+        // Get console interceptor instance
+        this.app.getConsoleInterceptor = () => {
+            return this.consoleInterceptor;
+        };
+
+        // Enable console interception
+        this.app.enableConsoleInterception = () => {
+            this.consoleInterceptor.start();
+        };
+
+        // Disable console interception
+        this.app.disableConsoleInterception = () => {
+            this.consoleInterceptor.stop();
+        };
+
+        // Get console interception statistics
+        this.app.getConsoleStats = () => {
+            return this.consoleInterceptor.getStats();
+        };
+
+        // Reset console interception statistics
+        this.app.resetConsoleStats = () => {
+            this.consoleInterceptor.resetStats();
+        };
+
+        // File watcher methods
+        this.app.getFileWatcherStatus = () => {
+            return this.getFileWatcherStatus();
+        };
+
+        this.app.getFileWatcherStats = () => {
+            return this.getFileWatcherStats();
+        };
+
+        this.app.stopFileWatcher = async () => {
+            return await this.stopFileWatcher();
+        };
+
+        // TypeScript checking methods
+        this.app.checkTypeScript = async (files?: string[]) => {
+            return await this.fileWatcherManager.checkTypeScript(files);
+        };
+
+        this.app.getTypeScriptStatus = () => {
+            return this.fileWatcherManager.getTypeScriptStatus();
+        };
+
+        this.app.enableTypeScriptChecking = () => {
+            this.fileWatcherManager.enableTypeScriptChecking();
+        };
+
+        this.app.disableTypeScriptChecking = () => {
+            this.fileWatcherManager.disableTypeScriptChecking();
+        };
+
+        // TypeScript checking methods
+        this.app.checkTypeScript = async (files?: string[]) => {
+            return await this.fileWatcherManager.checkTypeScript(files);
+        };
+
+        this.app.getTypeScriptStatus = () => {
+            return this.fileWatcherManager.getTypeScriptStatus();
+        };
+
+        this.app.enableTypeScriptChecking = () => {
+            this.fileWatcherManager.enableTypeScriptChecking();
+        };
+
+        this.app.disableTypeScriptChecking = () => {
+            this.fileWatcherManager.disableTypeScriptChecking();
+        };
+
+        // 🔐 Console encryption methods
+        this.app.enableConsoleEncryption = (key?: string) => {
+            this.consoleInterceptor.enableEncryption(key);
+        };
+
+        this.app.disableConsoleEncryption = () => {
+            this.consoleInterceptor.disableEncryption();
+        };
+
+        // Simple encrypt method
+        this.app.encrypt = (key: string) => {
+            this.consoleInterceptor.encrypt(key);
+        };
+
+        this.app.setConsoleEncryptionKey = (key: string) => {
+            this.consoleInterceptor.setEncryptionKey(key);
+        };
+
+        this.app.setConsoleEncryptionDisplayMode = (
+            displayMode: "readable" | "encrypted" | "both",
+            showEncryptionStatus?: boolean
+        ) => {
+            this.consoleInterceptor.setEncryptionDisplayMode(
+                displayMode,
+                showEncryptionStatus
+            );
+        };
+
+        this.app.getEncryptedLogs = () => {
+            return this.consoleInterceptor.getEncryptedLogs();
+        };
+
+        this.app.restoreConsoleFromEncrypted = async (
+            encryptedData: string[],
+            key: string
+        ) => {
+            return await this.consoleInterceptor.restoreFromEncrypted(
+                encryptedData,
+                key
+            );
+        };
+
+        this.app.isConsoleEncryptionEnabled = () => {
+            return this.consoleInterceptor.isEncryptionEnabled();
+        };
+
+        this.app.getConsoleEncryptionStatus = () => {
+            return this.consoleInterceptor.getEncryptionStatus();
         };
     }
 

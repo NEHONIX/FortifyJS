@@ -3,11 +3,10 @@
 ## Installation
 
 ```bash
-npm install fortifyjs
+npm install "fortify2-js"# or
+yarn add "fortify2-js"
 # or
-yarn add fortifyjs
-# or
-bun add fortifyjs
+bun add "fortify2-js"
 ```
 
 ## Basic Server

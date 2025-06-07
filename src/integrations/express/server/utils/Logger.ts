@@ -2,35 +2,8 @@
  * Centralized Logger for FastApi.ts Server
  * Provides granular control over logging output
  */
+import { LogLevel, LogComponent, LogType } from "../../types/logger.type";
 import { ServerOptions } from "../../types/types";
-
-export type LogLevel =
-    | "silent"
-    | "error"
-    | "warn"
-    | "info"
-    | "debug"
-    | "verbose";
-export type LogComponent =
-    | "middleware"
-    | "server"
-    | "cache"
-    | "cluster"
-    | "performance"
-    | "fileWatcher"
-    | "plugins"
-    | "security"
-    | "monitoring"
-    | "routes"
-    | "other";
-export type LogType =
-    | "startup"
-    | "warnings"
-    | "errors"
-    | "performance"
-    | "debug"
-    | "hotReload"
-    | "portSwitching";
 
 export class Logger {
     private config: ServerOptions["logging"];
@@ -50,6 +23,8 @@ export class Logger {
                 security: true,
                 monitoring: true,
                 routes: true,
+                userApp: true,
+                console: false, // Console interception system logs (can be verbose)
             },
             types: {
                 startup: true,

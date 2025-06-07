@@ -64,7 +64,7 @@ export class RedirectManager {
         try {
             // Set default options
             const defaultOptions = {
-                mode: "transparent" as const,
+                mode: "message" as const,
                 enableLogging: true,
                 enableStats: true,
                 redirectStatusCode: 302 as const,
@@ -735,4 +735,7 @@ export class RedirectManager {
         }));
     }
 }
+
+
+
 

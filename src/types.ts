@@ -3,6 +3,7 @@
  */
 
 import { HashStrength } from "./core";
+import { RateLimitMiddlewareOptions } from "./integrations/express/types/types";
 
 /**
  * Security level enum
@@ -321,7 +322,7 @@ export interface MiddlewareOptions {
      * Enable rate limiting
      * @default true
      */
-    rateLimit?: boolean;
+    rateLimit?: boolean | RateLimitMiddlewareOptions;
 
     /**
      * Maximum requests per minute

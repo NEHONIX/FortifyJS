@@ -11,6 +11,10 @@ FastServer provides a comprehensive, granular logging system that allows fine-gr
 -   **Flexible Formatting**: Customizable output formats with colors, timestamps, and prefixes
 -   **Environment Aware**: Different defaults for development, production, and testing
 -   **Custom Logger Support**: Integration with external logging systems
+-   **🆕 Enhanced Console Interception**: Advanced console output control with multiple display modes
+-   **🆕 Preserve Options**: Fine-grained control over original vs intercepted console output
+-   **🆕 Enhanced Console Interception**: Advanced console output control with multiple display modes
+-   **🆕 Preserve Options**: Fine-grained control over original vs intercepted console output
 
 ## Configuration
 
@@ -74,6 +78,73 @@ const app = createServer({
     },
 });
 ```
+
+## 🆕 Console Interception
+
+Fortify FastServer (FFS) now includes an advanced console interception system that provides fine-grained control over console output behavior. This is particularly useful for production environments where you need centralized logging and better control over console output.
+
+### Quick Start
+
+```typescript
+const app = createServer({
+    logging: {
+        consoleInterception: {
+            enabled: true,
+            preserveOriginal: {
+                enabled: true,
+                mode: "both", // Show both original and intercepted logs
+                showPrefix: true,
+                customPrefix: "[MYAPP]",
+                allowDuplication: true,
+                colorize: true,
+            },
+        },
+    },
+});
+```
+
+### Available Modes
+
+| Mode            | Description                              | Use Case                         |
+| --------------- | ---------------------------------------- | -------------------------------- |
+| `"original"`    | Show original console output only        | Development (clean output)       |
+| `"intercepted"` | Route through logging system with prefix | Production (centralized logging) |
+| `"both"`        | Show BOTH original AND intercepted       | Debugging (see everything)       |
+| `"none"`        | Silent mode (no console output)          | Testing (quiet environment)      |
+
+### Preset Configurations
+
+```typescript
+import { PRESERVE_PRESETS } from "fortify2-js";
+
+// Development preset - clean original output
+preserveOriginal: PRESERVE_PRESETS.development;
+
+// Production preset - intercepted with prefix
+preserveOriginal: PRESERVE_PRESETS.production;
+
+// Debug preset - show both original and intercepted
+preserveOriginal: PRESERVE_PRESETS.debug;
+
+// Silent preset - no console output
+preserveOriginal: PRESERVE_PRESETS.silent;
+```
+
+### Backward Compatibility
+
+```typescript
+// Old syntax (still supported)
+preserveOriginal: true,  // = "original" mode
+preserveOriginal: false, // = "intercepted" mode
+
+// New syntax (recommended)
+preserveOriginal: {
+    enabled: true,
+    mode: "original", // or "intercepted", "both", "none"
+}
+```
+
+📚 **[Complete Console Interception Guide →](./console/console-interception.md)**
 
 ## Log Levels
 
@@ -150,6 +221,7 @@ logging: {
         security: true,    // Security events
         monitoring: false, // Skip monitoring noise
         routes: true       // Route optimization
+        ...
     }
 }
 ```

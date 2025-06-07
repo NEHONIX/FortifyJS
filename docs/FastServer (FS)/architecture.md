@@ -6,7 +6,7 @@ FastServer is built on a modular, component-based architecture designed for high
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    FastServer (FS)                          │
+│                   Fortify FastServer (FFS)(FS)                          │
 ├─────────────────────────────────────────────────────────────┤
 │                 UltraFastServer (UFS)                       │
 ├─────────────────────────────────────────────────────────────┤

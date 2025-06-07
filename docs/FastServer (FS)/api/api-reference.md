@@ -1,8 +1,8 @@
-# FastServer API Reference
+#Fortify FastServer (FFS)API Reference
 
 ## createServer Function
 
-The `createServer` function is the primary entry point for creating FastServer instances.
+The `createServer` function is the primary entry point for creatingFortify FastServer (FFS)instances.
 
 ### Signature
 
@@ -22,7 +22,7 @@ Returns an `UltraFastApp` instance that extends Express.js with additional high-
 
 ## ServerOptions Interface
 
-Complete configuration interface for FastServer instances.
+Complete configuration interface forFortify FastServer (FFS)instances.
 
 ```typescript
 interface ServerOptions {
@@ -210,7 +210,7 @@ interface UltraFastApp extends Express {
         port?: number,
         callback?: () => void
     ): Promise<HttpServer> | HttpServer;
-    isReady(): boolean;
+    waitForReady(): Promise<void>;
 
     // Performance optimization
     getRequestPreCompiler(): RequestPreCompiler;
@@ -343,4 +343,3 @@ interface EnhancedResponse extends Response {
     paginated: (data: any[], pagination: PaginationInfo) => void;
 }
 ```
-

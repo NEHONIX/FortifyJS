@@ -30,6 +30,21 @@ export interface FileWatcherConfig {
     healthCheck: boolean;
     healthCheckInterval: number;
     memoryLimit: number; // MB
+
+    // TypeScript checking configuration
+    typeCheck?: {
+        enabled?: boolean; // Enable TypeScript checking
+        configFile?: string; // Path to tsconfig.json (auto-detected if not provided)
+        checkOnSave?: boolean; // Check types when files are saved
+        checkBeforeRestart?: boolean; // Check types before restarting server
+        showWarnings?: boolean; // Show TypeScript warnings
+        showInfos?: boolean; // Show TypeScript info messages
+        maxErrors?: number; // Maximum errors to display
+        failOnError?: boolean; // Prevent restart if type errors found
+        excludePatterns?: string[]; // Additional patterns to exclude from type checking
+        includePatterns?: string[]; // Specific patterns to include for type checking
+        verbose?: boolean; // Verbose type checking output
+    };
 }
 
 export interface FileChangeEvent {

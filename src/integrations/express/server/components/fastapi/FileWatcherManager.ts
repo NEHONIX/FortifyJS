@@ -34,6 +34,11 @@ import {
 import { UltraFastFileWatcher } from "../../service/Reload/FileWatcher";
 import { HotReloader } from "../../service/Reload/HotReloader";
 import { logger } from "../../utils/Logger";
+import {
+    TypeScriptChecker,
+    TypeScriptCheckerConfig,
+    TypeCheckResult,
+} from "./typescript/TypeScriptChecker";
 
 /**
  * FileWatcherManager - Handles all file watching and hot reload operations for FastApi.ts
@@ -46,6 +51,7 @@ export class FileWatcherManager {
     private hotReloader?: HotReloader;
     private httpServer?: any;
     private isMainProcess = true;
+    private typeScriptChecker?: TypeScriptChecker;
 
     constructor(
         options: FileWatcherManagerOptions,
@@ -56,6 +62,11 @@ export class FileWatcherManager {
 
         if (this.options.fileWatcher?.enabled) {
             this.initializeFileWatcher();
+        }
+
+        // Initialize TypeScript checker if enabled
+        if (this.options.fileWatcher?.typeCheck?.enabled) {
+            this.initializeTypeScriptChecker();
         }
     }
 
@@ -71,6 +82,7 @@ export class FileWatcherManager {
         this.isMainProcess = !process.env.FORTIFY_CHILD_PROCESS;
 
         if (this.isMainProcess) {
+            console.log("reloading...");
             // Main process: Initialize hot reloader for true process restart
             this.hotReloader = new HotReloader({
                 enabled: true,
@@ -100,6 +112,38 @@ export class FileWatcherManager {
         }
 
         logger.debug("fileWatcher", "FW initialized");
+    }
+
+    /**
+     * Initialize TypeScript checker
+     */
+    private initializeTypeScriptChecker(): void {
+        if (!this.options.fileWatcher?.typeCheck?.enabled) return;
+        logger.debug("typescript", "Initializing TypeScript checker...");
+
+        const typeCheckConfig: TypeScriptCheckerConfig = {
+            enabled: true,
+            configFile: this.options.fileWatcher.typeCheck.configFile,
+            watchMode: false,
+            checkOnSave: this.options.fileWatcher.typeCheck.checkOnSave ?? true,
+            showWarnings:
+                this.options.fileWatcher.typeCheck.showWarnings ?? true,
+            showInfos: this.options.fileWatcher.typeCheck.showInfos ?? false,
+            maxErrors: this.options.fileWatcher.typeCheck.maxErrors ?? 50,
+            excludePatterns: [
+                "node_modules",
+                "dist",
+                "build",
+                ".git",
+                ...(this.options.fileWatcher.typeCheck.excludePatterns || []),
+            ],
+            includePatterns: this.options.fileWatcher.typeCheck
+                .includePatterns || ["**/*.ts", "**/*.tsx"],
+            verbose: this.options.fileWatcher.typeCheck.verbose ?? false,
+        };
+
+        this.typeScriptChecker = new TypeScriptChecker(typeCheckConfig);
+        logger.debug("typescript", "TypeScript checker initialized");
     }
 
     /**
@@ -206,11 +250,14 @@ export class FileWatcherManager {
     private setupHotReloadEventHandlers(): void {
         if (!this.fileWatcher || !this.hotReloader) return;
 
-        this.fileWatcher.on("file:changed", (event: any) => {
+        this.fileWatcher.on("file:changed", async (event: any) => {
             if (this.options.fileWatcher?.verbose) {
                 logger.debug("fileWatcher", `File changed: ${event.filename}`);
             }
-        });
+
+            // Automatically check TypeScript if enabled and file is a TypeScript file
+            await this.handleTypeScriptCheck(event);
+        }); 
 
         this.fileWatcher.on("restart:starting", (event: any) => {
             logger.debug(
@@ -237,10 +284,13 @@ export class FileWatcherManager {
     private setupFileWatcherEventHandlers(): void {
         if (!this.fileWatcher) return;
 
-        this.fileWatcher.on("file:changed", (event: any) => {
+        this.fileWatcher.on("file:changed", async (event: any) => {
             if (this.options.fileWatcher?.verbose) {
                 logger.debug("fileWatcher", `File changed: ${event.filename}`);
             }
+
+            // Automatically check TypeScript if enabled and file is a TypeScript file
+            await this.handleTypeScriptCheck(event);
         });
 
         this.fileWatcher.on("restart:starting", (event: any) => {
@@ -273,6 +323,41 @@ export class FileWatcherManager {
         }
 
         try {
+            // Check TypeScript types before restarting if enabled
+            if (
+                this.typeScriptChecker &&
+                this.options.fileWatcher?.typeCheck?.checkBeforeRestart
+            ) {
+                logger.debug(
+                    "typescript",
+                    "Checking TypeScript types before restart..."
+                );
+                const typeCheckResult =
+                    await this.typeScriptChecker.checkFiles();
+
+                if (
+                    !typeCheckResult.success &&
+                    this.options.fileWatcher?.typeCheck?.failOnError
+                ) {
+                    logger.error(
+                        "typescript",
+                        "❌ TypeScript errors found, skipping restart"
+                    );
+                    logger.error(
+                        "typescript",
+                        `Found ${typeCheckResult.errors.length} errors`
+                    );
+                    return;
+                }
+
+                if (typeCheckResult.errors.length > 0) {
+                    logger.warn(
+                        "typescript",
+                        `⚠️ TypeScript errors found but continuing restart (${typeCheckResult.errors.length} errors)`
+                    );
+                }
+            }
+
             logger.debug(
                 "fileWatcher",
                 "Triggering hot reload (process restart)..."
@@ -291,7 +376,23 @@ export class FileWatcherManager {
      */
     private async restartServer(): Promise<void> {
         try {
-            logger.debug("fileWatcher", "Hot reloading server...");
+            logger.info("fileWatcher", "🔄 Hot reloading server...");
+
+            // If we have a hot reloader, use it for true process restart
+            if (this.hotReloader) {
+                logger.info(
+                    "fileWatcher",
+                    "Using hot reloader for process restart"
+                );
+                await this.hotReloader.restart();
+                return;
+            }
+
+            // Fallback: in-place restart (less effective)
+            logger.warn(
+                "fileWatcher",
+                "Hot reloader not available, using in-place restart"
+            );
 
             // Close current server
             if (this.httpServer) {
@@ -315,8 +416,7 @@ export class FileWatcherManager {
             // Small delay before restart
             await new Promise((resolve) => setTimeout(resolve, 200));
 
-            // For true hot reload, we need to restart the entire process
-            // But for now, let's restart the server with cleared cache
+            // Restart the server with cleared cache
             await this.reinitializeServer();
         } catch (error: any) {
             logger.error(
@@ -330,12 +430,27 @@ export class FileWatcherManager {
 
     /**
      * Reinitialize server with fresh configuration
+     * For true hot reload, we should restart the entire process
      */
     private async reinitializeServer(): Promise<void> {
         try {
-            logger.debug(
+            logger.info(
                 "fileWatcher",
-                "Reinitializing server with fresh config..."
+                "🔄 Triggering process restart for hot reload..."
+            );
+
+            // For true hot reload, we need to restart the entire process
+            // This ensures all modules are reloaded and configuration is fresh
+            if (this.hotReloader) {
+                // Use the hot reloader for true process restart
+                await this.hotReloader.restart();
+                return;
+            }
+
+            // Fallback: restart the HTTP server in-place (less effective but better than nothing)
+            logger.warn(
+                "fileWatcher",
+                "Hot reloader not available, attempting in-place restart"
             );
 
             // Re-read configuration from environment or files
@@ -355,9 +470,9 @@ export class FileWatcherManager {
                 port,
                 host,
                 async () => {
-                    logger.debug(
+                    logger.info(
                         "fileWatcher",
-                        `Server hot-reloaded on ${host}:${port}`
+                        `🔄 Server hot-reloaded on ${host}:${port}`
                     );
 
                     // Restart file watcher if it was stopped
@@ -369,10 +484,12 @@ export class FileWatcherManager {
                     }
                 }
             );
+
+            logger.info("fileWatcher", "✅ In-place hot reload completed");
         } catch (error: any) {
             logger.error(
                 "fileWatcher",
-                "Server reinitialization failed:",
+                "Failed to reinitialize server:",
                 error.message
             );
             throw error;
@@ -440,6 +557,145 @@ export class FileWatcherManager {
      */
     public getFileWatcherStats(): any {
         return this.fileWatcher?.getRestartStats() || null;
+    }
+
+    /**
+     * Check TypeScript files for errors
+     */
+    public async checkTypeScript(files?: string[]): Promise<TypeCheckResult> {
+        if (!this.typeScriptChecker) {
+            return {
+                success: false,
+                errors: [
+                    {
+                        file: "system",
+                        line: 0,
+                        column: 0,
+                        message: "TypeScript checker not initialized",
+                        code: 0,
+                        severity: "error",
+                        category: "system",
+                        source: "FileWatcherManager",
+                    },
+                ],
+                warnings: [],
+                totalFiles: 0,
+                checkedFiles: [],
+                duration: 0,
+                timestamp: new Date(),
+            };
+        }
+
+        return await this.typeScriptChecker.checkFiles(files);
+    }
+
+    /**
+     * Get TypeScript checker status
+     */
+    public getTypeScriptStatus(): any {
+        return this.typeScriptChecker?.getStatus() || null;
+    }
+
+    /**
+     * Enable TypeScript checking
+     */
+    public enableTypeScriptChecking(): void {
+        if (this.typeScriptChecker) {
+            this.typeScriptChecker.setEnabled(true);
+        } else {
+            logger.warn("typescript", "TypeScript checker not initialized");
+        }
+    }
+
+    /**
+     * Disable TypeScript checking
+     */
+    public disableTypeScriptChecking(): void {
+        if (this.typeScriptChecker) {
+            this.typeScriptChecker.setEnabled(false);
+        } else {
+            logger.warn("typescript", "TypeScript checker not initialized");
+        }
+    }
+
+    /**
+     * Handle automatic TypeScript checking when files change
+     */
+    private async handleTypeScriptCheck(event: any): Promise<void> {
+        if (
+            !this.typeScriptChecker ||
+            !this.options.fileWatcher?.typeCheck?.checkOnSave
+        ) {
+            return;
+        }
+
+        // Only check TypeScript files
+        const filename = event.filename || event.path || "";
+        if (!filename.endsWith(".ts") && !filename.endsWith(".tsx")) {
+            return;
+        }
+
+        try {
+            logger.debug(
+                "typescript",
+                `🔍 Auto-checking TypeScript for: ${filename}`
+            );
+
+            const result = await this.typeScriptChecker.checkFiles([filename]);
+
+            if (result.errors.length > 0) {
+                logger.error(
+                    "typescript",
+                    `❌ TypeScript errors in ${filename}:`
+                );
+                result.errors.slice(0, 3).forEach((error) => {
+                    logger.error(
+                        "typescript",
+                        `  Line ${error.line}: ${error.message} (TS${error.code})`
+                    );
+                });
+                if (result.errors.length > 3) {
+                    logger.error(
+                        "typescript",
+                        `  ... and ${result.errors.length - 3} more errors`
+                    );
+                }
+            } else {
+                if (this.options.fileWatcher?.typeCheck?.verbose) {
+                    logger.info(
+                        "typescript",
+                        `✅ No TypeScript errors in ${filename}`
+                    );
+                }
+            }
+
+            if (
+                result.warnings.length > 0 &&
+                this.options.fileWatcher?.typeCheck?.showWarnings
+            ) {
+                logger.warn(
+                    "typescript",
+                    `⚠️ TypeScript warnings in ${filename}:`
+                );
+                result.warnings.slice(0, 2).forEach((warning) => {
+                    logger.warn(
+                        "typescript",
+                        `  Line ${warning.line}: ${warning.message} (TS${warning.code})`
+                    );
+                });
+                if (result.warnings.length > 2) {
+                    logger.warn(
+                        "typescript",
+                        `  ... and ${result.warnings.length - 2} more warnings`
+                    );
+                }
+            }
+        } catch (error: any) {
+            logger.warn(
+                "typescript",
+                `Failed to check TypeScript for ${filename}: ${error.message}`
+            );
+        }
     }
 
     /**

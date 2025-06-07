@@ -38,8 +38,8 @@ export const DEFAULT_FW_CONFIG: FileWatcherConfig = {
         ".yml",
     ],
     debounceMs: 50, // Reduced for better responsiveness
-    restartDelay: 300, // Reduced for faster restarts
-    maxRestarts: 10000, // Increased limit
+    restartDelay: 50, // Reduced for faster restarts
+    maxRestarts: 7000, // Increased limit
     resetRestartsAfter: 300000, // Reset after 5 minutes
     gracefulShutdown: true,
     gracefulShutdownTimeout: 5000,
@@ -55,10 +55,29 @@ export const DEFAULT_FW_CONFIG: FileWatcherConfig = {
     showBanner: true,
     customIgnoreFile: ".watcherignore",
     watchDotFiles: false,
-    maxFileSize: 10, // 10MB max file size
+    maxFileSize: 20, // 20MB max file size
     excludeEmptyFiles: true,
     parallelProcessing: true,
     healthCheck: true,
     healthCheckInterval: 30000, // 30 seconds
     memoryLimit: 512, // 512MB
+
+    // TypeScript checking configuration (enabled by default)
+    typeCheck: {
+        enabled: true, // Enable TypeScript checking by default
+        checkOnSave: true, // Check types when files are saved
+        checkBeforeRestart: true, // Check types before restarting server
+        showWarnings: true, // Show TypeScript warnings
+        showInfos: false, // Don't show info messages by default
+        maxErrors: 20, // Limit error output to prevent overwhelming
+        failOnError: false, // Don't prevent restart on errors (for development)
+        includePatterns: ["**/*.ts", "**/*.tsx"], // TypeScript file patterns
+        verbose: true, // Detailed TypeScript checking output
+        excludePatterns: [
+            "node_modules",
+            "dist",
+            "build",
+            ".git",
+        ], // Additional patterns to exclude (beyond ignorePaths)
+    },
 };

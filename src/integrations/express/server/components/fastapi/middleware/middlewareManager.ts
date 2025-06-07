@@ -117,7 +117,7 @@ export class MiddlewareManager implements IMiddlewareManager {
         let handler: RequestHandler;
         let priority: MiddlewarePriority = options?.priority || "normal";
         let routes = options?.routes;
-        let cacheable = options?.cacheable === true; // Only cache if explicitly set to true
+        let cacheable = options?.cacheable || false;
         let ttl = options?.ttl || this.optimizationConfig.defaultTTL;
 
         if (typeof middleware === "function") {
@@ -153,9 +153,6 @@ export class MiddlewareManager implements IMiddlewareManager {
 
         this.middlewareRegistry.set(id, entry);
         this.updateExecutionOrder();
-
-        // Apply middleware to Express app immediately
-        this.applyMiddlewareToApp(entry);
 
         logger.debug("middleware", `Registered middleware: ${name} (${id})`);
         return id;
@@ -500,57 +497,6 @@ export class MiddlewareManager implements IMiddlewareManager {
     }
 
     /**
-     * Clear all middleware
-     */
-    public clear(): void {
-        this.middlewareRegistry.clear();
-        this.middlewareCache.clear();
-        this.executionOrder = [];
-        logger.debug("middleware", "All middleware cleared");
-    }
-
-    /**
-     * Create cache middleware for route optimization
-     */
-    public createCacheMiddleware(options?: {
-        ttl?: number;
-        keyGenerator?: (req: any) => string;
-    }): RequestHandler {
-        const ttl = options?.ttl || this.optimizationConfig.defaultTTL;
-        const keyGenerator =
-            options?.keyGenerator ||
-            ((req: any) => `${req.method}:${req.path}`);
-
-        return (req: any, res: any, next: NextFunction) => {
-            const cacheKey = keyGenerator(req);
-            const cached = this.middlewareCache.get(cacheKey);
-
-            if (cached && this.isCacheValid(cached)) {
-                cached.hits++;
-                logger.debug("middleware", `Cache hit for route: ${cacheKey}`);
-                return next();
-            }
-
-            // Cache miss - continue with normal processing
-            const originalSend = res.send;
-            const self = this;
-            res.send = function (body: any) {
-                // Cache the response
-                self.middlewareCache.set(cacheKey, {
-                    result: body,
-                    timestamp: Date.now(),
-                    ttl,
-                    hits: 0,
-                    middleware: "route-cache",
-                });
-                return originalSend.call(this, body);
-            };
-
-            next();
-        };
-    }
-
-    /**
      * Shutdown middleware manager
      */
     public async shutdown(): Promise<void> {
@@ -565,31 +511,6 @@ export class MiddlewareManager implements IMiddlewareManager {
     }
 
     // ===== PRIVATE METHODS =====
-
-    /**
-     * Apply middleware to Express app
-     */
-    private applyMiddlewareToApp(entry: MiddlewareRegistryEntry): void {
-        if (!entry.enabled) return;
-
-        // If routes are specified, apply middleware only to those routes
-        if (entry.routes && entry.routes.length > 0) {
-            entry.routes.forEach((route) => {
-                this.dependencies.app.use(route, entry.handler);
-                logger.debug(
-                    "middleware",
-                    `Applied middleware "${entry.name}" to route: ${route}`
-                );
-            });
-        } else {
-            // Apply to all routes
-            this.dependencies.app.use(entry.handler);
-            logger.debug(
-                "middleware",
-                `Applied middleware "${entry.name}" globally`
-            );
-        }
-    }
 
     /**
      * Configure built-in middleware
@@ -763,16 +684,9 @@ export class MiddlewareManager implements IMiddlewareManager {
             const startTime = performance.now();
 
             try {
-                // Check cache if middleware is cacheable AND the specific middleware entry allows caching
+                // Check cache if middleware is cacheable
                 const cacheKey = this.generateCacheKey(req, name);
-                const middlewareEntry = Array.from(
-                    this.middlewareRegistry.values()
-                ).find((entry) => entry.name === name);
-
-                if (
-                    this.optimizationConfig.enableCaching &&
-                    middlewareEntry?.cacheable === true
-                ) {
+                if (this.optimizationConfig.enableCaching) {
                     const cached = this.middlewareCache.get(cacheKey);
                     if (cached && this.isCacheValid(cached)) {
                         cached.hits++;
@@ -785,46 +699,36 @@ export class MiddlewareManager implements IMiddlewareManager {
                     }
                 }
 
-                // Execute middleware (Express middleware uses callbacks, not promises)
-                handler(req, res, (error?: any) => {
-                    const executionTime = performance.now() - startTime;
+                // Execute middleware
+                await handler(req, res, next);
 
-                    if (error) {
-                        logger.error(
-                            "middleware",
-                            `Error in ${name}: ${error} (${executionTime}ms)`
-                        );
-                        return next(error);
-                    }
+                const executionTime = performance.now() - startTime;
 
-                    // Cache result if applicable
-                    if (
-                        this.optimizationConfig.enableCaching &&
-                        executionTime < 10
-                    ) {
-                        this.middlewareCache.set(cacheKey, {
-                            result: null,
-                            timestamp: Date.now(),
-                            ttl: this.optimizationConfig.defaultTTL,
-                            hits: 0,
-                            middleware: name,
-                        });
-                    }
+                // Cache result if applicable
+                if (
+                    this.optimizationConfig.enableCaching &&
+                    executionTime < 10
+                ) {
+                    this.middlewareCache.set(cacheKey, {
+                        result: null,
+                        timestamp: Date.now(),
+                        ttl: this.optimizationConfig.defaultTTL,
+                        hits: 0,
+                        middleware: name,
+                    });
+                }
 
-                    logger.debug(
-                        "middleware",
-                        `Executed ${name}: ${executionTime}ms`
-                    );
-
-                    next();
-                });
+                logger.debug(
+                    "middleware",
+                    `Executed ${name}: ${executionTime}ms`
+                );
             } catch (error) {
                 const executionTime = performance.now() - startTime;
                 logger.error(
                     "middleware",
                     `Error in ${name}: ${error} (${executionTime}ms)`
                 );
-                next(error);
+                throw error;
             }
         };
     }

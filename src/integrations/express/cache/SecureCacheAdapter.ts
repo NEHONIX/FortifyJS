@@ -102,6 +102,9 @@ export class SecureCacheAdapter extends EventEmitter {
                 totalSize: 0,
                 entryCount: 0,
                 hitRate: 0,
+                totalAccesses: 0,
+                size: 0,
+                capacity: this.config.memory?.maxEntries || 10000,
                 memoryUsage: {
                     used: 0,
                     limit: (this.config.memory?.maxSize || 100) * 1024 * 1024,

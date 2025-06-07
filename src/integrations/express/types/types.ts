@@ -15,8 +15,25 @@ import { Server as HttpServer } from "http";
 import { ClusterConfig } from "./cluster";
 import type { RequestPreCompiler } from "../server/optimization/RequestPreCompiler";
 import { OptimizedRoute } from "./UFOptimizer.type";
+import { ConsoleInterceptionConfig } from "../server/components/fastapi/console/types";
+import { LogComponent, LogLevel } from "./logger.type";
 
 // ===== CORE CONFIGURATION TYPES =====
+
+// Create a DeepPartial utility type that makes everything optional recursively
+export type DeepPartial<T> = {
+    [K in keyof T]?: T[K] extends infer U
+        ? U extends object
+            ? U extends readonly any[]
+                ? U extends readonly (infer V)[]
+                    ? readonly DeepPartial<V>[]
+                    : U
+                : U extends Function
+                ? U
+                : DeepPartial<U>
+            : U
+        : never;
+};
 
 export interface ServerConfig {
     // Basic server settings
@@ -721,7 +738,7 @@ export interface ServerOptions {
     };
     cluster?: {
         enabled?: boolean;
-        config?: Omit<ClusterConfig, "enabled">;
+        config?: DeepPartial<Omit<ClusterConfig, "enabled">>;
     };
 
     // File watcher configuration for auto-reload
@@ -735,6 +752,21 @@ export interface ServerOptions {
         maxRestarts?: number;
         gracefulShutdown?: boolean;
         verbose?: boolean;
+
+        // TypeScript type checking configuration
+        typeCheck?: {
+            enabled?: boolean; // Enable TypeScript type checking (default: false)
+            configFile?: string; // Path to tsconfig.json (auto-detected if not provided)
+            checkOnSave?: boolean; // Check types when files are saved (default: true)
+            checkBeforeRestart?: boolean; // Check types before restarting server (default: true)
+            showWarnings?: boolean; // Show TypeScript warnings (default: true)
+            showInfos?: boolean; // Show TypeScript info messages (default: false)
+            maxErrors?: number; // Maximum errors to display (default: 50)
+            failOnError?: boolean; // Prevent restart if type errors found (default: false)
+            excludePatterns?: string[]; // Additional patterns to exclude from type checking
+            includePatterns?: string[]; // Specific patterns to include for type checking
+            verbose?: boolean; // Verbose type checking output (default: false)
+        };
     };
 
     // Middleware configuration
@@ -756,8 +788,12 @@ export interface ServerOptions {
             security?: boolean; // Security warnings and logs
             monitoring?: boolean; // Monitoring and metrics logs
             routes?: boolean; // Route compilation and handling logs
+            userApp?: boolean; // User application console output
+            console?: boolean; // Console interception system logs
             other?: boolean;
             middleware?: boolean;
+            router?: boolean;
+            typescript?: boolean;
         };
 
         // Specific log type controls
@@ -779,13 +815,42 @@ export interface ServerOptions {
             compact?: boolean; // Use compact format (default: false)
         };
 
+        // Console interception configuration
+        consoleInterception?: DeepPartial<ConsoleInterceptionConfig>;
+
         // Custom logger function
         customLogger?: (
-            level: string,
-            component: string,
+            level: LogLevel,
+            component: LogComponent,
             message: string,
             ...args: any[]
         ) => void;
+    };
+
+    // 🚀 High-Performance Router Configuration
+    router?: {
+        enabled?: boolean; // Enable high-performance routing (default: true)
+        precompileCommonRoutes?: boolean; // Pre-compile common routes (default: true)
+        enableSecurity?: boolean; // Enable security validation (default: true)
+        enableCaching?: boolean; // Enable route caching (default: true)
+        warmUpOnStart?: boolean; // Warm up routes on startup (default: true)
+        performance?: {
+            targetResponseTime?: number; // Target response time for simple routes in ms (default: 1)
+            complexRouteTarget?: number; // Target response time for complex routes in ms (default: 5)
+            enableProfiling?: boolean; // Enable performance profiling (default: true)
+            enableOptimizations?: boolean; // Enable all optimizations (default: true)
+        };
+        security?: {
+            enableValidation?: boolean; // Enable input validation (default: true)
+            enableSanitization?: boolean; // Enable input sanitization (default: true)
+            enableRateLimit?: boolean; // Enable rate limiting (default: true)
+            defaultRateLimit?: number; // Default rate limit per minute (default: 1000)
+        };
+        cache?: {
+            enabled?: boolean; // Enable route caching (default: true)
+            defaultTTL?: number; // Default cache TTL in ms (default: 60000)
+            maxCacheSize?: number; // Maximum cached responses (default: 1000)
+        };
     };
 }
 
@@ -939,7 +1004,7 @@ export interface UltraFastApp extends Express {
         port?: number,
         callback?: () => void
     ) => Promise<HttpServer> | HttpServer;
-    isReady: () => boolean;
+    waitForReady: () => Promise<void>;
 
     // Port management methods
     getPort: () => number;
@@ -959,6 +1024,64 @@ export interface UltraFastApp extends Express {
 
     // Performance optimization methods
     getRequestPreCompiler: () => RequestPreCompiler;
+
+    // Console interception methods
+    getConsoleInterceptor: () => any;
+    enableConsoleInterception: () => void;
+    disableConsoleInterception: () => void;
+    getConsoleStats: () => any;
+    resetConsoleStats: () => void;
+
+    // File watcher methods
+    getFileWatcherStatus: () => any;
+    getFileWatcherStats: () => any;
+    stopFileWatcher: () => Promise<void>;
+
+    // TypeScript checking methods
+    checkTypeScript: (files?: string[]) => Promise<any>;
+    getTypeScriptStatus: () => any;
+    enableTypeScriptChecking: () => void;
+    disableTypeScriptChecking: () => void;
+
+    // Console encryption methods
+    enableConsoleEncryption: (key?: string) => void;
+    disableConsoleEncryption: () => void;
+    encrypt: (key: string) => void; // Simple encrypt method
+    setConsoleEncryptionKey: (key: string) => void;
+    setConsoleEncryptionDisplayMode: (
+        displayMode: "readable" | "encrypted" | "both",
+        showEncryptionStatus?: boolean
+    ) => void;
+    getEncryptedLogs: () => string[];
+    restoreConsoleFromEncrypted: (
+        encryptedData: string[],
+        key: string
+    ) => Promise<string[]>;
+    isConsoleEncryptionEnabled: () => boolean;
+    getConsoleEncryptionStatus: () => {
+        enabled: boolean;
+        algorithm?: string;
+        hasKey: boolean;
+        externalLogging?: boolean;
+    };
+
+    // 🚀 High-Performance Router methods
+    ultraGet?: (path: string, options: any, handler: Function) => any;
+    ultraPost?: (path: string, options: any, handler: Function) => any;
+    ultraPut?: (path: string, options: any, handler: Function) => any;
+    ultraDelete?: (path: string, options: any, handler: Function) => any;
+    ultraRoutes?: (
+        routes: Array<{
+            method: string;
+            path: string;
+            options: any;
+            handler: Function;
+        }>
+    ) => any;
+    getRouterStats?: () => any;
+    getRouterInfo?: () => any;
+    warmUpRoutes?: () => Promise<void>;
+    resetRouterStats?: () => void;
 
     // Ultra-fast optimization methods
     registerRouteTemplate?: (template: OptimizedRoute) => void;
@@ -1009,4 +1132,5 @@ export interface UltraFastApp extends Express {
     initializeBuiltinPlugins?: () => Promise<void>;
     getServerStats?: () => Promise<any>;
 }
+
 

@@ -45,7 +45,6 @@ This pattern allows you to:
 -   ✅ **Configure built-in middleware** (security, CORS, compression, rate limiting)
 -   ✅ **Register custom middleware** with advanced options
 -   ✅ **Chain multiple configurations** for complex setups
--   ✅ **Get immediate execution** - middleware runs on every request
 
 ## Basic Usage
 

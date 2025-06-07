@@ -21,7 +21,7 @@ const app = createServer({
         jsonLimit: "10mb",
         urlEncodedLimit: "10mb",
         autoPortSwitch: {
-            enabled: false, // Disable in production
+            enabled: false, // Disable in production (or handle it manually)
         },
     },
 
@@ -29,28 +29,69 @@ const app = createServer({
     cluster: {
         enabled: true,
         config: {
-            workers: "auto",
-            autoRestart: true,
-            maxRestarts: 5,
-            restartDelay: 2000,
-            gracefulShutdown: true,
-            shutdownTimeout: 30000,
-
+            // Or leave it as default
+            workers: "auto", // You can also specify the number of workers explicitly,
+            processManagement: {
+                respawn: true,
+                maxRestarts: 5,
+                restartDelay: 1000,
+                gracefulShutdownTimeout: 30000,
+                killTimeout: 5000,
+                zombieDetection: true,
+                memoryThreshold: "512MB",
+                cpuThreshold: 80,
+            },
             healthCheck: {
                 enabled: true,
                 interval: 30000,
                 timeout: 5000,
-                retries: 3,
+                maxFailures: 3,
+                endpoint: "/health",
             },
-
-            scaling: {
+            loadBalancing: {
+                strategy: "round-robin",
+                stickySession: false,
+            },
+            ipc: {
                 enabled: true,
-                minWorkers: 2,
-                maxWorkers: 16,
-                scaleUpThreshold: 80,
-                scaleDownThreshold: 30,
-                scaleUpCooldown: 60000,
-                scaleDownCooldown: 300000,
+                broadcast: true,
+            },
+            autoScaling: {
+                enabled: true,
+                minWorkers: 1,
+                maxWorkers: 8,
+                cooldownPeriod: 300000,
+                scaleStep: 1,
+                scaleUpThreshold: {
+                    cpu: 70,
+                    memory: 80,
+                    responseTime: 1000,
+                    queueLength: 50,
+                },
+                scaleDownThreshold: {
+                    cpu: 30,
+                    memory: 40,
+                    idleTime: 10,
+                },
+            },
+            monitoring: {
+                enabled: true,
+                collectMetrics: true,
+                metricsInterval: 60000,
+                logLevel: "info",
+                logWorkerEvents: true,
+                logPerformance: true,
+            },
+            errorHandling: {
+                uncaughtException: "restart",
+                unhandledRejection: "restart",
+                errorThreshold: 10,
+            },
+            security: {
+                isolateWorkers: true,
+                resourceLimits: true,
+                preventForkBombs: true,
+                encryptIPC: true,
             },
         },
     },
@@ -63,14 +104,7 @@ const app = createServer({
             host: process.env.REDIS_HOST || "localhost",
             port: parseInt(process.env.REDIS_PORT || "6379"),
             password: process.env.REDIS_PASSWORD,
-            db: parseInt(process.env.REDIS_DB || "0"),
             cluster: process.env.REDIS_CLUSTER === "true",
-            pool: {
-                min: 5,
-                max: 20,
-                acquireTimeoutMillis: 30000,
-                idleTimeoutMillis: 30000,
-            },
         },
     },
 
@@ -99,13 +133,33 @@ const app = createServer({
         accessMonitoring: true,
         sanitization: true,
         auditLogging: true,
-        cors: true,
-        helmet: true,
+        // cors: true, // for more controle, use the middleware: app.middleware
+        // helmet: true, // for more controle, use the middleware: app.middleware
     },
 
     // Production logging
     logging: {
         level: "warn",
+        enabled: true,
+        consoleInterception: {
+            enabled: true,
+            preserveOriginal: {
+                enabled: true,
+                mode: "intercepted", // Route through custom logger (NOT "none"!)
+                showPrefix: false, // Silent console output
+                allowDuplication: false,
+                separateStreams: false,
+                onlyUserApp: true,
+                colorize: true,
+            },
+            performanceMode: true,
+            filters: {
+                minLevel: "debug",
+                maxLength: 2000,
+                includePatterns: [],
+                excludePatterns: [],
+            },
+        },
         components: {
             server: true,
             cache: false,
@@ -139,17 +193,16 @@ const app = createServer({
                 level: level.toUpperCase(),
                 component,
                 message,
-                service: "fastserver",
+                service: "nehonix fortify fast server",
                 environment: "production",
                 pid: process.pid,
                 ...(args.length > 0 && { details: args }),
             };
 
-            // Example: Send to external service
+            // Example: Send to external service (handle like you want)
             console.log(JSON.stringify(logEntry));
         },
     },
-
     // Monitoring and health checks
     monitoring: {
         enabled: true,
@@ -166,50 +219,23 @@ const app = createServer({
 });
 
 // Security middleware
-app.use(
-    helmet({
-        contentSecurityPolicy: {
-            directives: {
-                defaultSrc: ["'self'"],
-                styleSrc: ["'self'", "'unsafe-inline'"],
-                scriptSrc: ["'self'"],
-                imgSrc: ["'self'", "data:", "https:"],
-            },
-        },
-        hsts: {
-            maxAge: 31536000,
-            includeSubDomains: true,
-            preload: true,
-        },
-    })
-);
-
-// Compression middleware
-app.use(
-    compression({
-        level: 6,
-        threshold: 1024,
-        filter: (req, res) => {
-            if (req.headers["x-no-compression"]) {
-                return false;
-            }
-            return compression.filter(req, res);
-        },
-    })
-);
-
-// Rate limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
-    message: {
-        error: "Too many requests from this IP, please try again later.",
+const middleware = app.middleware({
+    rateLimit: false, // Disable rate limiting
+    cors: true, // Enable CORS with defaults
+    compression: true, // Enable compression
+    security: {
+        // Configure security
+        helmet: true,
+        csrfProtection: false,
     },
-    standardHeaders: true,
-    legacyHeaders: false,
 });
 
-app.use("/api/", limiter);
+// Or Register custom middleware
+middleware.register((req, res, next) => {
+    // Your custom middleware logic here
+    console.log(`Hello world from FFS: ${req.method} ${req.path} - ${Date.now()}`);
+    next();
+});
 
 // Health check endpoints
 app.get("/health", (req, res) => {
@@ -266,7 +292,7 @@ app.get("/metrics", async (req, res) => {
     res.json(metrics);
 });
 
-// Graceful shutdown handling
+// Graceful shutdown handling (optionnal)
 const gracefulShutdown = async (signal) => {
     console.log(`Received ${signal}, shutting down gracefully`);
 
@@ -331,7 +357,7 @@ FROM node:18-alpine AS production
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S fastserver -u 1001
+    adduser -SFortify FastServer (FFS)-u 1001
 
 WORKDIR /app
 
@@ -458,11 +484,11 @@ spec:
     template:
         metadata:
             labels:
-                app: fastserver
+                app: ffs
         spec:
             containers:
-                - name: fastserver
-                  image: your-registry/fastserver:latest
+                - name: ffs
+                  image: your-registry/ffs:latest
                   ports:
                       - containerPort: 8080
                   env:
@@ -514,7 +540,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-    name: fastserver-service
+    name: ffs-service
 spec:
     selector:
         app: fastserver
@@ -555,7 +581,7 @@ spec:
 ### Nginx Configuration
 
 ```nginx
-upstream fastserver {
+upstreamFortify FastServer (FFS){
     least_conn;
     server fastserver-1:8080 max_fails=3 fail_timeout=30s;
     server fastserver-2:8080 max_fails=3 fail_timeout=30s;

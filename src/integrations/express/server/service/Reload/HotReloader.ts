@@ -6,6 +6,7 @@
 import { spawn, ChildProcess } from "child_process";
 import { EventEmitter } from "events";
 import { HotReloaderConfig } from "./types/hotreloader";
+import { DEFAULT_FW_CONFIG } from "../../const/FileWatcher.config";
 
 export class HotReloader extends EventEmitter {
     private config: HotReloaderConfig;
@@ -24,7 +25,7 @@ export class HotReloader extends EventEmitter {
             env: { ...process.env },
             cwd: process.cwd(),
             restartDelay: 500,
-            maxRestarts: 10,
+            maxRestarts: DEFAULT_FW_CONFIG.maxRestarts,
             gracefulShutdownTimeout: 5000,
             verbose: false,
             ...config,
@@ -101,7 +102,7 @@ export class HotReloader extends EventEmitter {
         }
 
         try {
-            // console.log("Hot reloading process...");
+            console.log("Hot reloading process...");
 
             const startTime = Date.now();
 
@@ -160,7 +161,7 @@ export class HotReloader extends EventEmitter {
                         console.log(
                             `Child process started (PID: ${this.childProcess?.pid})`
                         );
-                    } 
+                    }
                     resolve();
                 });
 

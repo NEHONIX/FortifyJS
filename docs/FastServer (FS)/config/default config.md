@@ -1,8 +1,6 @@
-import { ServerOptions } from "../../ServerFactory";
-import { DEFAULT_FW_CONFIG } from "./FileWatcher.config";
-import { DEFAULT_CONSOLE_CONFIG } from "../components/fastapi/console/types";
+By default createServer() is called with the following options:
 
-// Default configuration
+```ts
 export const DEFAULT_OPTIONS: ServerOptions = {
     cache: {
         strategy: "auto",
@@ -103,9 +101,9 @@ export const DEFAULT_OPTIONS: ServerOptions = {
             prefix: true,
             colors: true,
             compact: false,
-            timestamps: false, 
+            timestamps: false,
         },
-        // Console Interception with Encryption Support
+        // 🔐 Console Interception with Encryption Support
         consoleInterception: {
             ...DEFAULT_CONSOLE_CONFIG,
             enabled: false, // Disabled by default (user can enable when needed)
@@ -113,3 +111,95 @@ export const DEFAULT_OPTIONS: ServerOptions = {
         },
     },
 };
+```
+
+```ts
+export const DEFAULT_CONSOLE_CONFIG: ConsoleInterceptionConfig = {
+    enabled: false,
+    interceptMethods: ["log", "error", "warn", "info", "debug"],
+    preserveOriginal: false, // Only through logging system for clean output
+    filterUserCode: true,
+    performanceMode: true,
+    sourceMapping: false,
+    stackTrace: false,
+    maxInterceptionsPerSecond: 1000,
+
+    //  Encryption Configuration
+    encryption: {
+        enabled: false, // Disabled by default, enable for production
+        algorithm: "aes-256-gcm",
+        keyDerivation: "pbkdf2",
+        iterations: 100000,
+        saltLength: 32,
+        ivLength: 16,
+        tagLength: 16,
+        encoding: "base64",
+        key: undefined, // Set via environment variable or method
+
+        //  Display behavior
+        displayMode: "readable", // Show readable logs by default
+        showEncryptionStatus: false, // Don't show encryption indicators by default
+
+        externalLogging: {
+            enabled: false,
+            endpoint: undefined,
+            headers: {},
+            batchSize: 100,
+            flushInterval: 5000,
+        },
+    },
+
+    // Advanced Filtering and Categorization
+    filters: {
+        minLevel: "debug",
+        maxLength: 1000,
+        includePatterns: [],
+        excludePatterns: ["node_modules", "fastserver", "express", "internal"],
+
+        // User Application Patterns (emoji and common prefixes)
+        userAppPatterns: [
+            "⚡",
+            "🛠️",
+            "🔍", // Emoji patterns
+            "DEBUG:",
+            "INFO:",
+            "WARN:",
+            "ERROR:",
+            "SUCCESS:",
+            "FAIL:", // Common prefixes
+            "Testing",
+            "Starting",
+            "Completed",
+            "Failed",
+            "Initializing", // Common words
+        ],
+
+        // System/FastServer Patterns
+        systemPatterns: [
+            "UFSIMC-",
+            "FastServer",
+            "[SERVER]",
+            "[CACHE]",
+            "[CLUSTER]", //Fortify FastServer (FFS)patterns
+            "node_modules",
+            "internal",
+            "express",
+            "middleware", // System patterns
+        ],
+
+        // Category Behavior Configuration
+        categoryBehavior: {
+            userApp: "intercept", // Route user app logs through logging system
+            system: "intercept", // Route system logs through logging system
+            unknown: "intercept", // Route unknown logs through logging system
+        },
+    },
+
+    // Error Handling and Fallback
+    fallback: {
+        onError: "console",
+        gracefulDegradation: true,
+        maxErrors: 10,
+    },
+};
+```
