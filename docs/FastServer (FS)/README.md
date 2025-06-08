@@ -90,9 +90,9 @@ console.log(`Server running on port: ${app.getPort()}`);
 
 ### Feature Guides
 
--   [Middleware System](./middleware.md) - Priority-based middleware with performance optimization
--   [Caching System](./caching.md) - Multi-tier caching with UFSIMC and Redis
--   [Clustering](./clustering.md) - Auto-scaling cluster management
+-   [Middleware System](./middleware/middleware.md) - Priority-based middleware with performance optimization
+-   [Caching System](./cache/caching.md) - Multi-tier caching with UFSIMC and Redis
+-   [Clustering](./cluster/clustering.md) - Auto-scaling cluster management
 -   [Performance Optimization](./performance.md) - Ultra-fast performance tuning
 -   [Logging System](./logging.md) - Granular logging control system
 -   [Console Interception](./console/console-interception.md) - Advanced console output control

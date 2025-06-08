@@ -5,6 +5,8 @@
 
 import { spawn, ChildProcess } from "child_process";
 import { EventEmitter } from "events";
+import { existsSync } from "fs";
+import { join } from "path";
 import { HotReloaderConfig } from "./types/hotreloader";
 import { DEFAULT_FW_CONFIG } from "../../const/FileWatcher.config";
 
@@ -28,6 +30,13 @@ export class HotReloader extends EventEmitter {
             maxRestarts: DEFAULT_FW_CONFIG.maxRestarts,
             gracefulShutdownTimeout: 5000,
             verbose: false,
+            typescript: {
+                enabled: true,
+                runner: "auto",
+                runnerArgs: [],
+                fallbackToNode: true,
+                autoDetectRunner: true,
+            },
             ...config,
         };
     }
@@ -42,7 +51,7 @@ export class HotReloader extends EventEmitter {
         }
 
         if (this.isRunning) {
-            // console.log("Hot reloader already running");
+            console.log("Hot reloader already running");
             return;
         }
 
@@ -136,25 +145,143 @@ export class HotReloader extends EventEmitter {
     }
 
     /**
+     * Check if a TypeScript runner is available
+     */
+    private isRunnerAvailable(runner: string): boolean {
+        try {
+            const { execSync } = require("child_process");
+            execSync(`${runner} --version`, { stdio: "ignore" });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Auto-detect the best available TypeScript runner
+     */
+    private detectTypeScriptRunner(): string {
+        const runners = ["tsx", "bun", "ts-node"];
+
+        for (const runner of runners) {
+            if (this.isRunnerAvailable(runner)) {
+                if (this.config.verbose) {
+                    console.log(
+                        `🎯 Auto-detected TypeScript runner: ${runner}`
+                    );
+                }
+                return runner;
+            }
+        }
+
+        if (this.config.verbose) {
+            console.log("⚠️ No TypeScript runner found, falling back to node");
+        }
+        return "node";
+    }
+
+    /**
+     * Check if the script is a TypeScript file
+     */
+    private isTypeScriptFile(script: string): boolean {
+        return script.endsWith(".ts") || script.endsWith(".tsx");
+    }
+
+    /**
+     * Get the appropriate runtime and arguments for the script
+     */
+    private getRuntimeConfig(): { runtime: string; args: string[] } {
+        const isTS = this.isTypeScriptFile(this.config.script);
+        const tsConfig = this.config.typescript;
+
+        // If TypeScript is disabled or not a TS file, use default behavior
+        if (!tsConfig?.enabled || !isTS) {
+            const runtime = process.execPath.includes("bun") ? "bun" : "node";
+            return {
+                runtime,
+                args: [this.config.script, ...this.config.args],
+            };
+        }
+
+        let runner = tsConfig.runner || "auto";
+
+        // Auto-detect runner if needed
+        if (runner === "auto" && tsConfig.autoDetectRunner) {
+            runner = this.detectTypeScriptRunner();
+        }
+
+        // Handle specific runners
+        switch (runner) {
+            case "tsx":
+                return {
+                    runtime: "tsx",
+                    args: [
+                        ...(tsConfig.runnerArgs || []),
+                        this.config.script,
+                        ...this.config.args,
+                    ],
+                };
+
+            case "ts-node":
+                return {
+                    runtime: "ts-node",
+                    args: [
+                        ...(tsConfig.runnerArgs || []),
+                        this.config.script,
+                        ...this.config.args,
+                    ],
+                };
+
+            case "bun":
+                return {
+                    runtime: "bun",
+                    args: [
+                        "run",
+                        ...(tsConfig.runnerArgs || []),
+                        this.config.script,
+                        ...this.config.args,
+                    ],
+                };
+
+            case "node":
+                return {
+                    runtime: "node",
+                    args: [this.config.script, ...this.config.args],
+                };
+
+            default:
+                // Custom runner
+                return {
+                    runtime: runner,
+                    args: [
+                        ...(tsConfig.runnerArgs || []),
+                        this.config.script,
+                        ...this.config.args,
+                    ],
+                };
+        }
+    }
+
+    /**
      * Start child process
      */
     private async startChildProcess(): Promise<void> {
         return new Promise((resolve, reject) => {
             try {
-                const runtime = process.execPath.includes("bun")
-                    ? "bun"
-                    : "node";
+                const { runtime, args } = this.getRuntimeConfig();
 
-                this.childProcess = spawn(
-                    runtime,
-                    [this.config.script, ...this.config.args],
-                    {
-                        cwd: this.config.cwd,
-                        env: this.config.env,
-                        stdio: "inherit",
-                        detached: false,
-                    }
-                );
+                if (this.config.verbose) {
+                    console.log(
+                        `🚀 Starting process with: ${runtime} ${args.join(" ")}`
+                    );
+                }
+
+                this.childProcess = spawn(runtime, args, {
+                    cwd: this.config.cwd,
+                    env: this.config.env,
+                    stdio: "inherit",
+                    detached: false,
+                });
 
                 this.childProcess.on("spawn", () => {
                     if (this.config.verbose) {
@@ -166,7 +293,63 @@ export class HotReloader extends EventEmitter {
                 });
 
                 this.childProcess.on("error", (error) => {
+                    // Handle TypeScript runner not found error
+                    if (
+                        error.message.includes("ENOENT") &&
+                        this.isTypeScriptFile(this.config.script)
+                    ) {
+                        const tsConfig = this.config.typescript;
+                        if (tsConfig?.fallbackToNode) {
+                            console.warn(
+                                `⚠️ TypeScript runner failed, falling back to node (this will likely fail for .ts files)`
+                            );
+                            console.warn(
+                                `💡 Install a TypeScript runner: npm install -g tsx`
+                            );
+
+                            // Retry with node
+                            this.childProcess = spawn(
+                                "node",
+                                [this.config.script, ...this.config.args],
+                                {
+                                    cwd: this.config.cwd,
+                                    env: this.config.env,
+                                    stdio: "inherit",
+                                    detached: false,
+                                }
+                            );
+                            return;
+                        }
+                    }
+
                     console.error("Child process error:", error.message);
+
+                    // Provide helpful error messages for common issues
+                    if (error.message.includes("ENOENT")) {
+                        const { runtime } = this.getRuntimeConfig();
+                        console.error(
+                            `❌ Runtime '${runtime}' not found. Please install it:`
+                        );
+
+                        switch (runtime) {
+                            case "tsx":
+                                console.error(`   npm install -g tsx`);
+                                break;
+                            case "ts-node":
+                                console.error(`   npm install -g ts-node`);
+                                break;
+                            case "bun":
+                                console.error(
+                                    `   Visit: https://bun.sh/docs/installation`
+                                );
+                                break;
+                            default:
+                                console.error(
+                                    `   Make sure '${runtime}' is installed and available in PATH`
+                                );
+                        }
+                    }
+
                     reject(error);
                 });
 

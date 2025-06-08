@@ -45,6 +45,15 @@ export interface FileWatcherConfig {
         includePatterns?: string[]; // Specific patterns to include for type checking
         verbose?: boolean; // Verbose type checking output
     };
+
+    // TypeScript execution configuration
+    typescript?: {
+        enabled?: boolean; // Auto-detect TypeScript files and use appropriate runner
+        runner?: "auto" | "tsx" | "ts-node" | "bun" | "node" | string; // TypeScript runner to use
+        runnerArgs?: string[]; // Additional arguments for the TypeScript runner
+        fallbackToNode?: boolean; // Fallback to node if TypeScript runner fails
+        autoDetectRunner?: boolean; // Auto-detect available TypeScript runner
+    };
 }
 
 export interface FileChangeEvent {

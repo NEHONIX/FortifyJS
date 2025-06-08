@@ -73,11 +73,15 @@ export const DEFAULT_FW_CONFIG: FileWatcherConfig = {
         failOnError: false, // Don't prevent restart on errors (for development)
         includePatterns: ["**/*.ts", "**/*.tsx"], // TypeScript file patterns
         verbose: true, // Detailed TypeScript checking output
-        excludePatterns: [
-            "node_modules",
-            "dist",
-            "build",
-            ".git",
-        ], // Additional patterns to exclude (beyond ignorePaths)
+        excludePatterns: ["node_modules", "dist", "build", ".git"], // Additional patterns to exclude (beyond ignorePaths)
+    },
+
+    // TypeScript execution configuration (enabled by default)
+    typescript: {
+        enabled: true, // Auto-detect TypeScript files and use appropriate runner
+        runner: "auto", // Auto-detect the best available TypeScript runner
+        runnerArgs: [], // Additional arguments for the TypeScript runner
+        fallbackToNode: true, // Fallback to node if TypeScript runner fails (with warning)
+        autoDetectRunner: true, // Auto-detect available TypeScript runner
     },
 };

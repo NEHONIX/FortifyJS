@@ -11,7 +11,7 @@ import { createOptimalCache } from "../../integrations/express/cache/CacheFactor
 import { SecureCacheAdapter } from "../../integrations/express/cache/SecureCacheAdapter";
 import { generateSafeCacheKey } from "./safe-serializer";
 import { NehoID } from "nehoid";
-import { fArray } from "../..";
+import { createSecureArray } from "../../security/secure-array";
 import {
     FUNCTION_CACHE,
     HASH_CACHE,
@@ -73,7 +73,7 @@ export class FuncExecutionEngine extends EventEmitter {
      */
     private preAllocateResources(): void {
         // Pre-generate 500 execution IDs for zero-allocation
-        const ID_POOL = fArray([] as string[]);
+        const ID_POOL = createSecureArray([] as string[]);
 
         const b = NehoID.batch({
             count: 500,

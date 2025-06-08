@@ -97,6 +97,13 @@ export class FileWatcherManager {
                 maxRestarts: this.options.fileWatcher.maxRestarts || 10,
                 gracefulShutdownTimeout: 5000,
                 verbose: this.options.fileWatcher.verbose || false,
+                typescript: this.options.fileWatcher.typescript || {
+                    enabled: true,
+                    runner: "auto",
+                    runnerArgs: [],
+                    fallbackToNode: true,
+                    autoDetectRunner: true,
+                },
             });
 
             // Initialize file watcher for the main process
@@ -257,7 +264,7 @@ export class FileWatcherManager {
 
             // Automatically check TypeScript if enabled and file is a TypeScript file
             await this.handleTypeScriptCheck(event);
-        }); 
+        });
 
         this.fileWatcher.on("restart:starting", (event: any) => {
             logger.debug(
@@ -353,7 +360,7 @@ export class FileWatcherManager {
                 if (typeCheckResult.errors.length > 0) {
                     logger.warn(
                         "typescript",
-                        `⚠️ TypeScript errors found but continuing restart (${typeCheckResult.errors.length} errors)`
+                        `TypeScript errors found but continuing restart (${typeCheckResult.errors.length} errors)`
                     );
                 }
             }
@@ -373,51 +380,26 @@ export class FileWatcherManager {
 
     /**
      * Restart server (for file watcher) with hot reload
+     * Uses HotReloader for true process restart with TypeScript support
      */
     private async restartServer(): Promise<void> {
         try {
             logger.info("fileWatcher", "🔄 Hot reloading server...");
 
-            // If we have a hot reloader, use it for true process restart
+            // Use hot reloader for true process restart (supports TypeScript)
             if (this.hotReloader) {
-                logger.info(
-                    "fileWatcher",
-                    "Using hot reloader for process restart"
-                );
                 await this.hotReloader.restart();
                 return;
             }
 
-            // Fallback: in-place restart (less effective)
-            logger.warn(
+            // This should not happen if FileWatcherManager is properly initialized
+            logger.error(
                 "fileWatcher",
-                "Hot reloader not available, using in-place restart"
+                "❌ HotReloader not available - this indicates a configuration issue"
             );
-
-            // Close current server
-            if (this.httpServer) {
-                await new Promise<void>((resolve) => {
-                    this.httpServer.close(() => {
-                        logger.debug("fileWatcher", "Server closed");
-                        resolve();
-                    });
-                });
-            }
-
-            // Stop cluster if running
-            if (this.dependencies.clusterManager?.isClusterEnabled()) {
-                await this.dependencies.clusterManager.stopCluster(true);
-                logger.debug("fileWatcher", "Cluster stopped");
-            }
-
-            // Clear module cache for hot reload
-            this.clearModuleCache();
-
-            // Small delay before restart
-            await new Promise((resolve) => setTimeout(resolve, 200));
-
-            // Restart the server with cleared cache
-            await this.reinitializeServer();
+            throw new Error(
+                "HotReloader not initialized. Cannot perform hot reload."
+            );
         } catch (error: any) {
             logger.error(
                 "fileWatcher",
@@ -425,113 +407,6 @@ export class FileWatcherManager {
                 error.message
             );
             throw error;
-        }
-    }
-
-    /**
-     * Reinitialize server with fresh configuration
-     * For true hot reload, we should restart the entire process
-     */
-    private async reinitializeServer(): Promise<void> {
-        try {
-            logger.info(
-                "fileWatcher",
-                "🔄 Triggering process restart for hot reload..."
-            );
-
-            // For true hot reload, we need to restart the entire process
-            // This ensures all modules are reloaded and configuration is fresh
-            if (this.hotReloader) {
-                // Use the hot reloader for true process restart
-                await this.hotReloader.restart();
-                return;
-            }
-
-            // Fallback: restart the HTTP server in-place (less effective but better than nothing)
-            logger.warn(
-                "fileWatcher",
-                "Hot reloader not available, attempting in-place restart"
-            );
-
-            // Re-read configuration from environment or files
-            const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-            const host = process.env.HOST || "localhost";
-
-            logger.debug("fileWatcher", `Using port: ${port}, host: ${host}`);
-
-            // Restart cluster if enabled
-            if (this.dependencies.clusterManager?.isClusterEnabled()) {
-                await this.dependencies.clusterManager.startCluster();
-                logger.debug("fileWatcher", "Cluster restarted");
-            }
-
-            // Start HTTP server with potentially updated config
-            this.httpServer = this.dependencies.app.listen(
-                port,
-                host,
-                async () => {
-                    logger.info(
-                        "fileWatcher",
-                        `🔄 Server hot-reloaded on ${host}:${port}`
-                    );
-
-                    // Restart file watcher if it was stopped
-                    if (
-                        this.fileWatcher &&
-                        !this.fileWatcher.getStatus().isWatching
-                    ) {
-                        await this.startFileWatcher();
-                    }
-                }
-            );
-
-            logger.info("fileWatcher", "✅ In-place hot reload completed");
-        } catch (error: any) {
-            logger.error(
-                "fileWatcher",
-                "Failed to reinitialize server:",
-                error.message
-            );
-            throw error;
-        }
-    }
-
-    /**
-     * Clear Node.js module cache for hot reload
-     */
-    private clearModuleCache(): void {
-        try {
-            logger.debug(
-                "fileWatcher",
-                "Clearing module cache for hot reload..."
-            );
-
-            const cacheKeys = Object.keys(require.cache);
-            let clearedCount = 0;
-
-            for (const key of cacheKeys) {
-                // Only clear modules from our project (not node_modules)
-                if (
-                    key.includes(process.cwd()) &&
-                    !key.includes("node_modules") &&
-                    !key.includes(".node") &&
-                    !key.endsWith(".json")
-                ) {
-                    delete require.cache[key];
-                    clearedCount++;
-                }
-            }
-
-            logger.debug(
-                "fileWatcher",
-                `Cleared ${clearedCount} modules from cache`
-            );
-        } catch (error: any) {
-            logger.warn(
-                "fileWatcher",
-                "Module cache clearing failed:",
-                error.message
-            );
         }
     }
 
@@ -638,7 +513,7 @@ export class FileWatcherManager {
         try {
             logger.debug(
                 "typescript",
-                `🔍 Auto-checking TypeScript for: ${filename}`
+                `Checking TypeScript for: ${filename}`
             );
 
             const result = await this.typeScriptChecker.checkFiles([filename]);
@@ -664,7 +539,7 @@ export class FileWatcherManager {
                 if (this.options.fileWatcher?.typeCheck?.verbose) {
                     logger.info(
                         "typescript",
-                        `✅ No TypeScript errors in ${filename}`
+                        `✔ No TypeScript errors in ${filename}`
                     );
                 }
             }
@@ -675,7 +550,7 @@ export class FileWatcherManager {
             ) {
                 logger.warn(
                     "typescript",
-                    `⚠️ TypeScript warnings in ${filename}:`
+                    `TypeScript warnings in ${filename}:`
                 );
                 result.warnings.slice(0, 2).forEach((warning) => {
                     logger.warn(

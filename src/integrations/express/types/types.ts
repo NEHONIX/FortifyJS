@@ -767,6 +767,15 @@ export interface ServerOptions {
             includePatterns?: string[]; // Specific patterns to include for type checking
             verbose?: boolean; // Verbose type checking output (default: false)
         };
+
+        // TypeScript execution configuration
+        typescript?: {
+            enabled?: boolean; // Auto-detect TypeScript files and use appropriate runner (default: true)
+            runner?: "auto" | "tsx" | "ts-node" | "bun" | "node" | string; // TypeScript runner to use (default: 'auto')
+            runnerArgs?: string[]; // Additional arguments for the TypeScript runner (default: [])
+            fallbackToNode?: boolean; // Fallback to node if TypeScript runner fails (default: true)
+            autoDetectRunner?: boolean; // Auto-detect available TypeScript runner (default: true)
+        };
     };
 
     // Middleware configuration
@@ -1132,6 +1141,4 @@ export interface UltraFastApp extends Express {
     initializeBuiltinPlugins?: () => Promise<void>;
     getServerStats?: () => Promise<any>;
 }
-
-
 
