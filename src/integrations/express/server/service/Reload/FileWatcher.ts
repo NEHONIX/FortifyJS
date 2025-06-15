@@ -16,7 +16,7 @@ import {
     WatcherHealth,
 } from "./types/fw.types";
 import { DEFAULT_FW_CONFIG } from "../../const/FileWatcher.config";
- 
+
 export class UltraFastFileWatcher extends EventEmitter {
     private config: FileWatcherConfig;
     private watchers: Map<string, FSWatcher> = new Map();
@@ -134,7 +134,7 @@ export class UltraFastFileWatcher extends EventEmitter {
         restartCallback?: () => Promise<void>
     ): Promise<void> {
         if (!this.config.enabled) {
-            console.log("📴 File watcher disabled");
+            console.log("File watcher disabled");
             return;
         }
 
@@ -738,7 +738,7 @@ export class UltraFastFileWatcher extends EventEmitter {
         const validPaths: string[] = [];
 
         for (const path of this.config.watchPaths) {
-            try {
+            try { 
                 const fullPath = resolve(process.cwd(), path);
                 const stats = await fs.stat(fullPath);
 

@@ -62,7 +62,7 @@ export const DEFAULT_OPTIONS: ServerOptions = {
     },
     server: {
         enableMiddleware: true,
-        port: 8085,
+        port: 8085, // Default port for a UF Server
         host: "localhost",
         trustProxy: false,
         jsonLimit: "10mb",

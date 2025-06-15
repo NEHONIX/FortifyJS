@@ -5,9 +5,9 @@
  * leveraging FortifyJS cache systems for ultra-fast performance.
  */
 
-import { func } from "../../../../../utils/fortified-function";
+import { func } from "../../../../../components/fortified-function";
 import { Hash } from "../../../../../core/hash";
-import { Cache, createOptimalCache } from "../../../../../security/cache";
+import { Cache, createOptimalCache } from "../../../../../components/cache";
 import {
     BasePlugin,
     CachePlugin as ICachePlugin,

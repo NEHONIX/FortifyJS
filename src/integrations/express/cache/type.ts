@@ -2,7 +2,7 @@ import {
     CacheStats as SecurityCacheStats,
     CachedData,
     CacheOptions,
-} from "../../../security/cache/types/cache.type";
+} from "../../../components/cache/types/cache.type";
 
 /**
  * Enhanced cache configuration
@@ -10,7 +10,7 @@ import {
 export interface SecureCacheConfig {
     // Cache strategy
     strategy?: "memory" | "redis" | "hybrid" | "distributed";
- 
+
     // Memory cache settings
     memory?: {
         maxSize?: number; // MB

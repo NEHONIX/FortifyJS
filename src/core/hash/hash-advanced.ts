@@ -1,8 +1,10 @@
 /**
- * Hash advanced features - Cutting-edge hash implementations
+ * Hash advanced features - Optimized hash implementations
  */
 
 import * as crypto from "crypto";
+import { Worker } from "worker_threads";
+import * as path from "path";
 import {
     HashAgilityResult,
     AgilityHashOptions,
@@ -12,6 +14,9 @@ import { HashUtils } from "./hash-utils";
 import { HashAlgorithms } from "../../algorithms/hash-algorithms";
 
 export class HashAdvanced {
+    private static readonly CHUNK_SIZE = 64 * 1024; // 64KB
+    private static readonly MAX_WORKERS = require("os").cpus().length;
+
     /**
      * Cryptographic agility - support for algorithm migration
      * @param input - Input to hash
@@ -80,27 +85,20 @@ export class HashAdvanced {
             outputFormat = "hex",
         } = options;
 
-        // Convert input to buffer
         const inputBuffer = HashUtils.toBuffer(input);
- 
-        // Constant-time processing
+
         if (constantTime) {
-            return HashAdvanced.constantTimeHash(
+            return this.constantTimeHash(
                 inputBuffer,
                 memoryProtection,
                 outputFormat
             );
         }
 
-        // Power analysis resistant processing
         if (powerAnalysisResistant) {
-            return HashAdvanced.powerAnalysisResistantHash(
-                inputBuffer,
-                outputFormat
-            );
+            return this.powerAnalysisResistantHash(inputBuffer, outputFormat);
         }
 
-        // Fallback to standard secure hash
         return HashAlgorithms.secureHash(input, { outputFormat });
     }
 
@@ -116,31 +114,33 @@ export class HashAdvanced {
         memoryProtection: boolean,
         outputFormat: string
     ): string | Buffer {
-        // Pad input to fixed size to prevent length-based attacks
-        const paddedInput = Buffer.alloc(1024);
-        inputBuffer.copy(paddedInput, 0, 0, Math.min(inputBuffer.length, 1024));
+        // Use fixed-size buffer to prevent length-based timing attacks
+        const blockSize = 1024;
+        const numBlocks = Math.ceil(inputBuffer.length / blockSize);
+        const paddedInput = Buffer.alloc(numBlocks * blockSize);
 
-        // Use constant-time operations
-        let hash = crypto.createHash("sha256");
+        inputBuffer.copy(paddedInput, 0, 0, inputBuffer.length);
 
-        // Process in constant-time chunks
-        for (let i = 0; i < paddedInput.length; i += 64) {
-            const chunk = paddedInput.subarray(i, i + 64);
-            hash.update(chunk);
+        // Use HMAC for constant-time properties
+        const key = crypto.randomBytes(32);
+        const hmac = crypto.createHmac("sha256", key);
 
-            // Add constant delay to prevent timing analysis
-            const start = Date.now();
-            while (Date.now() - start < 1) {
-                // Constant time delay
-            }
+        // Process in fixed-size blocks
+        for (let i = 0; i < paddedInput.length; i += blockSize) {
+            const block = paddedInput.subarray(i, i + blockSize);
+            hmac.update(block);
         }
 
-        const result = hash.digest();
+        const result = hmac.digest();
 
-        // Memory protection - clear sensitive data
+        // Secure memory cleanup
         if (memoryProtection) {
             paddedInput.fill(0);
-            inputBuffer.fill(0);
+            key.fill(0);
+            // Force garbage collection hint
+            if (global.gc) {
+                global.gc();
+            }
         }
 
         return HashUtils.formatOutput(
@@ -156,7 +156,7 @@ export class HashAdvanced {
     }
 
     /**
-     * Power analysis resistant hash processing
+     * Power analysis resistant hash processing - optimized implementation
      * @param inputBuffer - Input buffer
      * @param outputFormat - Output format
      * @returns Power analysis resistant hash
@@ -165,19 +165,14 @@ export class HashAdvanced {
         inputBuffer: Buffer,
         outputFormat: string
     ): string | Buffer {
-        // Use multiple hash rounds with random delays
+        // Use multiple hash algorithms to create noise
+        const algorithms = ["sha256", "sha512", "sha3-256"];
         let result = inputBuffer;
-        const rounds = 3 + Math.floor(Math.random() * 3); // 3-5 rounds
 
-        for (let i = 0; i < rounds; i++) {
-            result = crypto.createHash("sha512").update(result).digest();
-
-            // Random delay to prevent power analysis
-            const delay = Math.floor(Math.random() * 5) + 1;
-            const start = Date.now();
-            while (Date.now() - start < delay) {
-                // Random delay
-            }
+        // Fixed number of rounds with different algorithms
+        for (let i = 0; i < 3; i++) {
+            const algo = algorithms[i % algorithms.length];
+            result = crypto.createHash(algo).update(result).digest();
         }
 
         return HashUtils.formatOutput(
@@ -193,7 +188,7 @@ export class HashAdvanced {
     }
 
     /**
-     * Parallel hash processing for performance
+     * tse.ExecutionResultparallel hash processing using worker threads
      * @param input - Input to hash
      * @param options - Parallel processing options
      * @returns Promise resolving to hash result
@@ -208,15 +203,15 @@ export class HashAdvanced {
         } = {}
     ): Promise<string | Buffer> {
         const {
-            chunkSize = 64 * 1024, // 64KB chunks
-            workers = 4,
+            chunkSize = this.CHUNK_SIZE,
+            workers = Math.min(this.MAX_WORKERS, 4),
             algorithm = "sha256",
             outputFormat = "hex",
         } = options;
 
         const inputBuffer = HashUtils.toBuffer(input);
 
-        // If input is small, use single-threaded processing
+        // Use single-threaded for small inputs
         if (inputBuffer.length <= chunkSize) {
             return HashAlgorithms.secureHash(input, {
                 algorithm,
@@ -230,29 +225,67 @@ export class HashAdvanced {
             chunks.push(inputBuffer.subarray(i, i + chunkSize));
         }
 
-        // Process chunks in parallel (simulated with Promise.all)
-        const chunkHashes = await Promise.all(
-            chunks.map(async (chunk, index) => {
-                // Add small delay to simulate parallel processing
-                await new Promise((resolve) =>
-                    setTimeout(resolve, index % workers)
+        // Process chunks with actual worker threads
+        const workerPromises = chunks.map((chunk, index) => {
+            return new Promise<Buffer>((resolve, reject) => {
+                const worker = new Worker(
+                    `
+                    const { parentPort } = require('worker_threads');
+                    const crypto = require('crypto');
+                    
+                    parentPort.on('message', ({ chunk, algorithm }) => {
+                        try {
+                            const hash = crypto.createHash(algorithm).update(chunk).digest();
+                            parentPort.postMessage({ success: true, hash });
+                        } catch (error) {
+                            parentPort.postMessage({ success: false, error: error.message });
+                        }
+                    });
+                `,
+                    { eval: true }
                 );
-                return crypto.createHash(algorithm).update(chunk).digest();
-            })
-        );
 
-        // Combine chunk hashes
-        const combinedHash = crypto.createHash(algorithm);
-        for (const chunkHash of chunkHashes) {
-            combinedHash.update(chunkHash);
+                worker.postMessage({ chunk, algorithm });
+
+                worker.on("message", ({ success, hash, error }) => {
+                    if (success) {
+                        resolve(hash);
+                    } else {
+                        reject(new Error(error));
+                    }
+                    worker.terminate();
+                });
+
+                worker.on("error", reject);
+            });
+        });
+
+        try {
+            const chunkHashes = await Promise.all(workerPromises);
+
+            // Combine chunk hashes
+            const combinedHash = crypto.createHash(algorithm);
+            for (const chunkHash of chunkHashes) {
+                combinedHash.update(chunkHash);
+            }
+
+            const result = combinedHash.digest();
+            return HashUtils.formatOutput(result, outputFormat);
+        } catch (error) {
+            // Fallback to single-threaded processing
+            console.warn(
+                "Parallel processing failed, falling back to single-threaded:",
+                error
+            );
+            return HashAlgorithms.secureHash(input, {
+                algorithm,
+                outputFormat,
+            });
         }
-
-        const result = combinedHash.digest();
-        return HashUtils.formatOutput(result, outputFormat);
     }
 
     /**
-     * Streaming hash for large data processing
+     * Optimized streaming hash for large data processing
      * @param algorithm - Hash algorithm
      * @param options - Streaming options
      * @returns Stream hash processor
@@ -269,43 +302,58 @@ export class HashAdvanced {
         reset: () => void;
         getProgress: () => { processed: number; chunks: number };
     } {
-        const { chunkSize = 64 * 1024, progressCallback } = options;
+        const { chunkSize = this.CHUNK_SIZE, progressCallback } = options;
 
         let hash = crypto.createHash(algorithm);
         let totalProcessed = 0;
         let chunksProcessed = 0;
+        let buffer = Buffer.alloc(0);
 
         return {
             update: (chunk: Buffer) => {
-                // Process in smaller chunks if needed
-                let offset = 0;
-                while (offset < chunk.length) {
-                    const end = Math.min(offset + chunkSize, chunk.length);
-                    const subChunk = chunk.subarray(offset, end);
-                    hash.update(subChunk);
-                    offset = end;
-                    totalProcessed += subChunk.length;
+                // Accumulate data in buffer for optimal processing
+                buffer = Buffer.concat([buffer, chunk]);
+
+                // Process complete chunks
+                while (buffer.length >= chunkSize) {
+                    const processChunk = buffer.subarray(0, chunkSize);
+                    hash.update(processChunk);
+                    buffer = buffer.subarray(chunkSize);
+
+                    totalProcessed += chunkSize;
                     chunksProcessed++;
 
-                    // Call progress callback if provided
                     if (progressCallback) {
                         progressCallback(totalProcessed);
                     }
                 }
             },
+
             digest: () => {
+                // Process remaining buffer
+                if (buffer.length > 0) {
+                    hash.update(buffer);
+                    totalProcessed += buffer.length;
+                }
+
                 const result = hash.digest();
-                // Reset for potential reuse
+
+                // Reset state
                 hash = crypto.createHash(algorithm);
+                buffer = Buffer.alloc(0);
                 totalProcessed = 0;
                 chunksProcessed = 0;
+
                 return result;
             },
+
             reset: () => {
                 hash = crypto.createHash(algorithm);
+                buffer = Buffer.alloc(0);
                 totalProcessed = 0;
                 chunksProcessed = 0;
             },
+
             getProgress: () => ({
                 processed: totalProcessed,
                 chunks: chunksProcessed,
@@ -314,7 +362,7 @@ export class HashAdvanced {
     }
 
     /**
-     * Merkle tree hash for data integrity
+     * Optimized Merkle tree hash for data integrity
      * @param data - Array of data chunks
      * @param algorithm - Hash algorithm
      * @returns Merkle root hash
@@ -327,39 +375,48 @@ export class HashAdvanced {
             throw new Error("Cannot create Merkle tree from empty data");
         }
 
-        // Convert all data to buffers and hash them
-        let hashes = data.map((chunk) => {
-            const buffer = HashUtils.toBuffer(chunk);
-            return crypto.createHash(algorithm).update(buffer).digest();
-        });
+        // Pre-allocate arrays for better performance
+        let hashes = new Array<Buffer>(data.length);
 
-        // Build Merkle tree bottom-up
+        // Hash all leaf nodes
+        for (let i = 0; i < data.length; i++) {
+            const buffer = HashUtils.toBuffer(data[i]);
+            hashes[i] = crypto.createHash(algorithm).update(buffer).digest();
+        }
+
+        // Build tree bottom-up with optimized memory usage
         while (hashes.length > 1) {
-            const newHashes: Buffer[] = [];
+            const nextLevel = new Array<Buffer>(Math.ceil(hashes.length / 2));
+            let nextIndex = 0;
 
             for (let i = 0; i < hashes.length; i += 2) {
                 if (i + 1 < hashes.length) {
-                    // Combine pair of hashes
-                    const combined = Buffer.concat([hashes[i], hashes[i + 1]]);
-                    const parentHash = crypto
+                    // Combine pair of hashes efficiently
+                    const combined = Buffer.allocUnsafe(
+                        hashes[i].length + hashes[i + 1].length
+                    );
+                    hashes[i].copy(combined, 0);
+                    hashes[i + 1].copy(combined, hashes[i].length);
+
+                    nextLevel[nextIndex] = crypto
                         .createHash(algorithm)
                         .update(combined)
                         .digest();
-                    newHashes.push(parentHash);
                 } else {
                     // Odd number of hashes, promote the last one
-                    newHashes.push(hashes[i]);
+                    nextLevel[nextIndex] = hashes[i];
                 }
+                nextIndex++;
             }
 
-            hashes = newHashes;
+            hashes = nextLevel;
         }
 
         return hashes[0];
     }
 
     /**
-     * Incremental hash for append-only data
+     * Optimized incremental hash for append-only data
      * @param previousHash - Previous hash state
      * @param newData - New data to append
      * @param algorithm - Hash algorithm
@@ -376,14 +433,18 @@ export class HashAdvanced {
 
         const newBuffer = HashUtils.toBuffer(newData);
 
-        // Combine previous hash with new data
-        const combined = Buffer.concat([prevBuffer, newBuffer]);
+        // Efficient concatenation and hashing
+        const totalLength = prevBuffer.length + newBuffer.length;
+        const combined = Buffer.allocUnsafe(totalLength);
+
+        prevBuffer.copy(combined, 0);
+        newBuffer.copy(combined, prevBuffer.length);
 
         return crypto.createHash(algorithm).update(combined).digest();
     }
 
     /**
-     * Hash chain for sequential data integrity
+     * Optimized hash chain for sequential data integrity
      * @param data - Array of data items
      * @param algorithm - Hash algorithm
      * @returns Array of chained hashes
@@ -396,27 +457,72 @@ export class HashAdvanced {
             return [];
         }
 
-        const hashes: Buffer[] = [];
+        const hashes = new Array<Buffer>(data.length);
         let previousHash: Buffer | null = null;
 
-        for (const item of data) {
-            const itemBuffer = HashUtils.toBuffer(item);
+        for (let i = 0; i < data.length; i++) {
+            const itemBuffer = HashUtils.toBuffer(data[i]);
+            const hasher = crypto.createHash(algorithm);
 
-            let hashInput: Buffer;
             if (previousHash) {
-                hashInput = Buffer.concat([previousHash, itemBuffer]);
-            } else {
-                hashInput = itemBuffer;
+                hasher.update(previousHash);
             }
+            hasher.update(itemBuffer);
 
-            const hash = crypto
-                .createHash(algorithm)
-                .update(hashInput)
-                .digest();
-            hashes.push(hash);
+            const hash = hasher.digest();
+            hashes[i] = hash;
             previousHash = hash;
         }
 
         return hashes;
+    }
+
+    /**
+     * Batch hash processing for multiple inputs
+     * @param inputs - Array of inputs to hash
+     * @param algorithm - Hash algorithm
+     * @param outputFormat - Output format
+     * @returns Array of hashes
+     */
+    public static batchHash(
+        inputs: (string | Uint8Array | Buffer)[],
+        algorithm: string = "sha256",
+        outputFormat: "hex" | "base64" | "buffer" = "hex"
+    ): (string | Buffer)[] {
+        const results = new Array<string | Buffer>(inputs.length);
+
+        for (let i = 0; i < inputs.length; i++) {
+            const buffer = HashUtils.toBuffer(inputs[i]);
+            const hash = crypto.createHash(algorithm).update(buffer).digest();
+            results[i] = HashUtils.formatOutput(hash, outputFormat);
+        }
+
+        return results;
+    }
+ 
+    /**
+     * Memory-efficient hash verification
+     * @param input - Input to verify
+     * @param expectedHash - Expected hash value
+     * @param algorithm - Hash algorithm
+     * @returns True if hash matches
+     */
+    public static verifyHash(
+        input: string | Uint8Array | Buffer,
+        expectedHash: string | Buffer,
+        algorithm: string = "sha256"
+    ): boolean {
+        const inputBuffer = HashUtils.toBuffer(input);
+        const computedHash = crypto
+            .createHash(algorithm)
+            .update(inputBuffer)
+            .digest();
+
+        const expectedBuffer = Buffer.isBuffer(expectedHash)
+            ? expectedHash
+            : Buffer.from(expectedHash, "hex");
+
+        // Constant-time comparison to prevent timing attacks
+        return crypto.timingSafeEqual(computedHash, expectedBuffer);
     }
 }

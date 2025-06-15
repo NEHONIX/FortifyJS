@@ -1,4 +1,4 @@
-import SecureString from "../security/secure-string";
+import SecureString from "../components/secure-string";
 
 /**
  * Options for HMAC operations

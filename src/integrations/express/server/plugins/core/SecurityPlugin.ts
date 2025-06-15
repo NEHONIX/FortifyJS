@@ -8,7 +8,7 @@
  * Focus: Framework-level security that integrates with any authentication system
  */
 
-import { func } from "../../../../../utils/fortified-function";
+import { func } from "../../../../../components/fortified-function";
 import { Hash } from "../../../../../core/hash";
 import {
     BasePlugin,
@@ -24,7 +24,7 @@ import { SecurityRateLimiter } from "../../../../../utils/securityUtils";
 import {
     TamperEvidentLogger,
     LogLevel,
-} from "../../../../../security/tamper-evident-logging";
+} from "../../../../../components/tamper-evident-logging";
 
 /**
  * Abstract base class for security plugins

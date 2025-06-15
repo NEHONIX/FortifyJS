@@ -13,12 +13,12 @@
 
 import { EventEmitter } from "events";
 import Redis, { Cluster } from "ioredis";
-import { SecureInMemoryCache } from "../../../security/cache/useCache";
+import { SecureInMemoryCache } from "../../../components/cache/useCache";
 import {
     CacheStats as SecurityCacheStats,
     CachedData,
     CacheOptions,
-} from "../../../security/cache/types/cache.type";
+} from "../../../components/cache/types/cache.type";
 import { EncryptionService } from "../encryption";
 
 import { FortifyJS } from "../../../core/crypto";

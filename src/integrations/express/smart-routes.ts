@@ -6,7 +6,7 @@
 import { Request, Response, NextFunction } from "express";
 import { RouteConfig, RouteHandler, MiddlewareFunction } from "./types/types";
 import { SecureCacheAdapter } from "./cache/SecureCacheAdapter";
-import { func } from "../../utils/fortified-function";
+import { func } from "../../components/fortified-function";
 import { FortifyJS } from "../../core/crypto";
 import { Validators } from "../../core/validators";
 import { Hash } from "../../core/hash";

@@ -1,7 +1,7 @@
 import { FileWatcherConfig } from "../service/Reload/types/fw.types";
 
 export const DEFAULT_FW_CONFIG: FileWatcherConfig = {
-    enabled: true,
+    enabled: false,
     watchPaths: ["src", "lib", "core"],
     ignorePaths: [
         "node_modules",
@@ -83,5 +83,15 @@ export const DEFAULT_FW_CONFIG: FileWatcherConfig = {
         runnerArgs: [], // Additional arguments for the TypeScript runner
         fallbackToNode: true, // Fallback to node if TypeScript runner fails (with warning)
         autoDetectRunner: true, // Auto-detect available TypeScript runner
+        enableRuntimeCompilation: true, // Enable runtime TypeScript compilation as ultimate fallback
+        compilerOptions: {
+            target: "ES2020",
+            module: "CommonJS",
+            moduleResolution: "node",
+            allowSyntheticDefaultImports: true,
+            esModuleInterop: true,
+            skipLibCheck: true,
+            strict: false, // Less strict for development
+        },
     },
 };

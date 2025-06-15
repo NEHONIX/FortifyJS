@@ -1,6 +1,6 @@
 /**
  * FortifyJS Express Cache Module
- * 
+ *
  * Ultra-fast, secure cache system combining:
  * - FortifyJS Security Cache (memory-based with encryption)
  * - Redis Cluster support with failover
@@ -8,24 +8,22 @@
  * - Advanced monitoring and health checks
  */
 
-export { SecureCacheAdapter } from './SecureCacheAdapter';
-export type { 
-    SecureCacheConfig, 
-    EnhancedCacheStats 
-} from './type';
+export { SecureCacheAdapter } from "./SecureCacheAdapter";
+export type { SecureCacheConfig, EnhancedCacheStats } from "./type";
 
 // Legacy compatibility exports
-export { 
+export {
     SecureInMemoryCache,
     Cache,
     readCache,
     writeCache,
     getCacheStats,
     expireCache,
-    clearAllCache
-} from '../../../security/cache';
+    clearAllCache,
+} from "../../../components/cache";
 
-export type { 
+export type {
     CacheStats,
-    CacheOptions 
-} from '../../../security/cache/types/cache.type';
+    CacheOptions,
+} from "../../../components/cache/types/cache.type";
+

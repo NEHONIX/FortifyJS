@@ -84,27 +84,27 @@ export class FileWatcherManager {
         if (this.isMainProcess) {
             console.log("reloading...");
             // Main process: Initialize hot reloader for true process restart
-            this.hotReloader = new HotReloader({
-                enabled: true,
-                script: process.argv[1] || "index.js",
-                args: process.argv.slice(2),
-                env: {
-                    ...process.env,
-                    FORTIFY_CHILD_PROCESS: "true", // Mark child processes
-                },
-                cwd: process.cwd(),
-                restartDelay: this.options.fileWatcher.restartDelay || 500,
-                maxRestarts: this.options.fileWatcher.maxRestarts || 10,
-                gracefulShutdownTimeout: 5000,
-                verbose: this.options.fileWatcher.verbose || false,
-                typescript: this.options.fileWatcher.typescript || {
+            this.hotReloader = new HotReloader(
+                {
                     enabled: true,
-                    runner: "auto",
-                    runnerArgs: [],
-                    fallbackToNode: true,
-                    autoDetectRunner: true,
+                    script: process.argv[1] || "index.js",
+                    args: process.argv.slice(2),
+                    env: process.env, // Don't set FORTIFY_CHILD_PROCESS here - it will be set when spawning child processes
+                    cwd: process.cwd(),
+                    restartDelay: this.options.fileWatcher.restartDelay || 500,
+                    maxRestarts: this.options.fileWatcher.maxRestarts || 10,
+                    gracefulShutdownTimeout: 5000,
+                    verbose: this.options.fileWatcher.verbose || false,
+                    typescript: this.options.fileWatcher.typescript || {
+                        enabled: true,
+                        runner: "auto",
+                        runnerArgs: [],
+                        fallbackToNode: true,
+                        autoDetectRunner: true,
+                    },
                 },
-            });
+                this.options
+            );
 
             // Initialize file watcher for the main process
             this.fileWatcher = new UltraFastFileWatcher(
@@ -511,10 +511,7 @@ export class FileWatcherManager {
         }
 
         try {
-            logger.debug(
-                "typescript",
-                `Checking TypeScript for: ${filename}`
-            );
+            logger.debug("typescript", `Checking TypeScript for: ${filename}`);
 
             const result = await this.typeScriptChecker.checkFiles([filename]);
 

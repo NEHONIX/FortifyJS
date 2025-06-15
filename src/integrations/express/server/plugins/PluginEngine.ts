@@ -7,7 +7,7 @@
 
 import { EventEmitter } from "events";
 import { Request, Response, NextFunction } from "express";
-import { func } from "../../../../utils/fortified-function";
+import { func } from "../../../../components/fortified-function";
 import { NehoID } from "nehoid";
 import {
     BasePlugin,

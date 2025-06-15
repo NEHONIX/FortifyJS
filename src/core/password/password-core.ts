@@ -6,8 +6,8 @@
  */
 
 import { SecureRandom } from "../random";
-import { secureWipe } from "../../security";
-import { constantTimeEqual } from "../../security";
+import { secureWipe } from "../../components";
+import { constantTimeEqual } from "../../components";
 import {
     PasswordAlgorithm,
     PasswordSecurityLevel,

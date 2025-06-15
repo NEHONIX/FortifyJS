@@ -19,8 +19,31 @@ import { RandomGenerators } from "./random-generators";
 import { EnhancedUint8Array } from "../../helpers/Uint8Array";
 
 /**
- * Ultra-secure random number generation with modular architecture
- * Provides military-grade security with multiple entropy sources
+ * ## Core Cryptographic Exports
+ *
+ * Primary cryptographic classes and utilities for secure random generation,
+ * key management, validation, and buffer operations.
+ */
+
+/**
+ * ### Secure Random Generation
+ *
+ * High-entropy random number and data generation with multiple entropy sources.
+ * Provides cryptographically secure random values for all security operations.
+ *
+ * @example
+ * ```typescript
+ * import { Random } from "fortify2-js";
+ *
+ * // Generate secure random bytes
+ * const randomBytes = Random.getRandomBytes(32);
+ *
+ * // Generate secure UUID
+ * const uuid = Random.generateSecureUUID();
+ *
+ * // Generate random integers
+ * const randomInt = Random.getSecureRandomInt(1, 100);
+ * ```
  */
 export class SecureRandom {
     private static instance: SecureRandom;

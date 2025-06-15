@@ -1,11 +1,15 @@
 {
     "name": "fortify2-js",
-    "version": "4.5.7",
+    "version": "4.5.11",
     "description": "MOST POWERFUL JavaScript Security Library! Military-grade cryptography + 19 enhanced object methods + quantum-resistant algorithms + perfect TypeScript support. More powerful than Lodash with built-in security.",
     "main": "./dist/cjs/index.js",
     "module": "./dist/esm/index.js",
     "types": "./dist/index.d.ts",
     "type": "module",
+    "bin": {
+        "tsr": "./dist/tsr/tsr.cjs",
+        "typescript-runner": "./dist/tsr/tsr.cjs"
+    },
     "files": [
         "dist/cjs/index.js",
         "dist/cjs/package.json",
@@ -32,21 +36,24 @@
         "dist/esm/types",
         "dist/esm/utils",
         "dist/esm/types.js",
+        "dist/tsr",
         "README.md",
         "LICENSE"
     ],
     "scripts": {
         "build": "node --max-old-space-size=4096 node_modules/rollup/dist/bin/rollup -c rollup.config.js",
         "build:memory": "node --max-old-space-size=6144 node_modules/rollup/dist/bin/rollup -c rollup.config.js",
-        "dev": "rollup -c rollup.config.js -w",
+        "build:tsr": "node build-tsr.mjs",
+        "build:standalone": "node build-standalone.mjs",
+        "build:all": "npm run build && npm run build:standalone",
         "test": "jest",
         "test:watch": "jest --watch",
         "test:coverage": "jest --coverage",
         "benchmark": "node benchmarks/index.js",
         "lint": "eslint src --ext .ts",
         "type-check": "tsc --noEmit",
-        "docs": "typedoc src/index.ts",
         "prepublishOnly": "npm run build",
+        "docs": "typedoc src/index.ts",
         "server": "ts-node src/server/start.ts",
         "server:build": "tsc src/server/start.ts --outDir dist/server",
         "server:start": "node dist/server/start.js"
@@ -232,15 +239,19 @@
         "@types/ioredis": "^4.28.10",
         "@types/msgpack-lite": "^0.1.11",
         "@types/node-os-utils": "^1.3.4",
+        "@types/pako": "^2.0.3",
         "@types/pidusage": "^2.0.5",
         "@types/redis": "^4.0.10",
         "@types/systeminformation": "^3.23.1",
         "aes-js": "^3.1.2",
         "argon2": "^0.43.0",
+        "argon2-browser": "^1.18.0",
+        "axios": "^1.6.0",
         "bcrypt": "^6.0.0",
         "bcryptjs": "^2.4.3",
         "check-disk-space": "^3.4.0",
         "compression": "^1.8.0",
+        "concurrently": "^8.2.2",
         "cors": "^2.8.5",
         "crypto-js": "^4.2.0",
         "crystals-kyber": "^5.1.0",
@@ -261,6 +272,7 @@
         "noble": "^1.9.1",
         "node-forge": "^1.3.1",
         "node-os-utils": "^1.3.7",
+        "pako": "^2.1.0",
         "pbkdf2": "^3.1.2",
         "pidusage": "^4.0.1",
         "pqc-kyber": "^0.7.0",
@@ -273,4 +285,3 @@
         "ws": "^8.18.2"
     }
 }
-

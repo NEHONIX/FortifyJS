@@ -65,7 +65,7 @@ export enum KeyDerivationAlgorithm {
     ARGON2 = "argon2",
     BALLOON = "balloon",
 }
-
+  
 /**
  * Entropy source enum
  */

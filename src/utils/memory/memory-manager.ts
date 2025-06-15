@@ -28,11 +28,7 @@
  * SOFTWARE.
  ***************************************************************************** */
 
-/**
- * Advanced Memory Manager
- *
- * Main orchestrator for the memory management system with all components
- */
+
 
 import { initializePolyfills } from "../../types/global";
 import {
@@ -57,7 +53,9 @@ import { AdvancedMemoryPool } from "./memory-pool";
 initializePolyfills();
 
 /**
- * Advanced Memory Manager with modular architecture
+ * Advanced Memory Manager
+ *
+ * Main orchestrator for the memory management system with all components
  */
 export class AdvancedMemoryManager {
     private static instance: AdvancedMemoryManager;

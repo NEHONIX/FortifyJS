@@ -124,7 +124,11 @@ export class Logger {
         let formatted = message;
 
         if (this.config?.format?.prefix && !this.config?.format?.compact) {
-            const prefix = `[${component.toUpperCase()}]`;
+            const prefix = `[${
+                component === "server"
+                    ? "SYSTEM".toUpperCase()
+                    : component.toUpperCase()
+            }]`;
             formatted = `${prefix} ${message}`;
         }
 

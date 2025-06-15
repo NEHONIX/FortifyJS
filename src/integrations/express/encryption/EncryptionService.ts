@@ -14,7 +14,7 @@
 import { Hash } from "../../../core/hash";
 import { SecureRandom, RandomCrypto } from "../../../core/random";
 import { Validators } from "../../../core/validators";
-import { SecureBuffer } from "../../../security/secure-memory";
+import { SecureBuffer } from "../../../components/secure-memory";
 
 import * as crypto from "crypto";
 

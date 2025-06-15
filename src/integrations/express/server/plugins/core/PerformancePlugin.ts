@@ -5,7 +5,7 @@
  * and comprehensive metrics collection using FortifyJS performance utilities.
  */
 
-import { func } from "../../../../../utils/fortified-function";
+import { func } from "../../../../../components/fortified-function";
 import {
     BasePlugin,
     PerformancePlugin as IPerformancePlugin,

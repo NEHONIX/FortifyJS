@@ -1,5 +1,6 @@
 /**
  * Random security - Advanced security features and monitoring
+ * Optimized for real-world applications
  */
 
 import * as crypto from "crypto";
@@ -7,7 +8,6 @@ import { SecurityLevel } from "../../types";
 import {
     EntropyQuality,
     SecurityMonitoringResult,
-    EntropyAnalysisResult,
     RandomGenerationOptions,
 } from "./random-types";
 import { RandomEntropy } from "./random-entropy";
@@ -17,6 +17,8 @@ export class RandomSecurity {
     private static securityAlerts: string[] = [];
     private static lastSecurityCheck: number = Date.now();
     private static threatLevel: "low" | "medium" | "high" | "critical" = "low";
+    private static monitoringEnabled = false;
+    private static monitoringInterval: NodeJS.Timeout | null = null;
 
     /**
      * Perform comprehensive security assessment
@@ -31,29 +33,26 @@ export class RandomSecurity {
 
         // Analyze entropy if data provided
         let entropyQuality = EntropyQuality.GOOD;
-        if (data) {
+        if (data && data.length > 0) {
             entropyQuality = RandomEntropy.assessEntropyQuality(data);
         }
 
         // Assess threats
-        const threats = RandomSecurity.assessThreats(
-            libraryStatus,
-            entropyQuality
-        );
+        const threats = this.assessThreats(libraryStatus, entropyQuality);
 
         // Generate recommendations
-        const recommendations = RandomSecurity.generateRecommendations(
+        const recommendations = this.generateRecommendations(
             threats,
             libraryStatus
         );
 
         // Determine security level
-        const securityLevel = RandomSecurity.determineSecurityLevel(
+        const securityLevel = this.determineSecurityLevel(
             threats,
             entropyQuality
         );
 
-        RandomSecurity.lastSecurityCheck = timestamp;
+        this.lastSecurityCheck = timestamp;
 
         return {
             entropyQuality,
@@ -61,14 +60,14 @@ export class RandomSecurity {
             threats,
             recommendations,
             timestamp,
-            bytesGenerated: 0, // This would be filled by the calling class
-            reseedCount: 0, // This would be filled by the calling class
+            bytesGenerated: 0,
+            reseedCount: 0,
             libraryStatus,
         };
     }
 
     /**
-     * Assess current threats
+     * Assess current threats based on real-world security concerns
      */
     private static assessThreats(
         libraryStatus: any,
@@ -76,48 +75,50 @@ export class RandomSecurity {
     ): string[] {
         const threats: string[] = [];
 
-        // Entropy quality threats
+        // Reset threat level for fresh assessment
+        this.threatLevel = "low";
+
+        // Critical entropy quality issues
         if (entropyQuality === EntropyQuality.POOR) {
-            threats.push("Critical: Very low entropy quality detected");
-            RandomSecurity.threatLevel = "critical";
+            threats.push(
+                "Critical entropy quality - immediate attention required"
+            );
+            this.threatLevel = "critical";
         } else if (entropyQuality === EntropyQuality.FAIR) {
-            threats.push("Warning: Low entropy quality");
-            if (RandomSecurity.threatLevel === "low") {
-                RandomSecurity.threatLevel = "medium";
+            threats.push("Suboptimal entropy quality detected");
+            this.updateThreatLevel("medium");
+        }
+
+        // Entropy source availability
+        if (libraryStatus && typeof libraryStatus === "object") {
+            const availableLibraries =
+                Object.values(libraryStatus).filter(Boolean).length;
+            if (availableLibraries === 0) {
+                threats.push("No enhanced entropy sources available");
+                this.threatLevel = "critical";
+            } else if (availableLibraries === 1) {
+                threats.push("Single point of failure in entropy sources");
+                this.updateThreatLevel("medium");
             }
         }
 
-        // Library availability threats
-        const availableLibraries =
-            Object.values(libraryStatus).filter(Boolean).length;
-        if (availableLibraries === 0) {
-            threats.push("Critical: No enhanced entropy libraries available");
-            RandomSecurity.threatLevel = "critical";
-        } else if (availableLibraries < 2) {
-            threats.push("Warning: Limited entropy sources available");
-            if (RandomSecurity.threatLevel === "low") {
-                RandomSecurity.threatLevel = "medium";
-            }
+        // Platform-specific entropy checks
+        if (!this.isSecureRandomAvailable()) {
+            threats.push("Secure random generation not available");
+            this.threatLevel = "critical";
         }
 
-        // Hardware entropy threats
-        if (!RandomSecurity.isHardwareEntropyAvailable()) {
-            threats.push("Warning: Hardware entropy not available");
-        }
-
-        // Timing-based threats
-        if (RandomSecurity.detectTimingAttackRisk()) {
-            threats.push("Medium: Potential timing attack vulnerability");
-            if (RandomSecurity.threatLevel === "low") {
-                RandomSecurity.threatLevel = "medium";
-            }
+        // Performance-based risk assessment
+        if (this.detectHighFrequencyUsage()) {
+            threats.push("High-frequency random generation detected");
+            this.updateThreatLevel("medium");
         }
 
         return threats;
     }
 
     /**
-     * Generate security recommendations
+     * Generate actionable security recommendations
      */
     private static generateRecommendations(
         threats: string[],
@@ -125,84 +126,94 @@ export class RandomSecurity {
     ): string[] {
         const recommendations: string[] = [];
 
+        // Entropy quality recommendations
         if (threats.some((t) => t.includes("entropy quality"))) {
-            recommendations.push(
-                "Enable quantum-safe mode for enhanced entropy"
-            );
-            recommendations.push(
-                "Consider reseeding entropy pool more frequently"
-            );
+            recommendations.push("Implement entropy pooling and mixing");
+            recommendations.push("Consider hardware security modules");
         }
 
-        if (threats.some((t) => t.includes("entropy libraries"))) {
-            recommendations.push(
-                "Install additional entropy libraries (libsodium, secure-random)"
-            );
+        // Source diversity recommendations
+        if (
+            threats.some(
+                (t) =>
+                    t.includes("entropy sources") || t.includes("Single point")
+            )
+        ) {
+            recommendations.push("Diversify entropy sources");
+            recommendations.push("Implement entropy source failover");
         }
 
-        if (threats.some((t) => t.includes("Hardware entropy"))) {
-            recommendations.push("Use hardware security modules if available");
+        // Platform security recommendations
+        if (threats.some((t) => t.includes("Secure random"))) {
+            recommendations.push("Upgrade to secure random generation");
+            recommendations.push("Verify cryptographic library versions");
         }
 
-        if (threats.some((t) => t.includes("timing attack"))) {
-            recommendations.push("Enable timing-safe operations");
-            recommendations.push("Use constant-time algorithms");
+        // Performance recommendations
+        if (threats.some((t) => t.includes("High-frequency"))) {
+            recommendations.push("Implement entropy caching");
+            recommendations.push("Use batch random generation");
         }
 
+        // Default recommendation for secure systems
         if (threats.length === 0) {
-            recommendations.push(
-                "Security posture is good - maintain current practices"
-            );
+            recommendations.push("Maintain current security practices");
+            recommendations.push("Schedule regular security assessments");
         }
 
         return recommendations;
     }
 
     /**
-     * Determine overall security level
+     * Determine security level based on threat assessment
      */
     private static determineSecurityLevel(
         threats: string[],
         entropyQuality: EntropyQuality
     ): SecurityLevel {
-        if (threats.some((t) => t.includes("Critical"))) {
-            return SecurityLevel.STANDARD;
+        // Critical threats require immediate attention
+        if (this.threatLevel === "critical") {
+            return SecurityLevel.STANDARD; // Fallback to standard until issues resolved
         }
 
-        if (threats.length > 2 || entropyQuality === EntropyQuality.POOR) {
-            return SecurityLevel.HIGH;
-        }
-
-        if (threats.length > 0 || entropyQuality === EntropyQuality.FAIR) {
-            return SecurityLevel.HIGH;
-        }
-
-        if (entropyQuality === EntropyQuality.MILITARY) {
+        // High-quality entropy deserves maximum security
+        if (
+            entropyQuality === EntropyQuality.MILITARY &&
+            threats.length === 0
+        ) {
             return SecurityLevel.MAXIMUM;
         }
 
+        // Medium threats or fair entropy
+        if (
+            this.threatLevel === "medium" ||
+            entropyQuality === EntropyQuality.FAIR
+        ) {
+            return SecurityLevel.HIGH;
+        }
+
+        // Default to high security for good entropy
         return SecurityLevel.HIGH;
     }
 
     /**
-     * Check if hardware entropy is available
+     * Check if secure random generation is available
      */
-    private static isHardwareEntropyAvailable(): boolean {
+    private static isSecureRandomAvailable(): boolean {
         try {
-            // Check for Web Crypto API
-            if (
-                typeof crypto !== "undefined" &&
-                typeof crypto.getRandomValues === "function"
-            ) {
+            // Node.js crypto module
+            if (typeof crypto !== "undefined" && crypto.randomBytes) {
+                crypto.randomBytes(1); // Test generation
                 return true;
             }
 
-            // Check for browser crypto
+            // Browser Web Crypto API
             if (
                 typeof window !== "undefined" &&
-                window.crypto &&
-                typeof window.crypto.getRandomValues === "function"
+                window.crypto?.getRandomValues
             ) {
+                const test = new Uint8Array(1);
+                window.crypto.getRandomValues(test);
                 return true;
             }
 
@@ -213,21 +224,28 @@ export class RandomSecurity {
     }
 
     /**
-     * Detect potential timing attack risks
+     * Detect high-frequency usage patterns
      */
-    private static detectTimingAttackRisk(): boolean {
-        // Simple heuristic: if we're in a high-frequency generation scenario
+    private static detectHighFrequencyUsage(): boolean {
         const now = Date.now();
-        const timeSinceLastCheck = now - RandomSecurity.lastSecurityCheck;
+        const timeSinceLastCheck = now - this.lastSecurityCheck;
 
-        // If security checks are happening very frequently, there might be timing risks
-        return timeSinceLastCheck < 100; // Less than 100ms between checks
+        // Consider high frequency if called more than once per 50ms
+        return timeSinceLastCheck < 50;
     }
 
     /**
-     * Monitor for side-channel attacks
-     * @param data - Data to monitor
-     * @returns Monitoring result
+     * Update threat level (only escalate, never de-escalate)
+     */
+    private static updateThreatLevel(newLevel: "medium" | "high"): void {
+        const levels = { low: 0, medium: 1, high: 2, critical: 3 };
+        if (levels[newLevel] > levels[this.threatLevel]) {
+            this.threatLevel = newLevel;
+        }
+    }
+
+    /**
+     * Monitor for side-channel attacks with real-world heuristics
      */
     public static monitorSideChannelAttacks(data: Buffer): {
         riskLevel: "low" | "medium" | "high";
@@ -238,47 +256,69 @@ export class RandomSecurity {
         const recommendations: string[] = [];
         let riskLevel: "low" | "medium" | "high" = "low";
 
-        // Check for patterns that might indicate side-channel attacks
-
-        // 1. Frequency analysis
-        const frequency = new Map<number, number>();
-        for (const byte of data) {
-            frequency.set(byte, (frequency.get(byte) || 0) + 1);
+        if (!data || data.length === 0) {
+            return { riskLevel, indicators, recommendations };
         }
 
-        const maxFreq = Math.max(...frequency.values());
-        const expectedFreq = data.length / 256;
-
-        if (maxFreq > expectedFreq * 3) {
-            indicators.push("Unusual byte frequency distribution detected");
+        // Statistical analysis for bias detection
+        const entropy = this.calculateShannonEntropy(data);
+        if (entropy < 7.5) {
+            // Good entropy should be close to 8 bits
+            indicators.push("Low entropy detected in random data");
             riskLevel = "medium";
-            recommendations.push("Increase entropy mixing");
+            recommendations.push("Investigate entropy source quality");
         }
 
-        // 2. Timing patterns
-        const currentTime = Date.now();
-        if (
-            RandomSecurity.lastSecurityCheck &&
-            currentTime - RandomSecurity.lastSecurityCheck < 10
-        ) {
-            indicators.push("High-frequency access pattern detected");
+        // Frequency analysis for bias
+        const frequencies = new Uint32Array(256);
+        for (const byte of data) {
+            frequencies[byte]++;
+        }
+
+        const expectedFreq = data.length / 256;
+        const maxDeviation = Math.max(...frequencies) / expectedFreq;
+
+        if (maxDeviation > 2.0) {
+            indicators.push("Statistical bias detected");
             riskLevel = "high";
-            recommendations.push("Implement rate limiting");
+            recommendations.push("Implement entropy whitening");
         }
 
-        // 3. Data size patterns
-        if (data.length % 16 === 0 && data.length < 64) {
-            indicators.push("Suspicious data size pattern");
-            recommendations.push("Use variable-length padding");
+        // Timing analysis
+        const now = Date.now();
+        if (now - this.lastSecurityCheck < 10) {
+            indicators.push("Potential timing attack pattern");
+            riskLevel = "high";
+            recommendations.push("Implement timing attack countermeasures");
         }
 
         return { riskLevel, indicators, recommendations };
     }
 
     /**
+     * Calculate Shannon entropy for data quality assessment
+     */
+    private static calculateShannonEntropy(data: Buffer): number {
+        const frequencies = new Uint32Array(256);
+        for (const byte of data) {
+            frequencies[byte]++;
+        }
+
+        let entropy = 0;
+        const length = data.length;
+
+        for (let i = 0; i < 256; i++) {
+            if (frequencies[i] > 0) {
+                const probability = frequencies[i] / length;
+                entropy -= probability * Math.log2(probability);
+            }
+        }
+
+        return entropy;
+    }
+
+    /**
      * Validate entropy source integrity
-     * @param sourceName - Name of entropy source
-     * @returns Validation result
      */
     public static validateEntropySourceIntegrity(sourceName: string): {
         valid: boolean;
@@ -289,32 +329,39 @@ export class RandomSecurity {
         let confidence = 1.0;
 
         try {
-            // Test the entropy source
-            const testResult = RandomSources.testEntropySource(sourceName);
+            // Basic availability test
+            const testResult =
+                RandomSources.testEntropySource?.(sourceName) ?? false;
 
             if (!testResult) {
-                issues.push(`Entropy source ${sourceName} failed basic test`);
+                issues.push(
+                    `Entropy source '${sourceName}' unavailable or failed test`
+                );
                 confidence = 0.0;
             }
 
-            // Additional integrity checks could be added here
-            // For example: statistical tests, known-answer tests, etc.
+            // Additional validation could include:
+            // - Statistical tests (NIST SP 800-22)
+            // - Performance benchmarks
+            // - Compliance verification
         } catch (error) {
-            issues.push(`Error testing entropy source ${sourceName}: ${error}`);
+            issues.push(
+                `Entropy source validation error: ${
+                    error instanceof Error ? error.message : String(error)
+                }`
+            );
             confidence = 0.0;
         }
 
         return {
-            valid: issues.length === 0,
+            valid: issues.length === 0 && confidence > 0.5,
             confidence,
             issues,
         };
     }
 
     /**
-     * Generate security report
-     * @param includeDetails - Include detailed analysis
-     * @returns Comprehensive security report
+     * Generate comprehensive security report
      */
     public static generateSecurityReport(includeDetails: boolean = false): {
         summary: string;
@@ -322,18 +369,16 @@ export class RandomSecurity {
         recommendations: string[];
         details?: any;
     } {
-        const assessment = RandomSecurity.performSecurityAssessment();
+        const assessment = this.performSecurityAssessment();
 
-        let summary = "Security assessment completed. ";
-        if (assessment.threats.length === 0) {
-            summary += "No significant threats detected.";
-        } else {
-            summary += `${assessment.threats.length} potential issues identified.`;
-        }
+        const summary =
+            assessment.threats.length === 0
+                ? "Security posture is acceptable with no critical issues detected."
+                : `Security assessment identified ${assessment.threats.length} issue(s) requiring attention.`;
 
         const report = {
             summary,
-            threatLevel: RandomSecurity.threatLevel,
+            threatLevel: this.threatLevel,
             recommendations: assessment.recommendations,
         };
 
@@ -344,6 +389,7 @@ export class RandomSecurity {
                 threats: assessment.threats,
                 libraryStatus: assessment.libraryStatus,
                 timestamp: assessment.timestamp,
+                lastSecurityCheck: this.lastSecurityCheck,
             };
         }
 
@@ -351,77 +397,145 @@ export class RandomSecurity {
     }
 
     /**
-     * Enable security monitoring
+     * Enable security monitoring with configurable interval
      */
-    public static enableSecurityMonitoring(): void {
-        // Set up periodic security checks
-        setInterval(() => {
-            const assessment = RandomSecurity.performSecurityAssessment();
+    public static enableSecurityMonitoring(intervalMs: number = 300000): void {
+        // 5 minutes default
+        if (this.monitoringEnabled) {
+            return;
+        }
 
-            if (assessment.threats.length > 0) {
-                console.warn("Security Alert:", assessment.threats);
-                RandomSecurity.securityAlerts.push(...assessment.threats);
+        this.monitoringEnabled = true;
+        this.monitoringInterval = setInterval(() => {
+            try {
+                const assessment = this.performSecurityAssessment();
+
+                if (assessment.threats.length > 0) {
+                    const criticalThreats = assessment.threats.filter(
+                        (t) => t.includes("Critical") || t.includes("critical")
+                    );
+
+                    if (criticalThreats.length > 0) {
+                        console.error(
+                            "CRITICAL Security Alert:",
+                            criticalThreats
+                        );
+                    } else {
+                        console.warn("Security Alert:", assessment.threats);
+                    }
+
+                    this.securityAlerts.push(...assessment.threats);
+                }
+            } catch (error) {
+                console.error("Security monitoring error:", error);
             }
-        }, 60000); // Check every minute
+        }, intervalMs);
+    }
+
+    /**
+     * Disable security monitoring
+     */
+    public static disableSecurityMonitoring(): void {
+        if (this.monitoringInterval) {
+            clearInterval(this.monitoringInterval);
+            this.monitoringInterval = null;
+        }
+        this.monitoringEnabled = false;
     }
 
     /**
      * Get security alerts
      */
     public static getSecurityAlerts(): string[] {
-        return [...RandomSecurity.securityAlerts];
+        return [...this.securityAlerts];
     }
 
     /**
      * Clear security alerts
      */
     public static clearSecurityAlerts(): void {
-        RandomSecurity.securityAlerts = [];
+        this.securityAlerts = [];
     }
 
     /**
      * Get current threat level
      */
     public static getThreatLevel(): "low" | "medium" | "high" | "critical" {
-        return RandomSecurity.threatLevel;
+        return this.threatLevel;
     }
 
     /**
-     * Perform quantum-readiness assessment
-     * @returns Quantum readiness report
+     * Assess quantum readiness with realistic recommendations
      */
     public static assessQuantumReadiness(): {
         ready: boolean;
         score: number;
         recommendations: string[];
-        algorithms: { name: string; quantumSafe: boolean }[];
+        algorithms: {
+            name: string;
+            quantumSafe: boolean;
+            available: boolean;
+        }[];
     } {
         const algorithms = [
-            { name: "AES-256", quantumSafe: false },
-            { name: "ChaCha20", quantumSafe: false },
-            { name: "Kyber", quantumSafe: true },
-            { name: "Dilithium", quantumSafe: true },
+            { name: "AES-256", quantumSafe: false, available: true },
+            { name: "ChaCha20", quantumSafe: false, available: true },
+            { name: "RSA-2048", quantumSafe: false, available: true },
+            { name: "ECDSA", quantumSafe: false, available: true },
+            { name: "Kyber", quantumSafe: true, available: false },
+            { name: "Dilithium", quantumSafe: true, available: false },
+            { name: "SPHINCS+", quantumSafe: true, available: false },
         ];
 
-        const quantumSafeCount = algorithms.filter((a) => a.quantumSafe).length;
-        const score = (quantumSafeCount / algorithms.length) * 100;
-        const ready = score >= 50;
+        const availableAlgorithms = algorithms.filter((a) => a.available);
+        const quantumSafeAvailable = availableAlgorithms.filter(
+            (a) => a.quantumSafe
+        );
+
+        const score =
+            availableAlgorithms.length > 0
+                ? (quantumSafeAvailable.length / availableAlgorithms.length) *
+                  100
+                : 0;
+
+        const ready = score >= 25; // More realistic threshold
 
         const recommendations: string[] = [];
         if (!ready) {
             recommendations.push(
-                "Implement post-quantum cryptographic algorithms"
+                "Evaluate post-quantum cryptography libraries"
             );
-            recommendations.push("Enable quantum-safe random generation");
-            recommendations.push("Plan migration to quantum-resistant systems");
+            recommendations.push("Plan quantum-safe migration strategy");
+            recommendations.push("Monitor NIST post-quantum standards");
+        } else {
+            recommendations.push(
+                "Continue monitoring quantum computing developments"
+            );
+            recommendations.push("Test quantum-safe implementations");
         }
 
         return {
             ready,
-            score,
+            score: Math.round(score),
             recommendations,
             algorithms,
         };
     }
-}
 
+    /**
+     * Get monitoring status
+     */
+    public static getMonitoringStatus(): {
+        enabled: boolean;
+        lastCheck: number;
+        alertCount: number;
+        threatLevel: string;
+    } {
+        return {
+            enabled: this.monitoringEnabled,
+            lastCheck: this.lastSecurityCheck,
+            alertCount: this.securityAlerts.length,
+            threatLevel: this.threatLevel,
+        };
+    }
+}

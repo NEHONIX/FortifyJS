@@ -6,7 +6,7 @@
 import { CacheConfig, RedisConfig, MemoryConfig } from "./types/types";
 import { Hash } from "../../core/hash";
 import { FortifyJS } from "../../core/crypto";
-import { SecureString } from "../../security/secure-string";
+import { SecureString } from "../../components/secure-string";
 
 import { SecureRandom } from "../../core/random";
 import { Validators } from "../../core/validators";

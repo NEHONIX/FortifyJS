@@ -1,9 +1,10 @@
 /**
  * 🔐 Password Security Analysis Module
  *
- * Advanced password strength analysis and security validation
+ * Production-ready password strength analysis and security validation
  */
 
+import { commonPassword, keyboardPatterns } from "../../utils/patterns";
 import {
     PasswordStrengthAnalysis,
     PasswordPolicy,
@@ -19,12 +20,13 @@ import {
  */
 export class PasswordSecurity {
     private config: PasswordManagerConfig;
-    private commonPasswords: Set<string> = new Set();
-    private keyboardPatterns: RegExp[] = [];
+    private commonPasswords: Set<string>;
+    private keyboardPatterns: RegExp[];
 
     constructor(config: PasswordManagerConfig) {
         this.config = config;
-        this.initializeSecurityData();
+        this.commonPasswords = this.getCommonPasswords();
+        this.keyboardPatterns = this.getKeyboardPatterns();
     }
 
     /**
@@ -86,7 +88,7 @@ export class PasswordSecurity {
             );
         }
 
-        if (password.length > policy.maxLength) {
+        if (policy.maxLength && password.length > policy.maxLength) {
             violations.push(
                 `Password must be no more than ${policy.maxLength} characters long`
             );
@@ -115,7 +117,10 @@ export class PasswordSecurity {
 
         // Strength requirement
         const strength = this.analyzeStrength(password);
-        if (strength.score < policy.minStrengthScore) {
+        if (
+            policy.minStrengthScore &&
+            strength.score < policy.minStrengthScore
+        ) {
             violations.push(
                 `Password strength score (${strength.score}) is below required minimum (${policy.minStrengthScore})`
             );
@@ -123,21 +128,27 @@ export class PasswordSecurity {
         }
 
         // Forbidden patterns
-        for (const pattern of policy.forbiddenPatterns) {
-            if (pattern.test(password)) {
-                violations.push("Password contains forbidden patterns");
-                suggestions.push("Avoid common patterns and sequences");
-                break;
+        if (policy.forbiddenPatterns) {
+            for (const pattern of policy.forbiddenPatterns) {
+                if (pattern.test(password)) {
+                    violations.push("Password contains forbidden patterns");
+                    suggestions.push("Avoid common patterns and sequences");
+                    break;
+                }
             }
         }
 
         // Forbidden words
-        const lowerPassword = password.toLowerCase();
-        for (const word of policy.forbiddenWords) {
-            if (lowerPassword.includes(word.toLowerCase())) {
-                violations.push("Password contains forbidden words");
-                suggestions.push("Avoid common words and personal information");
-                break;
+        if (policy.forbiddenWords) {
+            const lowerPassword = password.toLowerCase();
+            for (const word of policy.forbiddenWords) {
+                if (lowerPassword.includes(word.toLowerCase())) {
+                    violations.push("Password contains forbidden words");
+                    suggestions.push(
+                        "Avoid common words and personal information"
+                    );
+                    break;
+                }
             }
         }
 
@@ -145,7 +156,7 @@ export class PasswordSecurity {
             isValid: violations.length === 0,
             violations,
             score: strength.score,
-            suggestions: [...new Set(suggestions)], // Remove duplicates
+            suggestions: [...new Set(suggestions)],
         };
     }
 
@@ -155,9 +166,6 @@ export class PasswordSecurity {
     public async auditPasswords(
         hashes: string[]
     ): Promise<PasswordAuditResult> {
-        // This would typically parse metadata from hashes
-        // For now, we'll provide a basic implementation
-
         const algorithmDistribution: Record<PasswordAlgorithm, number> = {
             [PasswordAlgorithm.ARGON2ID]: 0,
             [PasswordAlgorithm.ARGON2I]: 0,
@@ -177,22 +185,19 @@ export class PasswordSecurity {
                 [PasswordSecurityLevel.QUANTUM_RESISTANT]: 0,
             };
 
-        // Analyze each hash with real implementation
         let weakPasswords = 0;
         let outdatedHashes = 0;
         let needsRehash = 0;
         let oldestHash = Date.now();
+        let totalStrength = 0;
 
         for (const hash of hashes) {
             try {
-                // Parse real hash metadata
                 const hashInfo = this.parseHashMetadata(hash);
 
                 // Update algorithm distribution
                 if (hashInfo.algorithm in algorithmDistribution) {
-                    algorithmDistribution[
-                        hashInfo.algorithm as PasswordAlgorithm
-                    ]++;
+                    algorithmDistribution[hashInfo.algorithm]++;
                 }
 
                 // Update security level distribution
@@ -216,11 +221,20 @@ export class PasswordSecurity {
                 if (hashInfo.timestamp && hashInfo.timestamp < oldestHash) {
                     oldestHash = hashInfo.timestamp;
                 }
-            } catch (error) {
-                // If we can't parse the hash, consider it potentially problematic
-                console.warn(
-                    `Failed to parse hash: ${(error as Error).message}`
+
+                // Add to total strength calculation
+                totalStrength += this.getSecurityLevelScore(
+                    hashInfo.securityLevel
                 );
+            } catch (error) {
+                // Log parsing errors for debugging
+                if (process.env.NODE_ENV === "development") {
+                    console.warn(
+                        `[PasswordSecurity] Failed to parse hash: ${
+                            (error as Error).message
+                        }`
+                    );
+                }
                 outdatedHashes++;
             }
         }
@@ -229,6 +243,8 @@ export class PasswordSecurity {
             0,
             100 - weakPasswords * 10 - outdatedHashes * 5
         );
+        const averageStrength =
+            hashes.length > 0 ? totalStrength / hashes.length : 0;
 
         const recommendations: string[] = [];
         if (weakPasswords > 0) {
@@ -257,7 +273,7 @@ export class PasswordSecurity {
             details: {
                 algorithmDistribution,
                 securityLevelDistribution,
-                averageStrength: securityScore,
+                averageStrength,
                 oldestHash,
             },
         };
@@ -265,167 +281,12 @@ export class PasswordSecurity {
 
     // ===== PRIVATE HELPER METHODS =====
 
-    private initializeSecurityData(): void {
-        // Initialize comprehensive common passwords list
-        this.commonPasswords = new Set([
-            // Top 100 most common passwords from real security breaches
-            "password",
-            "123456",
-            "password123",
-            "admin",
-            "qwerty",
-            "letmein",
-            "welcome",
-            "monkey",
-            "1234567890",
-            "abc123",
-            "111111",
-            "dragon",
-            "master",
-            "696969",
-            "mustang",
-            "123123",
-            "batman",
-            "trustno1",
-            "hunter",
-            "2000",
-            "test",
-            "superman",
-            "1234",
-            "soccer",
-            "harley",
-            "hockey",
-            "killer",
-            "george",
-            "sexy",
-            "andrew",
-            "charlie",
-            "superman",
-            "asshole",
-            "fuckyou",
-            "dallas",
-            "jessica",
-            "panties",
-            "pepper",
-            "1111",
-            "austin",
-            "william",
-            "daniel",
-            "golfer",
-            "summer",
-            "heather",
-            "hammer",
-            "yankees",
-            "joshua",
-            "maggie",
-            "biteme",
-            "enter",
-            "ashley",
-            "thunder",
-            "cowboy",
-            "silver",
-            "richard",
-            "fucker",
-            "orange",
-            "merlin",
-            "michelle",
-            "corvette",
-            "bigdog",
-            "cheese",
-            "matthew",
-            "patrick",
-            "martin",
-            "freedom",
-            "ginger",
-            "blowjob",
-            "nicole",
-            "sparky",
-            "yellow",
-            "camaro",
-            "secret",
-            "dick",
-            "falcon",
-            "taylor",
-            "birdman",
-            "donald",
-            "murphy",
-            "mexico",
-            "steelers",
-            "broncos",
-            "fishing",
-            "digital",
-            "cooper",
-            "jordan",
-            "hunter1",
-            "changeme",
-            "fuckme",
-            "brooklyn",
-            "john",
-            "computer",
-            "michelle",
-            "jessica",
-            "pepper",
-            "1111",
-            "zxcvbn",
-            "sunshine",
-            "iloveyou",
-            "princess",
-            "admin",
-            "welcome",
-            "666666",
-            "abc123",
-            "football",
-            "123123",
-            "monkey",
-            "654321",
-            "!@#$%^&*",
-            "charlie",
-            "aa123456",
-            "donald",
-            "password1",
-            "qwerty123",
-            "login",
-            "pass",
-            "root",
-            "toor",
-            "administrator",
-            "guest",
-        ]);
+    private getCommonPasswords(): Set<string> {
+        return new Set(commonPassword);
+    }
 
-        // Initialize comprehensive keyboard and pattern detection (real implementation)
-        this.keyboardPatterns = [
-            // QWERTY keyboard patterns
-            /qwerty|qwertyui|asdfgh|asdfghjk|zxcvbn|zxcvbnm/i,
-            /yuiop|uiop|hjkl|hjkl;|nm,\./i,
-
-            // Number sequences
-            /123456|1234567|12345678|123456789|1234567890/,
-            /654321|87654321|9876543210|098765/,
-            /147258|159357|741852|963852/,
-
-            // Alphabet sequences
-            /abcdef|abcdefg|abcdefgh|abcdefghi|abcdefghij/i,
-            /fedcba|gfedcba|hgfedcba|ihgfedcba|jihgfedcba/i,
-            /uvwxyz|tuvwxyz|stuvwxyz|rstuvwxyz|qrstuvwxyz/i,
-
-            // Repeated characters (3 or more)
-            /(.)\1{2,}/,
-
-            // Common patterns
-            /aaa|bbb|ccc|ddd|eee|fff|ggg|hhh|iii|jjj|kkk|lll|mmm|nnn|ooo|ppp|qqq|rrr|sss|ttt|uuu|vvv|www|xxx|yyy|zzz/i,
-            /000|111|222|333|444|555|666|777|888|999/,
-
-            // Date patterns
-            /19\d{2}|20\d{2}|0[1-9]\/|1[0-2]\/|\d{1,2}\/\d{1,2}\/\d{2,4}/,
-
-            // Phone number patterns
-            /\d{3}-\d{3}-\d{4}|\(\d{3}\)\s?\d{3}-\d{4}/,
-
-            // Common substitutions
-            /p@ssw0rd|passw0rd|p4ssw0rd|pa55w0rd/i,
-            /adm1n|4dm1n|@dmin/i,
-            /l0ve|h3ll0|h3llo|w0rld/i,
-        ];
+    private getKeyboardPatterns(): RegExp[] {
+        return keyboardPatterns;
     }
 
     private createEmptyAnalysis(): PasswordStrengthAnalysis {
@@ -461,7 +322,7 @@ export class PasswordSecurity {
         };
     }
 
-    private calculateEntropy(_password: string, details: any): number {
+    private calculateEntropy(password: string, details: any): number {
         let charsetSize = 0;
         if (details.hasUppercase) charsetSize += 26;
         if (details.hasLowercase) charsetSize += 26;
@@ -538,16 +399,17 @@ export class PasswordSecurity {
         return feedback.length > 0 ? feedback : ["Password is strong"];
     }
 
-    private estimateCrackTime(score: number, _entropy: number): string {
-        if (score >= 90) return "Centuries";
-        if (score >= 80) return "Decades";
-        if (score >= 70) return "Years";
-        if (score >= 60) return "Months";
-        if (score >= 50) return "Weeks";
-        if (score >= 40) return "Days";
-        if (score >= 30) return "Hours";
-        if (score >= 20) return "Minutes";
-        if (score >= 10) return "Seconds";
+    private estimateCrackTime(score: number, entropy: number): string {
+        // More accurate calculation based on entropy and modern hardware capabilities
+        if (entropy >= 80) return "Centuries";
+        if (entropy >= 60) return "Decades";
+        if (entropy >= 50) return "Years";
+        if (entropy >= 40) return "Months";
+        if (entropy >= 30) return "Weeks";
+        if (entropy >= 25) return "Days";
+        if (entropy >= 20) return "Hours";
+        if (entropy >= 15) return "Minutes";
+        if (entropy >= 10) return "Seconds";
         return "Instant";
     }
 
@@ -568,9 +430,6 @@ export class PasswordSecurity {
         return this.keyboardPatterns.some((pattern) => pattern.test(password));
     }
 
-    /**
-     * Parse hash metadata from various hash formats
-     */
     private parseHashMetadata(hash: string): {
         algorithm: PasswordAlgorithm;
         securityLevel: PasswordSecurityLevel;
@@ -578,23 +437,9 @@ export class PasswordSecurity {
         timestamp?: number;
         version?: string;
     } {
-        // Parse FortifyJS format
+        // Parse FortifyJS format (if available)
         if (hash.startsWith("$fortify$")) {
-            try {
-                const { PasswordUtils } = require("./password-utils");
-                const utils = new PasswordUtils(this.config);
-                const parsed = utils.parseHashWithMetadata(hash);
-                return {
-                    algorithm: parsed.metadata.algorithm,
-                    securityLevel: parsed.metadata.securityLevel,
-                    iterations: parsed.metadata.iterations,
-                    timestamp: parsed.metadata.timestamp,
-                    version: parsed.metadata.version,
-                };
-            } catch (error) {
-                // Fallback parsing
-                return this.parseGenericHash(hash);
-            }
+            return this.parseFortifyHash(hash);
         }
 
         // Parse bcrypt format
@@ -603,44 +448,12 @@ export class PasswordSecurity {
             hash.startsWith("$2b$") ||
             hash.startsWith("$2y$")
         ) {
-            const rounds = parseInt(hash.split("$")[2] || "10");
-            return {
-                algorithm: PasswordAlgorithm.BCRYPT_PLUS,
-                securityLevel:
-                    rounds >= 12
-                        ? PasswordSecurityLevel.HIGH
-                        : PasswordSecurityLevel.STANDARD,
-                iterations: Math.pow(2, rounds),
-                timestamp: Date.now() - 365 * 24 * 60 * 60 * 1000, // Assume 1 year old
-            };
+            return this.parseBcryptHash(hash);
         }
 
         // Parse Argon2 format
         if (hash.startsWith("$argon2")) {
-            const parts = hash.split("$");
-            const variant = parts[1];
-            const params = parts[3]?.split(",") || [];
-            const iterations = parseInt(
-                params.find((p) => p.startsWith("t="))?.substring(2) || "3"
-            );
-            const memory = parseInt(
-                params.find((p) => p.startsWith("m="))?.substring(2) || "65536"
-            );
-
-            return {
-                algorithm:
-                    variant === "argon2id"
-                        ? PasswordAlgorithm.ARGON2ID
-                        : variant === "argon2i"
-                        ? PasswordAlgorithm.ARGON2I
-                        : PasswordAlgorithm.ARGON2D,
-                securityLevel:
-                    memory >= 65536
-                        ? PasswordSecurityLevel.HIGH
-                        : PasswordSecurityLevel.STANDARD,
-                iterations,
-                timestamp: Date.now() - 180 * 24 * 60 * 60 * 1000, // Assume 6 months old
-            };
+            return this.parseArgon2Hash(hash);
         }
 
         // Parse scrypt format
@@ -649,42 +462,106 @@ export class PasswordSecurity {
             hash.startsWith("$s0$") ||
             hash.startsWith("$s1$")
         ) {
-            return {
-                algorithm: PasswordAlgorithm.SCRYPT,
-                securityLevel: PasswordSecurityLevel.HIGH,
-                iterations: 32768, // Default scrypt N parameter
-                timestamp: Date.now() - 90 * 24 * 60 * 60 * 1000, // Assume 3 months old
-            };
+            return this.parseScryptHash(hash);
         }
 
         // Parse PBKDF2 format
         if (hash.includes("pbkdf2") || hash.includes("$pbkdf2")) {
-            const iterations = this.extractIterationsFromPBKDF2(hash);
-            return {
-                algorithm: PasswordAlgorithm.PBKDF2_SHA512,
-                securityLevel:
-                    iterations >= 100000
-                        ? PasswordSecurityLevel.STANDARD
-                        : PasswordSecurityLevel.STANDARD,
-                iterations,
-                timestamp: Date.now() - 730 * 24 * 60 * 60 * 1000, // Assume 2 years old
-            };
+            return this.parsePBKDF2Hash(hash);
         }
 
         // Fallback for unknown formats
         return this.parseGenericHash(hash);
     }
 
-    /**
-     * Parse generic hash format
-     */
-    private parseGenericHash(hash: string): {
-        algorithm: PasswordAlgorithm;
-        securityLevel: PasswordSecurityLevel;
-        iterations?: number;
-        timestamp?: number;
-    } {
-        // Try to infer from hash characteristics
+    private parseFortifyHash(hash: string): any {
+        try {
+            // Parse FortifyJS specific format
+            const parts = hash.split("$");
+            if (parts.length < 4)
+                throw new Error("Invalid FortifyJS hash format");
+
+            const version = parts[2];
+            const metadata = JSON.parse(
+                Buffer.from(parts[3], "base64").toString()
+            );
+
+            return {
+                algorithm: metadata.algorithm || PasswordAlgorithm.ARGON2ID,
+                securityLevel:
+                    metadata.securityLevel || PasswordSecurityLevel.HIGH,
+                iterations: metadata.iterations,
+                timestamp: metadata.timestamp || Date.now(),
+                version,
+            };
+        } catch (error) {
+            return this.parseGenericHash(hash);
+        }
+    }
+
+    private parseBcryptHash(hash: string): any {
+        const rounds = parseInt(hash.split("$")[2] || "10");
+        return {
+            algorithm: PasswordAlgorithm.BCRYPT_PLUS,
+            securityLevel:
+                rounds >= 12
+                    ? PasswordSecurityLevel.HIGH
+                    : PasswordSecurityLevel.STANDARD,
+            iterations: Math.pow(2, rounds),
+            timestamp: Date.now() - 365 * 24 * 60 * 60 * 1000, // Estimate 1 year old
+        };
+    }
+
+    private parseArgon2Hash(hash: string): any {
+        const parts = hash.split("$");
+        const variant = parts[1];
+        const params = parts[3]?.split(",") || [];
+        const iterations = parseInt(
+            params.find((p) => p.startsWith("t="))?.substring(2) || "3"
+        );
+        const memory = parseInt(
+            params.find((p) => p.startsWith("m="))?.substring(2) || "65536"
+        );
+
+        let algorithm = PasswordAlgorithm.ARGON2ID;
+        if (variant === "argon2i") algorithm = PasswordAlgorithm.ARGON2I;
+        if (variant === "argon2d") algorithm = PasswordAlgorithm.ARGON2D;
+
+        return {
+            algorithm,
+            securityLevel:
+                memory >= 65536
+                    ? PasswordSecurityLevel.HIGH
+                    : PasswordSecurityLevel.STANDARD,
+            iterations,
+            timestamp: Date.now() - 180 * 24 * 60 * 60 * 1000, // Estimate 6 months old
+        };
+    }
+
+    private parseScryptHash(hash: string): any {
+        return {
+            algorithm: PasswordAlgorithm.SCRYPT,
+            securityLevel: PasswordSecurityLevel.HIGH,
+            iterations: 32768,
+            timestamp: Date.now() - 90 * 24 * 60 * 60 * 1000, // Estimate 3 months old
+        };
+    }
+
+    private parsePBKDF2Hash(hash: string): any {
+        const iterations = this.extractIterationsFromPBKDF2(hash);
+        return {
+            algorithm: PasswordAlgorithm.PBKDF2_SHA512,
+            securityLevel:
+                iterations >= 100000
+                    ? PasswordSecurityLevel.STANDARD
+                    : PasswordSecurityLevel.STANDARD,
+            iterations,
+            timestamp: Date.now() - 730 * 24 * 60 * 60 * 1000, // Estimate 2 years old
+        };
+    }
+
+    private parseGenericHash(hash: string): any {
+        // Infer from hash characteristics
         if (hash.length >= 128) {
             return {
                 algorithm: PasswordAlgorithm.MILITARY,
@@ -695,59 +572,45 @@ export class PasswordSecurity {
             return {
                 algorithm: PasswordAlgorithm.ARGON2ID,
                 securityLevel: PasswordSecurityLevel.HIGH,
-                timestamp: Date.now() - 30 * 24 * 60 * 60 * 1000, // Assume 1 month old
+                timestamp: Date.now() - 30 * 24 * 60 * 60 * 1000,
             };
         } else {
             return {
                 algorithm: PasswordAlgorithm.PBKDF2_SHA512,
                 securityLevel: PasswordSecurityLevel.STANDARD,
                 iterations: 10000,
-                timestamp: Date.now() - 365 * 24 * 60 * 60 * 1000, // Assume 1 year old
+                timestamp: Date.now() - 365 * 24 * 60 * 60 * 1000,
             };
         }
     }
 
-    /**
-     * Extract iterations from PBKDF2 hash
-     */
     private extractIterationsFromPBKDF2(hash: string): number {
-        // Try to extract iterations from various PBKDF2 formats
         const iterationMatch = hash.match(/\$(\d+)\$/);
         if (iterationMatch) {
             return parseInt(iterationMatch[1]);
         }
 
-        // Look for iterations in the hash string
         const iterMatch = hash.match(/iter[=:](\d+)/i);
         if (iterMatch) {
             return parseInt(iterMatch[1]);
         }
 
-        // Default PBKDF2 iterations
-        return 10000;
+        return 10000; // Default PBKDF2 iterations
     }
 
-    /**
-     * Check if algorithm is considered outdated
-     */
     private isOutdatedAlgorithm(algorithm: PasswordAlgorithm): boolean {
         const outdatedAlgorithms = [
             PasswordAlgorithm.PBKDF2_SHA512, // If iterations are too low
         ];
-
         return outdatedAlgorithms.includes(algorithm);
     }
 
-    /**
-     * Check if hash is weak based on parameters
-     */
     private isWeakHash(hashInfo: {
         algorithm: PasswordAlgorithm;
         securityLevel: PasswordSecurityLevel;
         iterations?: number;
         timestamp?: number;
     }): boolean {
-        // Check iterations for different algorithms
         switch (hashInfo.algorithm) {
             case PasswordAlgorithm.PBKDF2_SHA512:
                 return (hashInfo.iterations || 0) < 100000;
@@ -765,5 +628,21 @@ export class PasswordSecurity {
                 return false;
         }
     }
-}
 
+    private getSecurityLevelScore(level: PasswordSecurityLevel): number {
+        switch (level) {
+            case PasswordSecurityLevel.QUANTUM_RESISTANT:
+                return 100;
+            case PasswordSecurityLevel.MILITARY:
+                return 90;
+            case PasswordSecurityLevel.MAXIMUM:
+                return 80;
+            case PasswordSecurityLevel.HIGH:
+                return 70;
+            case PasswordSecurityLevel.STANDARD:
+                return 50;
+            default:
+                return 30;
+        }
+    }
+}

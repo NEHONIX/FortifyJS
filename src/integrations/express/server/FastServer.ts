@@ -1,7 +1,27 @@
+/**
+ * FortifyJS - Ultra-Fast Server
+ * Main server class for FortifyJS
+ */
+
+import express, { Request, Response, NextFunction } from "express";
+
+// Import types
+import type {
+    ServerOptions,
+    UltraFastApp,
+    UltraFastMiddlewareHandler,
+} from "../types/types";
+import type { PluginType } from "./plugins/types/PluginTypes";
+
+// Import plugin classes
+import { PluginManager } from "./components/fastapi/PluginManager";
+
+// Import utils
+import { Logger, initializeLogger } from "./utils/Logger";
+import { PortManager, PortSwitchResult } from "./utils/PortManager";
+import { Port } from "./utils/forceClosePort";
+import { ConfigLoader } from "./utils/ConfigLoader";
 import { DEFAULT_OPTIONS } from "./const/default";
-import { ServerOptions, UltraFastApp } from "../types/types";
-import express from "express";
-import { PluginType } from "./plugins/types/PluginTypes";
 
 // Import component classes
 import { CacheManager } from "./components/fastapi/CacheManager";
@@ -10,15 +30,13 @@ import { RequestProcessor } from "./components/fastapi/RequestProcessor";
 import { RouteManager } from "./components/fastapi/RouteManager";
 import { PerformanceManager } from "./components/fastapi/PerformanceManager";
 import { MonitoringManager } from "./components/fastapi/MonitoringManager";
-import { PluginManager } from "./components/fastapi/PluginManager";
 import { ClusterManagerComponent } from "./components/fastapi/ClusterManagerComponent";
 import { FileWatcherManager } from "./components/fastapi/FileWatcherManager";
-import { PortManager, PortSwitchResult } from "./utils/PortManager";
-import { Logger, initializeLogger } from "./utils/Logger";
 import { MiddlewareManager } from "./components/fastapi/middlewares/middlewareManager";
 import { RedirectManager } from "./components/fastapi/RedirectManager";
 import { ConsoleInterceptor } from "./components/fastapi/console/ConsoleInterceptor";
-import { Port } from "./utils/forceClosePort";
+import { UltraFastRequestProcessor } from "./components/fastapi/UltraFastRequestProcessor"; // UFRP
+
 
 /**
  * Ultra-Fast Express Server with Advanced Performance Optimization
@@ -28,7 +46,7 @@ export class UltraFastServer {
     private app: UltraFastApp;
     private options: ServerOptions;
     private ready = false;
-    private initPromise: Promise<void>;
+    private initPromise: Promise<void> = Promise.resolve();
     private httpServer?: any;
     private logger: Logger;
     private currentPort: number = 0; // Track the actual running port
@@ -46,6 +64,7 @@ export class UltraFastServer {
     private fileWatcherManager!: FileWatcherManager;
     private redirectManager!: RedirectManager;
     private consoleInterceptor!: ConsoleInterceptor;
+    private ultraFastProcessor!: UltraFastRequestProcessor;
 
     constructor(
         userOptions: ServerOptions = {
@@ -54,44 +73,71 @@ export class UltraFastServer {
             },
         }
     ) {
-        // Merge with defaults first
-        this.options = this.mergeWithDefaults(userOptions);
+        // Load configuration from file system if available
+        const fileConfig = ConfigLoader.loadConfig();
+
+        // Merge configurations: defaults < file config < user options
+        this.options = this.mergeWithDefaults(userOptions, fileConfig);
 
         // Initialize logger with user configuration
         this.logger = initializeLogger(this.options.logging);
 
-        this.logger.startup("server", "Creating fast server...");
+        this.logger.startup("server", "Creating server...");
 
         // Create Express app immediately
         this.app = express() as UltraFastApp;
 
-        // Initialize components
-        this.initializeComponents();
-
-        // Add middleware methods to app (synchronous)
-        this.middlewareMethodsManager.addMiddlewareMethods();
-
-        this.routeManager.addMethods();
-        this.monitoringManager.addMonitoringEndpoints();
+        // Add start method immediately so it's available right away
         this.addStartMethod();
-        this.addConsoleInterceptionMethods();
 
-        // Initialize cache in background
-        this.initPromise = this.cacheManager.initializeCache();
+        // Initialize ultra-fast processor first (using legacy config for backward compatibility)
+        this.ultraFastProcessor = new UltraFastRequestProcessor({
+            cpuWorkers: this.options.performance?.workers?.cpu || 4,
+            ioWorkers: this.options.performance?.workers?.io || 2,
+            maxCacheSize: this.options.cache?.maxSize || 1000,
+            enablePrediction: true,
+            enableCompression: true,
+            maxConcurrentTasks: 100,
+        });
+
+        // Add ultra-fast middleware with type coercion
+        this.app.use((req: Request, res: Response, next: NextFunction) => {
+            const handler =
+                this.ultraFastProcessor.middleware() as UltraFastMiddlewareHandler;
+            handler(req, res, next, "", {}).catch(next);
+        });
+
+        // Initialize other components asynchronously
+        this.initializeComponentsAsync();
 
         this.logger.debug(
             "server",
-            "Ultra-fast Express server created (cache initializing in background)"
+            "Ultra-fast Express server created with optimized request processing"
         );
     }
 
-    /**
-     * Initialize all component instances with proper dependencies
-     */
-    private initializeComponents(): void {
-        this.logger.startup("server", "Initializing components...");
+    private async initializeComponentsAsync(): Promise<void> {
+        // Initialize components in parallel for faster startup
+        await Promise.all([
+            this.initializeCache(),
+            this.initializePerformance(),
+            this.initializePlugins(),
+            this.initializeCluster(),
+            this.initializeFileWatcher(),
+        ]);
 
-        // Initialize CacheManager first (foundation component)
+        // Initialize components that depend on others
+        await this.initializeDependentComponents();
+
+        // Add routes and monitoring endpoints
+        this.routeManager.addMethods();
+        this.monitoringManager.addMonitoringEndpoints();
+        this.addConsoleInterceptionMethods();
+
+        this.ready = true;
+    }
+
+    private async initializeCache(): Promise<void> {
         this.cacheManager = new CacheManager({
             cache: this.options.cache,
             performance: this.options.performance,
@@ -99,10 +145,11 @@ export class UltraFastServer {
             env: this.options.env,
         });
 
-        // Set cache on app for backward compatibility
         this.app.cache = this.cacheManager.getCache();
+        await this.cacheManager.initializeCache();
+    }
 
-        // Initialize PerformanceManager (depends on CacheManager)
+    private async initializePerformance(): Promise<void> {
         this.performanceManager = new PerformanceManager(
             {
                 performance: this.options.performance,
@@ -114,14 +161,16 @@ export class UltraFastServer {
                 cacheManager: this.cacheManager,
             }
         );
+    }
 
-        // Initialize PluginManager (depends on CacheManager)
+    private async initializePlugins(): Promise<void> {
         this.pluginManager = new PluginManager({
             app: this.app,
             cacheManager: this.cacheManager,
         });
+    }
 
-        // Initialize ClusterManager
+    private async initializeCluster(): Promise<void> {
         this.clusterManager = new ClusterManagerComponent(
             {
                 cluster: this.options.cluster,
@@ -130,8 +179,9 @@ export class UltraFastServer {
                 app: this.app,
             }
         );
+    }
 
-        // Initialize FileWatcherManager
+    private async initializeFileWatcher(): Promise<void> {
         this.fileWatcherManager = new FileWatcherManager(
             {
                 fileWatcher: this.options.fileWatcher,
@@ -141,8 +191,10 @@ export class UltraFastServer {
                 clusterManager: this.clusterManager,
             }
         );
+    }
 
-        // Initialize RequestProcessor (depends on PerformanceManager and PluginManager)
+    private async initializeDependentComponents(): Promise<void> {
+        // Initialize components that depend on others
         this.requestProcessor = new RequestProcessor({
             performanceProfiler:
                 this.performanceManager.getPerformanceProfiler(),
@@ -152,7 +204,6 @@ export class UltraFastServer {
             cacheManager: this.cacheManager,
         });
 
-        // Initialize middlewareManager (new middleware system)
         this.middlewareManager = new MiddlewareManager(
             {
                 server: this.options.server,
@@ -171,10 +222,9 @@ export class UltraFastServer {
                     this.performanceManager.isOptimizationEnabled(),
                 optimizationStats:
                     this.performanceManager.getOptimizationStats(),
-                handleUltraFastPath:
-                    this.requestProcessor.handleUltraFastPath.bind(
-                        this.requestProcessor
-                    ),
+                handleUltraFastPath: this.ultraFastProcessor
+                    .middleware()
+                    .bind(this.ultraFastProcessor),
                 handleFastPath: this.requestProcessor.handleFastPath.bind(
                     this.requestProcessor
                 ),
@@ -185,13 +235,12 @@ export class UltraFastServer {
             }
         );
 
-        // Initialize MiddlewareMethodsManager (adds methods to app)
+        // Initialize remaining components
         this.middlewareMethodsManager = new MiddlewareMethodsManager({
             app: this.app,
             middlewareManager: this.middlewareManager,
         });
 
-        // Initialize RouteManager (depends on CacheManager and middlewareManager)
         this.routeManager = new RouteManager({
             app: this.app,
             cacheManager: this.cacheManager,
@@ -199,7 +248,6 @@ export class UltraFastServer {
             ultraFastOptimizer: this.performanceManager.getUltraFastOptimizer(),
         });
 
-        // Initialize MonitoringManager (depends on CacheManager and PerformanceManager)
         this.monitoringManager = new MonitoringManager(
             {
                 monitoring: this.options.monitoring,
@@ -211,16 +259,12 @@ export class UltraFastServer {
             }
         );
 
-        // Initialize RedirectManager (lightweight component)
         this.redirectManager = new RedirectManager(this.logger);
-
-        // Initialize ConsoleInterceptor (logging enhancement)
         this.consoleInterceptor = new ConsoleInterceptor(
             this.logger,
             this.options.logging
         );
 
-        // Start console interception if enabled
         if (this.options.logging?.consoleInterception?.enabled) {
             this.consoleInterceptor.start();
             this.logger.info(
@@ -229,14 +273,11 @@ export class UltraFastServer {
             );
         }
 
-        // Add file watcher monitoring endpoints if enabled
         if (this.options.fileWatcher?.enabled) {
             this.fileWatcherManager.addFileWatcherMonitoringEndpoints(
                 "/fortify"
             );
         }
-
-        // console.log("Components initialized successfully");
     }
 
     /**
@@ -283,21 +324,16 @@ export class UltraFastServer {
     }
 
     /**
-     * Merge user options with defaults
+     * Merge user options with defaults and file config
      */
-    private mergeWithDefaults(userOptions: ServerOptions): ServerOptions {
-        const defaults = DEFAULT_OPTIONS;
+    private mergeWithDefaults(
+        userOptions: ServerOptions,
+        fileConfig: Partial<ServerOptions> | null = null
+    ): ServerOptions {
         return {
-            ...defaults,
+            ...DEFAULT_OPTIONS,
+            ...(fileConfig || {}),
             ...userOptions,
-            cache: { ...defaults.cache, ...userOptions.cache },
-            security: { ...defaults.security, ...userOptions.security },
-            performance: {
-                ...defaults.performance,
-                ...userOptions.performance,
-            },
-            monitoring: { ...defaults.monitoring, ...userOptions.monitoring },
-            server: { ...defaults.server, ...userOptions.server },
         };
     }
 
@@ -355,7 +391,7 @@ export class UltraFastServer {
                         "server",
                         `Server running on ${host}:${port}`
                     );
-                    this.logger.info(
+                    this.logger.debug(
                         "server",
                         `State: ${this.ready ? "Ready" : "Initializing..."}`
                     );
@@ -400,11 +436,21 @@ export class UltraFastServer {
         }
     }
 
+
+
     /**
-     * Add start method to app with cluster support
+     * Add start method to app with cluster support (full version)
      */
     private addStartMethod(): void {
-        this.app.start = async (port?: number, callback?: () => void) => {
+       const start = async (port?: number, callback?: () => void) => {
+            // **INTERNAL HANDLING**: Wait for server to be ready before starting
+            // This ensures developers don't need to handle async initialization timing
+            if (!this.ready) {
+                this.logger.debug("server", "Waiting for initialization to complete...");
+                await this.waitForReady();
+                this.logger.info("server", "Initialization complete, starting server...");
+            }
+
             const serverPort = port || this.options.server?.port || 3000;
             const host = this.options.server?.host || "localhost";
 
@@ -413,6 +459,7 @@ export class UltraFastServer {
                 this.fileWatcherManager.isInMainProcess() &&
                 this.fileWatcherManager.getHotReloader()
             ) {
+              this.logger.debug("server","Taking hot reload mode path");
                 this.logger.startup(
                     "fileWatcher",
                     "Starting with hot reload support..."
@@ -454,6 +501,7 @@ export class UltraFastServer {
 
             // If cluster is enabled, use cluster manager
             if (this.clusterManager.isClusterEnabled()) {
+       this.logger.debug("server","Taking cluster mode path");
                 // console.log("Starting cluster...");
 
                 try {
@@ -546,6 +594,7 @@ export class UltraFastServer {
             }
 
             // Single process mode (default)
+   this.logger.debug("server", "Taking single process mode path");
             this.httpServer = await this.startServerWithPortHandling(
                 serverPort,
                 host,
@@ -571,6 +620,7 @@ export class UltraFastServer {
             return this.httpServer;
         };
 
+        this.app.start = start;
         this.app.waitForReady = () => this.waitForReady();
 
         // Add port management methods
@@ -804,21 +854,9 @@ export class UltraFastServer {
             this.fileWatcherManager.disableTypeScriptChecking();
         };
 
-        // TypeScript checking methods
-        this.app.checkTypeScript = async (files?: string[]) => {
-            return await this.fileWatcherManager.checkTypeScript(files);
-        };
-
-        this.app.getTypeScriptStatus = () => {
-            return this.fileWatcherManager.getTypeScriptStatus();
-        };
-
-        this.app.enableTypeScriptChecking = () => {
-            this.fileWatcherManager.enableTypeScriptChecking();
-        };
-
-        this.app.disableTypeScriptChecking = () => {
-            this.fileWatcherManager.disableTypeScriptChecking();
+        // Expose FileWatcherManager for debugging and advanced usage
+        this.app.getFileWatcherManager = () => {
+            return this.fileWatcherManager;
         };
 
         // 🔐 Console encryption methods
@@ -889,6 +927,18 @@ export class UltraFastServer {
      */
     public async forceClosePort(port: number): Promise<boolean> {
         return await new Port(port).forceClosePort();
+    }
+
+    public async stop(): Promise<void> {
+        // Cleanup ultra-fast processor
+        this.ultraFastProcessor.destroy();
+
+        // Stop other components
+        if (this.httpServer) {
+            await new Promise<void>((resolve) => {
+                this.httpServer.close(() => resolve());
+            });
+        }
     }
 }
 

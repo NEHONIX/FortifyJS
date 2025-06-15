@@ -6,7 +6,7 @@
 import { SecurityConfig } from "./types/types";
 import { FortifyJS } from "../../core/crypto";
 import { Hash } from "../../core/hash";
-import { SecureObject } from "../../security/secure-object";
+import { SecureObject } from "../../components/secure-object";
 import { Validators } from "../../core/validators";
 import { SecureRandom } from "../../core/random";
 

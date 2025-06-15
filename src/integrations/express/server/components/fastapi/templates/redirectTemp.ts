@@ -1,8 +1,6 @@
-import func from "../../../../../../utils/fortified-function";
-
-const redirectTempHtml = func(
-    ({ customMessage, toPort }: { customMessage: string; toPort: number }) => {
-        `
+// Simple HTML template function - no need for fortification for static content
+const redirectTempHtml = ({ customMessage, toPort }: { customMessage: string; toPort: number }) => {
+    return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -95,9 +93,6 @@ const redirectTempHtml = func(
     </body>
     </html>
 `;
-    }
-);
-
-redirectTempHtml.optimizePerformance();
+};
 
 export { redirectTempHtml };

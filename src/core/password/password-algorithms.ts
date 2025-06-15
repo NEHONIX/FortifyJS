@@ -6,7 +6,7 @@
 
 import { Hash, HashStrength } from "../hash";
 import { SecureRandom } from "../random";
-import { constantTimeEqual } from "../../security";
+import { constantTimeEqual } from "../../components";
 import { HashAlgorithm } from "../../types";
 import {
     PasswordAlgorithm,
@@ -516,4 +516,3 @@ export class PasswordAlgorithms {
         }
     }
 }
-

@@ -2,7 +2,10 @@
  * Test file for FortifyJS fFunc modular architecture
  */
 
-import { func, createFortifiedFunction } from "../utils/fortified-function";
+import {
+    func,
+    createFortifiedFunction,
+} from "../components/fortified-function";
 
 async function testBasicFFunc() {
     console.log("🧪 Testing Basic fFunc...");

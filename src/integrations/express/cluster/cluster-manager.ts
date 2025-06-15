@@ -16,13 +16,13 @@ import {
     PersistenceConfig,
     PersistentClusterState,
 } from "../types/cluster";
-import { WorkerManager } from "./components/WorkerManager";
-import { HealthMonitor } from "./components/HealthMonitor";
-import { LoadBalancer } from "./components/LoadBalancer";
-import { IPCManager } from "./components/IPCManager";
-import { MetricsCollector } from "./components/MetricsCollector";
-import { AutoScaler } from "./components/AutoScaler";
-import { ClusterPersistenceManager } from "./components/ClusterPersistenceManager";
+import { WorkerManager } from "./modules/WorkerManager";
+import { HealthMonitor } from "./modules/HealthMonitor";
+import { LoadBalancer } from "./modules/LoadBalancer";
+import { IPCManager } from "./modules/IPCManager";
+import { MetricsCollector } from "./modules/MetricsCollector";
+import { AutoScaler } from "./modules/AutoScaler";
+import { ClusterPersistenceManager } from "./modules/ClusterPersistenceManager";
 import {
     SecurityErrorLogger,
     createSecurityError,

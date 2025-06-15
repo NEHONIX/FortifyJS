@@ -6,7 +6,7 @@
  */
 
 import { EventEmitter } from "events";
-import { func } from "../../../../utils/fortified-function";
+import { func } from "../../../../components/fortified-function";
 import {
     BasePlugin,
     PluginType,

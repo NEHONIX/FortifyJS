@@ -530,7 +530,7 @@ export class ConsoleInterceptor {
         this.isProcessing = true;
 
         try {
-            // 🔐 ALWAYS handle encryption if enabled (background processing)
+            // ALWAYS handle encryption if enabled (background processing)
             if (this.encryptionHandler && this.config.encryption?.enabled) {
                 try {
                     await this.encryptionHandler.encryptLogEntry(call);
@@ -550,7 +550,7 @@ export class ConsoleInterceptor {
             }
 
             // Route through our logger system with appropriate prefix
-            // 📺 DISPLAY: Based on preserve option configuration
+            //  DISPLAY: Based on preserve option configuration
             let displayMessage = call.args.join(" ");
 
             // Determine display format only if we're actually displaying
@@ -584,7 +584,7 @@ export class ConsoleInterceptor {
                             // Show both readable and encrypted hash
                             displayMessage = `${call.args.join(
                                 " "
-                            )} [🔐 ${encryptedHash.substring(0, 32)}...]`;
+                            )} [${encryptedHash.substring(0, 32)}...]`;
                             break;
                     }
                 }
@@ -592,7 +592,7 @@ export class ConsoleInterceptor {
 
             // Add encryption status indicator if enabled
             if (showEncryptionStatus && this.config.encryption?.enabled) {
-                displayMessage = `🔐 ${displayMessage}`;
+                displayMessage = `${displayMessage}`;
             }
 
             const component: LogComponent = "userApp";

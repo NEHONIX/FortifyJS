@@ -225,7 +225,7 @@ export class PasswordUtils {
         // Encrypt if requested (real implementation)
         if (options.encrypt && options.encryptionKey) {
             try {
-                // Use real encryption - this should be called asynchronously in practice
+                //  this should be called asynchronously in practice
                 const encrypted = this.encryptPasswordHashSync(
                     result,
                     options.encryptionKey

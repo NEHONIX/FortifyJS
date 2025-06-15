@@ -56,8 +56,8 @@ import {
     constantTimeEqual,
     secureModPow,
     faultResistantEqual,
-} from "../security/side-channel";
-import { argon2Derive, balloonDerive } from "../security/memory-hard";
+} from "../components/side-channel";
+import { argon2Derive, balloonDerive } from "../components/memory-hard";
 import {
     lamportGenerateKeypair,
     lamportSign,
@@ -65,34 +65,34 @@ import {
     ringLweGenerateKeypair,
     ringLweEncrypt,
     ringLweDecrypt,
-} from "../security/post-quantum";
-import { SecureBuffer, secureWipe } from "../security/secure-memory";
-import { EntropyPool } from "../security/entropy-augmentation";
+} from "../components/post-quantum";
+import { SecureBuffer, secureWipe } from "../components/secure-memory";
+import { EntropyPool } from "../components/entropy-augmentation";
 import {
     createCanary,
     triggerCanary,
     createCanaryObject,
     createCanaryFunction,
-} from "../security/canary-tokens";
+} from "../components/canary-tokens";
 import {
     createAttestation,
     verifyAttestation,
     createLibraryAttestation,
     verifyLibraryAttestation,
-} from "../security/attestation";
-import { verifyRuntimeSecurity } from "../security/runtime-verification";
+} from "../components/attestation";
+import { verifyRuntimeSecurity } from "../components/runtime-verification";
 import {
     secureSerialize,
     secureDeserialize,
-} from "../security/secure-serialization";
+} from "../components/secure-serialization";
 import {
     TamperEvidentLogger,
     LogLevel,
-} from "../security/tamper-evident-logging";
+} from "../components/tamper-evident-logging";
 import { middleware } from "../integrations/express.middleware";
 import { bufferDataConverter } from "../utils/dataConverter";
-import SecureString from "../security/secure-string";
-import SecureObject from "../security/secure-object";
+import SecureString from "../components/secure-string";
+import SecureObject from "../components/secure-object";
 
 /**
  * Main class for the FortifyJS library
