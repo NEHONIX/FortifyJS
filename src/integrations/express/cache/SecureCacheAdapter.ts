@@ -252,7 +252,7 @@ export class SecureCacheAdapter extends EventEmitter {
                 });
 
                 console.log(" Redis Sentinel initialized");
-            } else {
+            } else { 
                 // Single Redis instance
                 this.redisClient = new Redis({
                     host: redisConfig.host,

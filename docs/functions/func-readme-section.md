@@ -2,7 +2,7 @@
 
 ## Transform Any Function into an Enterprise-Grade Solution
 
-The `func()` method is FortifyJS's revolutionary zero-configuration factory that transforms ordinary JavaScript functions into production-ready, enterprise-grade functions with automatic security, performance optimization, and intelligent caching.
+The `func()` method is FortifyJS's zero-configuration factory that transforms ordinary JavaScript functions into production-ready, enterprise-grade functions with automatic security, performance optimization, and intelligent caching.
 
 ## Quick Start
 

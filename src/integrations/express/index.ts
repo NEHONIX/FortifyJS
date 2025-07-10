@@ -3,7 +3,7 @@
 
 /**
  * FortifyJS Express Powerhouse
- * Revolutionary Express utility with Redis caching, smart optimization, and military-grade security
+ * Express utility with Redis caching, smart optimization, and military-grade security
  *
  * @author Nehonix team
  * @description Zero-configuration, ultra-fast, secure Express server factory
@@ -22,7 +22,7 @@ export type {
     ServerConfig,
     RouteConfig,
     CacheConfig,
-    SecurityConfig, 
+    SecurityConfig,
     PerformanceConfig,
 } from "./types/types";
 
