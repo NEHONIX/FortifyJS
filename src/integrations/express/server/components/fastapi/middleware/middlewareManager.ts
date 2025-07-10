@@ -9,9 +9,9 @@ import {
     MiddlewareRegistryEntry,
     MiddlewareExecutionResult,
     MiddlewareCacheEntry,
-    MiddlewareOptimizationConfig,
+    MiddlewareOptimizationConfig, 
     IMiddlewareManager,
-    MiddlewarePerformanceMetrics,
+    MiddlewarePerformanceMetrics, 
 } from "../../../../types/components/middleware.type";
 import {
     MiddlewareConfiguration,
@@ -281,14 +281,60 @@ export class MiddlewareManager implements IMiddlewareManager {
      */
     public enableCors(options?: any): void {
         try {
-            this.dependencies.app.use(cors(options));
-            logger.debug("middleware", "CORS enabled");
+            // Transform FortifyJS CORS config to standard cors package config
+            const corsConfig = this.transformCorsConfig(options);
+            this.dependencies.app.use(cors(corsConfig));
+            logger.debug("middleware", "CORS enabled with config:", corsConfig);
         } catch (error) {
             logger.warn(
                 "middleware",
                 "CORS not available, skipping CORS headers"
             );
         }
+    }
+
+    /**
+     * Transform FortifyJS CORS configuration to standard cors package configuration
+     */
+    private transformCorsConfig(fortifyConfig?: any): any {
+        if (!fortifyConfig) return {};
+
+        const corsConfig: any = {};
+
+        // Map FortifyJS config to standard cors config
+        if (fortifyConfig.origin !== undefined) {
+            corsConfig.origin = fortifyConfig.origin;
+        }
+
+        if (fortifyConfig.methods !== undefined) {
+            corsConfig.methods = fortifyConfig.methods;
+        }
+
+        if (fortifyConfig.allowedHeaders !== undefined) {
+            corsConfig.allowedHeaders = fortifyConfig.allowedHeaders;
+        }
+
+        if (fortifyConfig.credentials !== undefined) {
+            corsConfig.credentials = fortifyConfig.credentials;
+        }
+
+        if (fortifyConfig.maxAge !== undefined) {
+            corsConfig.maxAge = fortifyConfig.maxAge;
+        }
+
+        if (fortifyConfig.preflightContinue !== undefined) {
+            corsConfig.preflightContinue = fortifyConfig.preflightContinue;
+        }
+
+        if (fortifyConfig.optionsSuccessStatus !== undefined) {
+            corsConfig.optionsSuccessStatus =
+                fortifyConfig.optionsSuccessStatus;
+        }
+
+        // Don't pass the 'enabled' property to cors package
+        // Remove any other FortifyJS-specific properties
+
+        return corsConfig;
     }
 
     /**

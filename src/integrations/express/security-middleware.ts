@@ -247,7 +247,7 @@ export class SecurityMiddleware {
                 // SQL functions commonly used in attacks
                 /(\b(CHAR|ASCII|SUBSTRING|CONCAT|VERSION|DATABASE|USER|SCHEMA)\b\s*\()/gi,
             ];
-
+ 
             const validateSQLInput = (obj: any, path = ""): boolean => {
                 if (typeof obj === "string") {
                     // Use FortifyJS pattern matching for enhanced detection

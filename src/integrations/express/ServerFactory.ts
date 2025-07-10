@@ -33,8 +33,8 @@
  * Zero-async initialization for immediate use
  */
 
-import express, {
-    Express,
+import express, {  
+    Express, 
     Request,
     NextFunction,
     RequestHandler,
@@ -45,7 +45,7 @@ import compression from "compression";
 import { CacheUtils } from "./cache/CacheFactory";
 import { SecureCacheAdapter } from "./cache/SecureCacheAdapter";
 import {
-    RouteOptions,
+    RouteOptions, 
     ServerConfig,
     ServerOptions,
     UltraFastApp,

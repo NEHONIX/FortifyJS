@@ -211,8 +211,7 @@
         "rollup-plugin-typescript2": "^0.34.1",
         "ts-jest": "^29.3.4",
         "ts-node": "^10.9.2",
-        "typedoc": "^0.25.12",
-        "typescript": "^5.8.3"
+        "typedoc": "^0.25.12"
     },
     "engines": {
         "node": ">=22.12.0"
@@ -282,6 +281,8 @@
         "secure-random": "^1.1.2",
         "systeminformation": "^5.27.1",
         "tweetnacl": "^1.0.3",
-        "ws": "^8.18.2"
+        "ws": "^8.18.2",
+        "typescript": "^5.8.3"
     }
 }
+

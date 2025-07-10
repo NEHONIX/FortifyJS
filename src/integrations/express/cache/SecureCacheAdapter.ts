@@ -260,6 +260,10 @@ export class SecureCacheAdapter extends EventEmitter {
                     password: redisConfig.password,
                     db: redisConfig.db || 0,
                     lazyConnect: true,
+                    connectTimeout: 5000, // 5 second timeout
+                    commandTimeout: 5000, // 5 second command timeout
+                    retryDelayOnFailover: 100,
+                    maxRetriesPerRequest: 2,
                 });
 
                 console.log(" Redis single instance initialized");
@@ -268,8 +272,16 @@ export class SecureCacheAdapter extends EventEmitter {
             // Setup Redis event handlers
             this.setupRedisEventHandlers();
 
-            // Connect to Redis
-            await this.redisClient.connect();
+            // Connect to Redis with timeout
+            await Promise.race([
+                this.redisClient.connect(),
+                new Promise((_, reject) =>
+                    setTimeout(
+                        () => reject(new Error("Redis connection timeout")),
+                        10000
+                    )
+                ),
+            ]);
         } catch (error) {
             console.error(" Redis initialization failed:", error);
             throw error;

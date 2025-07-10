@@ -108,7 +108,7 @@ export class FortifiedFunctionCore<T extends any[], R> extends EventEmitter {
             options
         );
 
-        fortifiedLogger.info(
+        fortifiedLogger.debug(
             "CORE",
             `Creating optimized fortified function: ${this.functionId}`,
             {
@@ -271,7 +271,7 @@ export class FortifiedFunctionCore<T extends any[], R> extends EventEmitter {
         const instance = new FortifiedFunctionCore(fn, options, id);
         FortifiedFunctionCore.instances.set(id, instance);
 
-        fortifiedLogger.info("CORE", `Created new optimized instance: ${id}`, {
+        fortifiedLogger.debug("CORE", `Created new optimized instance: ${id}`, {
             totalInstances: FortifiedFunctionCore.globalMetrics.totalInstances,
         });
 
@@ -782,3 +782,4 @@ export class FortifiedFunctionCore<T extends any[], R> extends EventEmitter {
         return FortifiedFunctionCore.instances.size;
     }
 }
+

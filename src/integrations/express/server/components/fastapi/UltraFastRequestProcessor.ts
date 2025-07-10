@@ -399,6 +399,10 @@ export class UltraFastRequestProcessor {
                         requestId,
                         context
                     );
+                } else if (!res.headersSent) {
+                    // If we couldn't process the request, pass it to the next middleware
+                    next();
+                    return;
                 }
 
                 this.recordSuccess(context, Date.now() - startTime);
@@ -478,6 +482,10 @@ export class UltraFastRequestProcessor {
                 headers: this.sanitizeHeaders(req.headers),
             },
         };
+
+        // TODO: Implement actual request processing logic
+        // For now, return null to pass control to next middleware
+        return null;
     }
 
     private createTimeoutPromise(ms: number): Promise<never> {

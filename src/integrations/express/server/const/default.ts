@@ -5,7 +5,7 @@ import { DEFAULT_CONSOLE_CONFIG } from "../components/fastapi/console/types";
 // Default configuration
 export const DEFAULT_OPTIONS: ServerOptions = {
     cache: {
-        strategy: "auto",
+        strategy: "memory", // Use memory-only by default to avoid Redis dependency
         ttl: 300000, // 5 minutes
         enabled: true,
         memory: {
@@ -73,7 +73,10 @@ export const DEFAULT_OPTIONS: ServerOptions = {
             strategy: "random",
         },
     },
-    fileWatcher: DEFAULT_FW_CONFIG,
+    fileWatcher: {
+        ...DEFAULT_FW_CONFIG,
+        enabled: false, // Disable file watcher by default to avoid hanging
+    },
     logging: {
         level: "info",
         components: {
@@ -103,7 +106,7 @@ export const DEFAULT_OPTIONS: ServerOptions = {
             prefix: true,
             colors: true,
             compact: false,
-            timestamps: false, 
+            timestamps: false,
         },
         // Console Interception with Encryption Support
         consoleInterception: {
@@ -113,3 +116,4 @@ export const DEFAULT_OPTIONS: ServerOptions = {
         },
     },
 };
+

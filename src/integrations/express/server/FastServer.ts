@@ -37,7 +37,6 @@ import { RedirectManager } from "./components/fastapi/RedirectManager";
 import { ConsoleInterceptor } from "./components/fastapi/console/ConsoleInterceptor";
 import { UltraFastRequestProcessor } from "./components/fastapi/UltraFastRequestProcessor"; // UFRP
 
-
 /**
  * Ultra-Fast Express Server with Advanced Performance Optimization
  */
@@ -90,6 +89,9 @@ export class UltraFastServer {
         // Add start method immediately so it's available right away
         this.addStartMethod();
 
+        // Add basic middleware methods immediately for developer-friendly API
+        this.addImmediateMiddlewareMethods();
+
         // Initialize ultra-fast processor first (using legacy config for backward compatibility)
         this.ultraFastProcessor = new UltraFastRequestProcessor({
             cpuWorkers: this.options.performance?.workers?.cpu || 4,
@@ -108,7 +110,7 @@ export class UltraFastServer {
         });
 
         // Initialize other components asynchronously
-        this.initializeComponentsAsync();
+        this.initPromise = this.initializeComponentsAsync();
 
         this.logger.debug(
             "server",
@@ -240,6 +242,12 @@ export class UltraFastServer {
             app: this.app,
             middlewareManager: this.middlewareManager,
         });
+
+        // Add middleware methods to the app (this will upgrade the immediate methods)
+        this.middlewareMethodsManager.addMiddlewareMethods();
+
+        // Process any middleware that was queued during immediate usage
+        this.processQueuedMiddleware();
 
         this.routeManager = new RouteManager({
             app: this.app,
@@ -436,19 +444,216 @@ export class UltraFastServer {
         }
     }
 
+    /**
+     * Add immediate middleware methods for developer-friendly API
+     * These work immediately without waiting for async initialization
+     */
+    private addImmediateMiddlewareMethods(): void {
+        // Create a simple middleware queue for immediate use
+        const middlewareQueue: Array<{
+            handler: any;
+            options?: any;
+        }> = [];
 
+        // Add immediate middleware() method
+        this.app.middleware = (config?: any) => {
+            // Apply basic rate limiting if configured
+            if (config?.rateLimit && config.rateLimit.enabled !== false) {
+                const max = config.rateLimit.max || 100;
+                const windowMs = config.rateLimit.windowMs || 60000;
+
+                // Simple in-memory rate limiter
+                const requests = new Map<
+                    string,
+                    { count: number; resetTime: number }
+                >();
+
+                this.app.use((req: any, res: any, next: any) => {
+                    const ip =
+                        req.ip || req.connection.remoteAddress || "unknown";
+                    const now = Date.now();
+                    const windowStart = Math.floor(now / windowMs) * windowMs;
+
+                    const key = `${ip}:${windowStart}`;
+                    const current = requests.get(key) || {
+                        count: 0,
+                        resetTime: windowStart + windowMs,
+                    };
+
+                    if (now > current.resetTime) {
+                        // Reset window
+                        current.count = 0;
+                        current.resetTime = windowStart + windowMs;
+                    }
+
+                    current.count++;
+                    requests.set(key, current);
+
+                    if (current.count > max) {
+                        return res
+                            .status(429)
+                            .send("Too many requests, please try again later.");
+                    }
+
+                    next();
+                });
+            }
+
+            // Apply basic CORS if configured
+            if (config?.cors && config.cors.enabled !== false) {
+                const corsOptions = config.cors;
+                this.app.use((req: any, res: any, next: any) => {
+                    const origin = req.headers.origin;
+
+                    // Check if origin is allowed
+                    if (
+                        corsOptions.origin &&
+                        Array.isArray(corsOptions.origin)
+                    ) {
+                        if (corsOptions.origin.includes(origin)) { 
+                            res.setHeader(
+                                "Access-Control-Allow-Origin",
+                                origin
+                            );
+                        }
+                    } else {
+                        res.setHeader("Access-Control-Allow-Origin", "*");
+                    }
+
+                    if (corsOptions.methods) {
+                        res.setHeader(
+                            "Access-Control-Allow-Methods",
+                            corsOptions.methods.join(",")
+                        );
+                    } else {
+                        res.setHeader(
+                            "Access-Control-Allow-Methods",
+                            "GET,POST,PUT,DELETE,OPTIONS"
+                        );
+                    }
+
+                    if (corsOptions.allowedHeaders) {
+                        res.setHeader(
+                            "Access-Control-Allow-Headers",
+                            corsOptions.allowedHeaders.join(",")
+                        );
+                    } else {
+                        res.setHeader(
+                            "Access-Control-Allow-Headers",
+                            "Content-Type,Authorization"
+                        );
+                    }
+
+                    res.setHeader("Vary", "Origin");
+
+                    if (req.method === "OPTIONS") {
+                        return res.status(204).end();
+                    }
+
+                    next();
+                });
+            }
+
+            return {
+                register: (handler: any, options?: any) => {
+                    // Store middleware for later registration
+                    middlewareQueue.push({ handler, options });
+
+                    // Also add it immediately to Express for basic functionality
+                    this.app.use(handler);
+
+                    return this; // Return for chaining
+                },
+                enable: (id: string) => this,
+                disable: (id: string) => this,
+                getInfo: () => [],
+                getStats: () => ({}),
+            };
+        };
+
+        // Store the queue for later processing
+        (this.app as any)._middlewareQueue = middlewareQueue;
+
+        // Add basic convenience methods
+        this.app.enableSecurity = (options?: any) => {
+            // Basic security headers immediately
+            this.app.use((req: any, res: any, next: any) => {
+                res.setHeader("X-Content-Type-Options", "nosniff");
+                res.setHeader("X-Frame-Options", "DENY");
+                res.setHeader("X-XSS-Protection", "1; mode=block");
+                next();
+            });
+            return this.app;
+        };
+
+        this.app.enableCors = (options?: any) => {
+            // Basic CORS immediately
+            this.app.use((req: any, res: any, next: any) => {
+                res.setHeader("Access-Control-Allow-Origin", "*");
+                res.setHeader(
+                    "Access-Control-Allow-Methods",
+                    "GET,POST,PUT,DELETE,OPTIONS"
+                );
+                res.setHeader(
+                    "Access-Control-Allow-Headers",
+                    "Content-Type,Authorization"
+                );
+                next();
+            });
+            return this.app;
+        };
+
+        this.app.enableCompression = (options?: any) => {
+            // Basic compression will be added when full middleware manager is ready
+            return this.app;
+        };
+
+        this.app.enableRateLimit = (options?: any) => {
+            // Basic rate limiting will be added when full middleware manager is ready
+            return this.app;
+        };
+    }
+
+    /**
+     * Process middleware that was queued during immediate usage
+     */
+    private processQueuedMiddleware(): void {
+        const queue = (this.app as any)._middlewareQueue;
+        if (queue && Array.isArray(queue)) {
+            // Process each queued middleware with the full middleware manager
+            queue.forEach(({ handler, options }) => {
+                try {
+                    this.middlewareManager.register(handler, options);
+                } catch (error) {
+                    this.logger.warn(
+                        "middleware",
+                        `Failed to register queued middleware: ${error}`
+                    );
+                }
+            });
+
+            // Clear the queue
+            (this.app as any)._middlewareQueue = [];
+        }
+    }
 
     /**
      * Add start method to app with cluster support (full version)
      */
     private addStartMethod(): void {
-       const start = async (port?: number, callback?: () => void) => {
+        const start = async (port?: number, callback?: () => void) => {
             // **INTERNAL HANDLING**: Wait for server to be ready before starting
             // This ensures developers don't need to handle async initialization timing
             if (!this.ready) {
-                this.logger.debug("server", "Waiting for initialization to complete...");
+                this.logger.debug(
+                    "server",
+                    "Waiting for initialization to complete..."
+                );
                 await this.waitForReady();
-                this.logger.info("server", "Initialization complete, starting server...");
+                this.logger.info(
+                    "server",
+                    "Initialization complete, starting server..."
+                );
             }
 
             const serverPort = port || this.options.server?.port || 3000;
@@ -459,7 +664,7 @@ export class UltraFastServer {
                 this.fileWatcherManager.isInMainProcess() &&
                 this.fileWatcherManager.getHotReloader()
             ) {
-              this.logger.debug("server","Taking hot reload mode path");
+                this.logger.debug("server", "Taking hot reload mode path");
                 this.logger.startup(
                     "fileWatcher",
                     "Starting with hot reload support..."
@@ -501,7 +706,7 @@ export class UltraFastServer {
 
             // If cluster is enabled, use cluster manager
             if (this.clusterManager.isClusterEnabled()) {
-       this.logger.debug("server","Taking cluster mode path");
+                this.logger.debug("server", "Taking cluster mode path");
                 // console.log("Starting cluster...");
 
                 try {
@@ -594,7 +799,7 @@ export class UltraFastServer {
             }
 
             // Single process mode (default)
-   this.logger.debug("server", "Taking single process mode path");
+            this.logger.debug("server", "Taking single process mode path");
             this.httpServer = await this.startServerWithPortHandling(
                 serverPort,
                 host,
@@ -943,3 +1148,4 @@ export class UltraFastServer {
 }
 
 export { UltraFastServer as FastServer };
+
