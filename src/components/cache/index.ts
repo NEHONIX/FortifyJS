@@ -131,7 +131,7 @@ import type { SecureCacheAdapter as SecureCacheAdapterType } from "../../integra
  * ```
  *
  * @version 4.2.3
- * @author FortifyJS Team
+ * @author NEHONIX
  * @since 2024-12-19
  * @license MIT
  */
@@ -879,31 +879,179 @@ export default {
 };
 
 /**
+ * Redis configuration options
+ */
+export interface RedisConfig {
+    /** Redis server hostname */
+    host: string;
+    /** Redis server port */
+    port: number;
+    /** Redis authentication password */
+    password?: string;
+    /** Redis database number */
+    db?: number;
+    /** Connection timeout in milliseconds */
+    connectTimeout?: number;
+    /** Command timeout in milliseconds */
+    commandTimeout?: number;
+    /** Redis Cluster configuration */
+    cluster?: {
+        enabled: boolean;
+        nodes: Array<{ host: string; port: number }>;
+    };
+    /** Redis Sentinel configuration */
+    sentinel?: {
+        enabled: boolean;
+        masters: string[];
+        sentinels: Array<{ host: string; port: number }>;
+    };
+}
+
+/**
+ * Memory cache configuration options
+ */
+export interface MemoryConfig {
+    /** Maximum memory cache size in MB */
+    maxSize: number;
+    /** Maximum number of cache entries */
+    maxEntries: number;
+    /** LRU eviction policy settings */
+    evictionPolicy?: "lru" | "lfu" | "fifo";
+}
+
+/**
+ * Security configuration options
+ */
+export interface SecurityConfig {
+    /** Enable AES-256-GCM encryption */
+    encryption: boolean;
+    /** Enable automatic key rotation */
+    keyRotation?: boolean;
+    /** Custom encryption key (base64 encoded) */
+    customKey?: string;
+}
+
+/**
+ * Monitoring and health check configuration
+ */
+export interface MonitoringConfig {
+    /** Enable performance metrics collection */
+    enabled: boolean;
+    /** Metrics collection interval in milliseconds */
+    interval?: number;
+    /** Enable health checks */
+    healthChecks?: boolean;
+}
+
+/**
+ * Cache configuration options
+ */
+export interface CacheConfig {
+    /** Cache strategy: memory, redis, or hybrid */
+    strategy: "memory" | "redis" | "hybrid";
+    /** Default TTL in seconds */
+    ttl?: number;
+    /** Redis configuration (required for redis and hybrid strategies) */
+    redis?: RedisConfig;
+    /** Memory configuration (required for memory and hybrid strategies) */
+    memory?: MemoryConfig;
+    /** Security configuration */
+    security?: SecurityConfig;
+    /** Monitoring configuration */
+    monitoring?: MonitoringConfig;
+    /** Enable compression */
+    compression?: boolean;
+}
+
+/**
+ * Cache options for set operations
+ */
+export interface CacheSetOptions {
+    /** Time to live in seconds */
+    ttl?: number;
+    /** Array of tags for bulk invalidation */
+    tags?: string[];
+}
+
+/**
+ * Secure cache statistics interface
+ */
+export interface SecureCacheStats {
+    memory: {
+        hitRate: number;
+        missRate: number;
+        size: number;
+        entries: number;
+        maxSize: number;
+        maxEntries: number;
+    };
+    redis?: {
+        hitRate: number;
+        missRate: number;
+        connected: boolean;
+        memoryUsage: number;
+        keyCount: number;
+    };
+    operations: {
+        total: number;
+        gets: number;
+        sets: number;
+        deletes: number;
+        errors: number;
+    };
+    performance: {
+        avgResponseTime: number;
+        p95ResponseTime: number;
+        p99ResponseTime: number;
+    };
+}
+
+/**
+ * Cache health status interface
+ */
+export interface CacheHealth {
+    status: "healthy" | "degraded" | "unhealthy";
+    details: {
+        redis?: {
+            connected: boolean;
+            latency?: number;
+            error?: string;
+        };
+        memory?: {
+            usage: number;
+            available: number;
+        };
+        errors?: string[];
+        lastCheck: Date;
+    };
+}
+
+/**
  * Cache interface for public API to avoid TypeScript issues with private members
  */
 export interface ICacheAdapter {
-    get(key: string): Promise<any>;
-    set(
+    get<T = any>(key: string): Promise<T | null>;
+    set<T = any>(
         key: string,
-        value: any,
-        options?: { ttl?: number; tags?: string[] }
+        value: T,
+        options?: CacheSetOptions
     ): Promise<boolean>;
     delete(key: string): Promise<boolean>;
     exists(key: string): Promise<boolean>;
     clear(): Promise<void>;
     connect(): Promise<void>;
     disconnect(): Promise<void>;
-    getStats(): Promise<any>;
-    mget(keys: string[]): Promise<Record<string, any>>;
-    mset(
-        entries: Record<string, any> | Array<[string, any]>,
-        options?: { ttl?: number; tags?: string[] }
+    getStats(): Promise<SecureCacheStats>;
+    mget<T = any>(keys: string[]): Promise<Record<string, T>>;
+    mset<T = any>(
+        entries: Record<string, T> | Array<[string, T]>,
+        options?: CacheSetOptions
     ): Promise<boolean>;
     invalidateByTags(tags: string[]): Promise<number>;
     getTTL(key: string): Promise<number>;
     expire(key: string, ttl: number): Promise<boolean>;
     keys(pattern?: string): Promise<string[]>;
-    getHealth(): { status: "healthy" | "degraded" | "unhealthy"; details: any };
+    getHealth(): CacheHealth;
 }
 
 /**
@@ -1007,13 +1155,13 @@ export interface ICacheAdapter {
  *
  * @since 4.2.3
  * @version 4.2.3
- * @author FortifyJS Team
+ * @author NEHONIX
  * @see {@link ICacheAdapter} for the complete interface definition
  * @see {@link https://lab.nehonix.space/nehonix_viewer/_doc/Nehonix%20FortifyJs} for detailed documentation
  */
 export class SecureCacheClient implements ICacheAdapter {
     private adapter: SecureCacheAdapterType | null = null;
-    private config: any;
+    private config: CacheConfig;
 
     /**
      * Creates a new SecureCacheClient instance
@@ -1043,7 +1191,7 @@ export class SecureCacheClient implements ICacheAdapter {
      * });
      * ```
      */
-    constructor(config: any = {}) {
+    constructor(config: CacheConfig) {
         this.config = config;
         // Adapter will be created lazily on first use
     }
@@ -1072,13 +1220,13 @@ export class SecureCacheClient implements ICacheAdapter {
      *
      * @example
      * ```typescript
-     * const user = await cache.get("user:123");
+     * const user = await cache.get<User>("user:123");
      * if (user) {
      *   console.log("Found user:", user.name);
      * }
      * ```
      */
-    async get(key: string): Promise<any> {
+    async get<T = any>(key: string): Promise<T | null> {
         const adapter = await this.ensureAdapter();
         return adapter.get(key);
     }
@@ -1108,10 +1256,10 @@ export class SecureCacheClient implements ICacheAdapter {
      * });
      * ```
      */
-    async set(
+    async set<T = any>(
         key: string,
-        value: any,
-        options?: { ttl?: number; tags?: string[] }
+        value: T,
+        options?: CacheSetOptions
     ): Promise<boolean> {
         const adapter = await this.ensureAdapter();
         return adapter.set(key, value, options);
@@ -1227,14 +1375,56 @@ export class SecureCacheClient implements ICacheAdapter {
      * ```typescript
      * const stats = await cache.getStats();
      * console.log(`Memory hit rate: ${stats.memory.hitRate * 100}%`);
-     * console.log(`Redis hit rate: ${stats.redis.hitRate * 100}%`);
+     * console.log(`Redis hit rate: ${stats.redis?.hitRate * 100}%`);
      * console.log(`Total operations: ${stats.operations.total}`);
      * console.log(`Average response time: ${stats.performance.avgResponseTime}ms`);
      * ```
      */
-    async getStats(): Promise<any> {
+    async getStats(): Promise<SecureCacheStats> {
         const adapter = await this.ensureAdapter();
-        return adapter.getStats();
+        const stats: any = await adapter.getStats();
+
+        // Transform the adapter stats to match our interface
+        return {
+            memory: {
+                hitRate: stats.memory?.hitRate || 0,
+                missRate: stats.memory?.missRate || 0,
+                size: stats.memory?.size || 0,
+                entries: stats.memory?.entries || 0,
+                maxSize: stats.memory?.maxSize || 0,
+                maxEntries: stats.memory?.maxEntries || 0,
+            },
+            redis: stats.redis
+                ? {
+                      hitRate: stats.redis.hitRate || 0,
+                      missRate: stats.redis.missRate || 0,
+                      connected: stats.redis.connected || false,
+                      memoryUsage: stats.redis.memoryUsage || 0,
+                      keyCount: stats.redis.keyCount || 0,
+                  }
+                : undefined,
+            operations: {
+                total: stats.operations?.total || stats.total || 0,
+                gets: stats.operations?.gets || stats.gets || 0,
+                sets: stats.operations?.sets || stats.sets || 0, 
+                deletes: stats.operations?.deletes || stats.deletes || 0,
+                errors: stats.operations?.errors || stats.errors || 0,
+            },
+            performance: {
+                avgResponseTime:
+                    stats.performance?.avgResponseTime ||
+                    stats.avgResponseTime ||
+                    0,
+                p95ResponseTime:
+                    stats.performance?.p95ResponseTime ||
+                    stats.p95ResponseTime ||
+                    0,
+                p99ResponseTime:
+                    stats.performance?.p99ResponseTime ||
+                    stats.p99ResponseTime ||
+                    0,
+            },
+        };
     }
 
     /**
@@ -1245,11 +1435,11 @@ export class SecureCacheClient implements ICacheAdapter {
      *
      * @example
      * ```typescript
-     * const users = await cache.mget(["user:1", "user:2", "user:3"]);
+     * const users = await cache.mget<User>(["user:1", "user:2", "user:3"]);
      * console.log(users); // { "user:1": {...}, "user:2": {...} }
      * ```
      */
-    async mget(keys: string[]): Promise<Record<string, any>> {
+    async mget<T = any>(keys: string[]): Promise<Record<string, T>> {
         const adapter = await this.ensureAdapter();
         return adapter.mget(keys);
     }
@@ -1278,9 +1468,9 @@ export class SecureCacheClient implements ICacheAdapter {
      * ], { ttl: 1800, tags: ["sessions"] });
      * ```
      */
-    async mset(
-        entries: Record<string, any> | Array<[string, any]>,
-        options?: { ttl?: number; tags?: string[] }
+    async mset<T = any>(
+        entries: Record<string, T> | Array<[string, T]>,
+        options?: CacheSetOptions
     ): Promise<boolean> {
         const adapter = await this.ensureAdapter();
         return adapter.mset(entries, options);
@@ -1396,14 +1586,14 @@ export class SecureCacheClient implements ICacheAdapter {
      * }
      * ```
      */
-    getHealth(): {
-        status: "healthy" | "degraded" | "unhealthy";
-        details: any;
-    } {
+    getHealth(): CacheHealth {
         if (!this.adapter) {
             return {
                 status: "unhealthy",
-                details: { error: "Cache adapter not initialized" },
+                details: {
+                    errors: ["Cache adapter not initialized"],
+                    lastCheck: new Date(),
+                },
             };
         }
         return this.adapter.getHealth();
