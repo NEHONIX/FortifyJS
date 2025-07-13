@@ -1783,7 +1783,7 @@ export type {
  *         rateLimit: true,
  *         cors: true,
  *         helmet: true
- *     },
+ *     }, 
  *     monitoring: {
  *         metrics: true,
  *         logging: true

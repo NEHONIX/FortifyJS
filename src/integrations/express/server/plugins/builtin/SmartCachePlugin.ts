@@ -61,6 +61,21 @@ export class SmartCachePlugin extends CachePlugin {
         }
     > = new Map();
 
+    // Background prefetching queue and worker
+    private prefetchQueue: Array<{
+        url: string;
+        priority: number;
+        timestamp: number;
+        context?: any;
+    }> = [];
+    private prefetchWorkerActive = false;
+    private prefetchStats = {
+        totalPrefetched: 0,
+        successfulPrefetches: 0,
+        failedPrefetches: 0,
+        averagePrefetchTime: 0,
+    };
+
     /**
      * Initialize smart cache plugin
      */
@@ -447,11 +462,441 @@ export class SmartCachePlugin extends CachePlugin {
         const { req } = context;
         const relatedUrls = this.identifyRelatedContent(req.path);
 
-        // This would typically trigger background prefetching
+        // Queue related URLs for background prefetching
+        const queuedUrls: string[] = [];
+        for (const url of relatedUrls) {
+            const priority = this.calculatePrefetchPriority(url, context);
+
+            // Only queue high-priority URLs to avoid overwhelming the system
+            if (priority > 0.5) {
+                this.queueForPrefetch(url, priority, context);
+                queuedUrls.push(url);
+            }
+        }
+
+        // Start background prefetch worker if not already active
+        if (!this.prefetchWorkerActive && this.prefetchQueue.length > 0) {
+            this.startPrefetchWorker();
+        }
+
         return {
-            prefetched: relatedUrls.length,
-            urls: relatedUrls,
+            prefetched: queuedUrls.length,
+            urls: queuedUrls,
+            queueSize: this.prefetchQueue.length,
         };
+    }
+
+    /**
+     * Queue a URL for background prefetching
+     */
+    private queueForPrefetch(
+        url: string,
+        priority: number,
+        context: PluginExecutionContext
+    ): void {
+        // Avoid duplicate entries
+        const existingIndex = this.prefetchQueue.findIndex(
+            (item) => item.url === url
+        );
+        if (existingIndex >= 0) {
+            // Update priority if higher
+            if (this.prefetchQueue[existingIndex].priority < priority) {
+                this.prefetchQueue[existingIndex].priority = priority;
+                this.prefetchQueue[existingIndex].timestamp = Date.now();
+            }
+            return;
+        }
+
+        // Add to queue
+        this.prefetchQueue.push({
+            url,
+            priority,
+            timestamp: Date.now(),
+            context: {
+                method: context.req.method,
+                headers: context.req.headers,
+                baseUrl: `${context.req.protocol}://${context.req.get("host")}`,
+            },
+        });
+
+        // Sort by priority (highest first)
+        this.prefetchQueue.sort((a, b) => b.priority - a.priority);
+
+        // Limit queue size to prevent memory issues
+        if (this.prefetchQueue.length > 100) {
+            this.prefetchQueue = this.prefetchQueue.slice(0, 100);
+        }
+    }
+
+    /**
+     * Calculate prefetch priority for a URL
+     */
+    private calculatePrefetchPriority(
+        url: string,
+        context: PluginExecutionContext
+    ): number {
+        let priority = 0.3; // Base priority
+
+        // Check request patterns
+        const pattern = this.requestPatterns.get(url);
+        if (pattern) {
+            // Higher frequency = higher priority
+            priority += Math.min(pattern.frequency / 100, 0.4);
+
+            // Recent access = higher priority
+            const timeSinceAccess = Date.now() - pattern.lastAccess;
+            if (timeSinceAccess < 300000) {
+                // 5 minutes
+                priority += 0.2;
+            }
+
+            // Lower volatility = higher priority (more stable content)
+            priority += (1 - pattern.volatility) * 0.1;
+        }
+
+        // Check if URL matches high-priority patterns
+        if (url.includes("/api/") || url.includes("/static/")) {
+            priority += 0.2;
+        }
+
+        // Check if it's a common resource type
+        if (url.match(/\.(css|js|png|jpg|jpeg|gif|svg|woff|woff2)$/)) {
+            priority += 0.3;
+        }
+
+        return Math.min(priority, 1.0);
+    }
+
+    /**
+     * Start the background prefetch worker
+     */
+    private async startPrefetchWorker(): Promise<void> {
+        if (this.prefetchWorkerActive) return;
+
+        this.prefetchWorkerActive = true;
+
+        try {
+            while (this.prefetchQueue.length > 0) {
+                const item = this.prefetchQueue.shift();
+                if (!item) break;
+
+                // Skip items that are too old (older than 5 minutes)
+                if (Date.now() - item.timestamp > 300000) {
+                    continue;
+                }
+
+                await this.performPrefetch(item);
+
+                // Small delay to prevent overwhelming the server
+                await new Promise((resolve) => setTimeout(resolve, 10));
+            }
+        } catch (error) {
+            console.error("Prefetch worker error:", error);
+        } finally {
+            this.prefetchWorkerActive = false;
+        }
+    }
+
+    /**
+     * Perform actual prefetch operation
+     */
+    private async performPrefetch(item: {
+        url: string;
+        priority: number;
+        context?: any;
+    }): Promise<void> {
+        const startTime = Date.now();
+
+        try {
+            // Perform actual HTTP request for prefetching to warm up the cache
+            const response = await this.performActualPrefetchRequest(
+                item.url,
+                item.context
+            );
+
+            if (response.success) {
+                this.prefetchStats.successfulPrefetches++;
+
+                // Update request patterns
+                this.updateRequestPattern(item.url, Date.now() - startTime);
+            } else {
+                this.prefetchStats.failedPrefetches++;
+            }
+
+            this.prefetchStats.totalPrefetched++;
+
+            // Update average prefetch time
+            const prefetchTime = Date.now() - startTime;
+            this.prefetchStats.averagePrefetchTime =
+                (this.prefetchStats.averagePrefetchTime *
+                    (this.prefetchStats.totalPrefetched - 1) +
+                    prefetchTime) /
+                this.prefetchStats.totalPrefetched;
+        } catch (error) {
+            this.prefetchStats.failedPrefetches++;
+            this.prefetchStats.totalPrefetched++;
+            console.error(`Prefetch failed for ${item.url}:`, error);
+        }
+    } 
+
+    /**
+     * Perform actual prefetch request with real HTTP call
+     */
+    private async performActualPrefetchRequest(
+        url: string,
+        context?: any
+    ): Promise<{
+        success: boolean;
+        data?: any;
+        statusCode?: number;
+        headers?: any;
+        error?: string;
+    }> {
+        try {
+            // Construct full URL if relative
+            let fullUrl = url;
+            if (context?.baseUrl && !url.startsWith("http")) {
+                fullUrl = `${context.baseUrl}${
+                    url.startsWith("/") ? url : "/" + url
+                }`;
+            }
+
+            // Prepare request options
+            const requestOptions: any = {
+                method: context?.method || "GET",
+                headers: {
+                    "User-Agent": "FortifyJS-SmartCache/1.0",
+                    Accept: "*/*",
+                    "Cache-Control": "no-cache", // Force fresh fetch for prefetching
+                    ...this.getFilteredHeaders(context?.headers),
+                },
+                timeout: 5000, // 5 second timeout for prefetch requests
+                redirect: "follow",
+                maxRedirects: 3,
+            };
+
+            // Use Node.js built-in fetch if available (Node 18+), otherwise use a fallback
+            let response: any;
+            let responseData: any;
+
+            if (typeof fetch !== "undefined") {
+                // Use native fetch
+                response = await fetch(fullUrl, requestOptions);
+
+                if (response.ok) {
+                    // Try to get response data based on content type
+                    const contentType =
+                        response.headers.get("content-type") || "";
+
+                    if (contentType.includes("application/json")) {
+                        responseData = await response.json();
+                    } else if (contentType.includes("text/")) {
+                        responseData = await response.text();
+                    } else {
+                        // For binary data, just get the size
+                        const buffer = await response.arrayBuffer();
+                        responseData = {
+                            size: buffer.byteLength,
+                            type: "binary",
+                        };
+                    }
+                } else {
+                    throw new Error(
+                        `HTTP ${response.status}: ${response.statusText}`
+                    );
+                }
+            } else {
+                // Fallback using Node.js http/https modules
+                response = await this.makeHttpRequest(fullUrl, requestOptions);
+                responseData = response.data;
+            }
+
+            // Cache the prefetched content
+            await this.cachePrefetchedContent(url, responseData, response);
+
+            return {
+                success: true,
+                data: responseData,
+                statusCode: response.status || response.statusCode,
+                headers: response.headers,
+            };
+        } catch (error) {
+            console.warn(`Prefetch failed for ${url}:`, error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : "Unknown error",
+            };
+        }
+    }
+
+    /**
+     * Filter headers to only include safe ones for prefetching
+     */
+    private getFilteredHeaders(headers?: any): Record<string, string> {
+        if (!headers) return {};
+
+        const safeHeaders: Record<string, string> = {};
+        const allowedHeaders = [
+            "accept",
+            "accept-language",
+            "accept-encoding",
+            "user-agent",
+        ];
+
+        for (const [key, value] of Object.entries(headers)) {
+            if (
+                allowedHeaders.includes(key.toLowerCase()) &&
+                typeof value === "string"
+            ) {
+                safeHeaders[key] = value;
+            }
+        }
+
+        return safeHeaders;
+    }
+
+    /**
+     * Make HTTP request using Node.js built-in modules
+     */
+    private async makeHttpRequest(url: string, options: any): Promise<any> {
+        return new Promise((resolve, reject) => {
+            const urlObj = new URL(url);
+            const isHttps = urlObj.protocol === "https:";
+
+            // Dynamically import http/https modules
+            const httpModule = isHttps ? require("https") : require("http");
+
+            const requestOptions = {
+                hostname: urlObj.hostname,
+                port: urlObj.port || (isHttps ? 443 : 80),
+                path: urlObj.pathname + urlObj.search,
+                method: options.method || "GET",
+                headers: options.headers || {},
+                timeout: options.timeout || 5000,
+            };
+
+            const req = httpModule.request(requestOptions, (res: any) => {
+                let data = "";
+
+                res.on("data", (chunk: any) => {
+                    data += chunk;
+                });
+
+                res.on("end", () => {
+                    resolve({
+                        statusCode: res.statusCode,
+                        headers: res.headers,
+                        data: data,
+                    });
+                });
+            });
+
+            req.on("error", (error: any) => {
+                reject(error);
+            });
+
+            req.on("timeout", () => {
+                req.destroy();
+                reject(new Error("Request timeout"));
+            });
+
+            req.end();
+        });
+    }
+
+    /**
+     * Cache the prefetched content
+     */
+    private async cachePrefetchedContent(
+        url: string,
+        data: any,
+        response: any
+    ): Promise<void> {
+        try {
+            // Generate cache key for the prefetched content
+            const cacheKey = this.generatePrefetchCacheKey(url);
+
+            // Determine TTL based on response headers
+            const ttl = this.calculatePrefetchTTL(response);
+
+            // Store in cache with appropriate metadata
+            const cacheEntry = {
+                url,
+                data,
+                timestamp: Date.now(),
+                statusCode: response.status || response.statusCode,
+                headers: response.headers,
+                prefetched: true,
+            };
+
+            // Use the plugin's cache if available
+            if (this.cache) {
+                await this.cache.set(cacheKey, cacheEntry, { ttl });
+            }
+        } catch (error) {
+            console.warn(
+                `Failed to cache prefetched content for ${url}:`,
+                error
+            );
+        }
+    }
+
+    /**
+     * Generate cache key for prefetched content
+     */
+    private generatePrefetchCacheKey(url: string): string {
+        return `prefetch:${url}`;
+    }
+
+    /**
+     * Calculate TTL for prefetched content based on response headers
+     */
+    private calculatePrefetchTTL(response: any): number {
+        const headers = response.headers || {};
+
+        // Check Cache-Control header
+        const cacheControl =
+            headers["cache-control"] || headers.get?.("cache-control");
+        if (cacheControl) {
+            const maxAgeMatch = cacheControl.match(/max-age=(\d+)/);
+            if (maxAgeMatch) {
+                return parseInt(maxAgeMatch[1]) * 1000; // Convert to milliseconds
+            }
+        }
+
+        // Check Expires header
+        const expires = headers["expires"] || headers.get?.("expires");
+        if (expires) {
+            const expiresDate = new Date(expires);
+            const now = new Date();
+            if (expiresDate > now) {
+                return expiresDate.getTime() - now.getTime();
+            }
+        }
+
+        // Default TTL for prefetched content (5 minutes)
+        return 300000;
+    }
+
+    /**
+     * Update request pattern data
+     */
+    private updateRequestPattern(url: string, responseTime: number): void {
+        const pattern = this.requestPatterns.get(url) || {
+            frequency: 0,
+            lastAccess: 0,
+            averageResponseTime: 0,
+            volatility: 0.5,
+        };
+
+        pattern.frequency++;
+        pattern.lastAccess = Date.now();
+        pattern.averageResponseTime =
+            (pattern.averageResponseTime * (pattern.frequency - 1) +
+                responseTime) /
+            pattern.frequency;
+
+        this.requestPatterns.set(url, pattern);
     }
 
     // ===== UTILITY METHODS =====

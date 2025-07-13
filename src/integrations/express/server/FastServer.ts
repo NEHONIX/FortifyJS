@@ -36,6 +36,7 @@ import { MiddlewareManager } from "./components/fastapi/middlewares/middlewareMa
 import { RedirectManager } from "./components/fastapi/RedirectManager";
 import { ConsoleInterceptor } from "./components/fastapi/console/ConsoleInterceptor";
 import { UltraFastRequestProcessor } from "./components/fastapi/UltraFastRequestProcessor"; // UFRP
+import { createSafeJsonMiddleware } from "../middleware/safe-json-middleware";
 
 /**
  * Ultra-Fast Express Server with Advanced Performance Optimization
@@ -84,7 +85,7 @@ export class UltraFastServer {
         this.logger.startup("server", "Creating server...");
 
         // Create Express app immediately
-        this.app = express() as UltraFastApp;
+        this.app = express() as unknown as UltraFastApp;
 
         // Add start method immediately so it's available right away
         this.addStartMethod();
@@ -101,6 +102,9 @@ export class UltraFastServer {
             enableCompression: true,
             maxConcurrentTasks: 100,
         });
+
+        // Add safe JSON middleware to handle circular references
+        this.addSafeJsonMiddleware();
 
         // Add ultra-fast middleware with type coercion
         this.app.use((req: Request, res: Response, next: NextFunction) => {
@@ -173,14 +177,17 @@ export class UltraFastServer {
     }
 
     private async initializeCluster(): Promise<void> {
-        this.clusterManager = new ClusterManagerComponent(
-            {
-                cluster: this.options.cluster,
-            },
-            {
-                app: this.app,
-            }
-        );
+        // Only initialize cluster if it's explicitly configured and enabled
+        if (this.options.cluster?.enabled) {
+            this.clusterManager = new ClusterManagerComponent(
+                {
+                    cluster: this.options.cluster,
+                },
+                {
+                    app: this.app,
+                }
+            );
+        }
     }
 
     private async initializeFileWatcher(): Promise<void> {
@@ -349,13 +356,14 @@ export class UltraFastServer {
      * Handle automatic port switching when port is in use
      */
     private async handlePortSwitching(
-        requestedPort: number
+        requestedPort: number,
+        host: string = "localhost"
     ): Promise<PortSwitchResult> {
         const portManager = new PortManager(
             requestedPort,
             this.options.server?.autoPortSwitch
         );
-        const result = await portManager.findAvailablePort();
+        const result = await portManager.findAvailablePort(host);
 
         if (result.switched) {
             this.logger.portSwitching(
@@ -391,6 +399,34 @@ export class UltraFastServer {
         callback?: () => void
     ): Promise<any> {
         try {
+            // Check port availability first when auto port switch is enabled
+            if (this.options.server?.autoPortSwitch?.enabled) {
+                const portManager = new PortManager(
+                    port,
+                    this.options.server?.autoPortSwitch
+                );
+                const result = await portManager.findAvailablePort(host);
+
+                if (!result.success) {
+                    throw new Error(
+                        `Failed to find an available port after ${
+                            this.options.server?.autoPortSwitch?.maxAttempts ||
+                            10
+                        } attempts`
+                    );
+                }
+
+                if (result.switched) {
+                    this.logger.portSwitching(
+                        "server",
+                        `🔄 Port ${port} was in use, switched to port ${result.port}`
+                    );
+                    port = result.port; // Use the switched port
+                }
+            } else {
+                // console.log(`🔧 [DEBUG] Port switching NOT enabled`);
+            }
+
             // Try to start server on the requested port
             return new Promise((resolve, reject) => {
                 const server = this.app.listen(port, host, () => {
@@ -408,13 +444,29 @@ export class UltraFastServer {
                 });
 
                 server.on("error", async (error: any) => {
+                    this.logger.debug(
+                        "server",
+                        `Server error on port ${port}: ${error.code} - ${error.message}`
+                    );
+
                     if (error.code === "EADDRINUSE") {
                         // Port is in use, try auto-switching if enabled
+
                         if (this.options.server?.autoPortSwitch?.enabled) {
+                            this.logger.info(
+                                "server",
+                                `🔄 Port ${port} is in use, attempting auto port switch...`
+                            );
                             try {
                                 const result = await this.handlePortSwitching(
-                                    port
+                                    port,
+                                    host
                                 );
+                                this.logger.info(
+                                    "server",
+                                    `✅ Found available port: ${result.port}`
+                                );
+
                                 // Recursively try with the new port
                                 const newServer =
                                     await this.startServerWithPortHandling(
@@ -424,6 +476,10 @@ export class UltraFastServer {
                                     );
                                 resolve(newServer);
                             } catch (switchError) {
+                                this.logger.error(
+                                    "server",
+                                    `❌ Port switching failed: ${switchError}`
+                                );
                                 reject(switchError);
                             }
                         } else {
@@ -445,6 +501,103 @@ export class UltraFastServer {
     }
 
     /**
+     * Add safe JSON middleware to handle circular references
+     */
+    private addSafeJsonMiddleware(): void {
+        const safeJsonOptions = {
+            enabled: true,
+            maxDepth: 10,
+            logCircularRefs: this.options.env === "development",
+            truncateStrings: 1000,
+        };
+
+        this.app.use(createSafeJsonMiddleware(safeJsonOptions));
+
+        this.logger.debug(
+            "middleware",
+            "Safe JSON middleware added for circular reference handling"
+        );
+    }
+
+    /**
+     * Apply middleware directly when MiddlewareManager is not available
+     * Fallback method for immediate middleware application
+     */
+    private applyMiddlewareDirectly(config: any): void {
+
+        // Apply rate limiting if configured
+        if (config?.rateLimit && config.rateLimit !== true) {
+            try {
+                const rateLimit = require("express-rate-limit");
+                const rateLimitConfig = config.rateLimit;
+                const limiter = rateLimit({
+                    windowMs: rateLimitConfig.windowMs || 15 * 60 * 1000,
+                    max: rateLimitConfig.max || 100,
+                    message:
+                        "Too many requests from this IP, please try again later.",
+                    standardHeaders: true,
+                    legacyHeaders: false,
+                });
+                this.app.use(limiter);
+            } catch (error) {
+
+            }
+        }
+
+        // Apply CORS if configured
+        if (config?.cors && config.cors !== true) {
+            try {
+                const cors = require("cors");
+                const corsConfig = config.cors;
+                const corsOptions = {
+                    origin: corsConfig.origin || "*",
+                    methods: corsConfig.methods || [
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE",
+                        "OPTIONS",
+                    ],
+                    allowedHeaders: corsConfig.allowedHeaders || [
+                        "Origin",
+                        "X-Requested-With",
+                        "Content-Type",
+                        "Accept",
+                        "Authorization",
+                    ],
+                    credentials: corsConfig.credentials !== false,
+                };
+                this.app.use(cors(corsOptions));
+            } catch (error) {
+            }
+        }
+
+        // Apply security headers if configured
+        if (config?.security && config.security !== true) {
+            try {
+                const helmet = require("helmet");
+                this.app.use(helmet());
+            } catch (error) {
+            }
+        }
+
+        // Apply compression if configured
+        if (config?.compression && config.compression !== true) {
+            try {
+                const compression = require("compression");
+                this.app.use(compression());
+            } catch (error) {
+                this.logger.error(
+                    "server",
+                    "Failed to apply compression:",
+                    error
+                );
+            }
+        }
+
+    }
+
+    /**
      * Add immediate middleware methods for developer-friendly API
      * These work immediately without waiting for async initialization
      */
@@ -455,103 +608,19 @@ export class UltraFastServer {
             options?: any;
         }> = [];
 
-        // Add immediate middleware() method
-        this.app.middleware = (config?: any) => {
-            // Apply basic rate limiting if configured
-            if (config?.rateLimit && config.rateLimit.enabled !== false) {
-                const max = config.rateLimit.max || 100;
-                const windowMs = config.rateLimit.windowMs || 60000;
-
-                // Simple in-memory rate limiter
-                const requests = new Map<
-                    string,
-                    { count: number; resetTime: number }
-                >();
-
-                this.app.use((req: any, res: any, next: any) => {
-                    const ip =
-                        req.ip || req.connection.remoteAddress || "unknown";
-                    const now = Date.now();
-                    const windowStart = Math.floor(now / windowMs) * windowMs;
-
-                    const key = `${ip}:${windowStart}`;
-                    const current = requests.get(key) || {
-                        count: 0,
-                        resetTime: windowStart + windowMs,
-                    };
-
-                    if (now > current.resetTime) {
-                        // Reset window
-                        current.count = 0;
-                        current.resetTime = windowStart + windowMs;
-                    }
-
-                    current.count++;
-                    requests.set(key, current);
-
-                    if (current.count > max) {
-                        return res
-                            .status(429)
-                            .send("Too many requests, please try again later.");
-                    }
-
-                    next();
-                });
-            }
-
-            // Apply basic CORS if configured
-            if (config?.cors && config.cors.enabled !== false) {
-                const corsOptions = config.cors;
-                this.app.use((req: any, res: any, next: any) => {
-                    const origin = req.headers.origin;
-
-                    // Check if origin is allowed
-                    if (
-                        corsOptions.origin &&
-                        Array.isArray(corsOptions.origin)
-                    ) {
-                        if (corsOptions.origin.includes(origin)) { 
-                            res.setHeader(
-                                "Access-Control-Allow-Origin",
-                                origin
-                            );
-                        }
-                    } else {
-                        res.setHeader("Access-Control-Allow-Origin", "*");
-                    }
-
-                    if (corsOptions.methods) {
-                        res.setHeader(
-                            "Access-Control-Allow-Methods",
-                            corsOptions.methods.join(",")
-                        );
-                    } else {
-                        res.setHeader(
-                            "Access-Control-Allow-Methods",
-                            "GET,POST,PUT,DELETE,OPTIONS"
-                        );
-                    }
-
-                    if (corsOptions.allowedHeaders) {
-                        res.setHeader(
-                            "Access-Control-Allow-Headers",
-                            corsOptions.allowedHeaders.join(",")
-                        );
-                    } else {
-                        res.setHeader(
-                            "Access-Control-Allow-Headers",
-                            "Content-Type,Authorization"
-                        );
-                    }
-
-                    res.setHeader("Vary", "Origin");
-
-                    if (req.method === "OPTIONS") {
-                        return res.status(204).end();
-                    }
-
-                    next();
-                });
+        // Add immediate middleware() method that implements MiddlewareAPIInterface
+        this.app.middleware = (config?: any): any => {
+            // Delegate to MiddlewareManager for proper modular handling
+            if (config) {
+                if (this.middlewareManager) {
+                    this.middlewareManager.applyImmediateMiddleware(config);
+                } else {
+                    this.logger.debug(
+                        "server",
+                        "MiddlewareManager not available, applying directly"
+                    );
+                    this.applyMiddlewareDirectly(config);
+                }
             }
 
             return {
@@ -564,10 +633,14 @@ export class UltraFastServer {
 
                     return this; // Return for chaining
                 },
-                enable: (id: string) => this,
-                disable: (id: string) => this,
+                enable: (_id: string) => this,
+                disable: (_id: string) => this,
                 getInfo: () => [],
                 getStats: () => ({}),
+                unregister: (_id: string) => this,
+                getConfig: () => config || {},
+                clear: () => this,
+                optimize: async () => this,
             };
         };
 
@@ -575,9 +648,9 @@ export class UltraFastServer {
         (this.app as any)._middlewareQueue = middlewareQueue;
 
         // Add basic convenience methods
-        this.app.enableSecurity = (options?: any) => {
+        this.app.enableSecurity = (_options?: any) => {
             // Basic security headers immediately
-            this.app.use((req: any, res: any, next: any) => {
+            this.app.use((_req: any, res: any, next: any) => {
                 res.setHeader("X-Content-Type-Options", "nosniff");
                 res.setHeader("X-Frame-Options", "DENY");
                 res.setHeader("X-XSS-Protection", "1; mode=block");
@@ -586,9 +659,9 @@ export class UltraFastServer {
             return this.app;
         };
 
-        this.app.enableCors = (options?: any) => {
+        this.app.enableCors = (_options?: any) => {
             // Basic CORS immediately
-            this.app.use((req: any, res: any, next: any) => {
+            this.app.use((_req: any, res: any, next: any) => {
                 res.setHeader("Access-Control-Allow-Origin", "*");
                 res.setHeader(
                     "Access-Control-Allow-Methods",
@@ -603,12 +676,12 @@ export class UltraFastServer {
             return this.app;
         };
 
-        this.app.enableCompression = (options?: any) => {
+        this.app.enableCompression = (_options?: any) => {
             // Basic compression will be added when full middleware manager is ready
             return this.app;
         };
 
-        this.app.enableRateLimit = (options?: any) => {
+        this.app.enableRateLimit = (_options?: any) => {
             // Basic rate limiting will be added when full middleware manager is ready
             return this.app;
         };
@@ -636,7 +709,7 @@ export class UltraFastServer {
             (this.app as any)._middlewareQueue = [];
         }
     }
-
+ 
     /**
      * Add start method to app with cluster support (full version)
      */
@@ -705,7 +778,7 @@ export class UltraFastServer {
             // Regular startup (child process or hot reload disabled)
 
             // If cluster is enabled, use cluster manager
-            if (this.clusterManager.isClusterEnabled()) {
+            if (this.clusterManager?.isClusterEnabled()) {
                 this.logger.debug("server", "Taking cluster mode path");
                 // console.log("Starting cluster...");
 

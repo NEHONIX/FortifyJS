@@ -62,6 +62,7 @@ export {
     DEFAULT_FILE_CACHE_CONFIG,
 } from "./config/cache.config";
 import { FileCache } from "./cacheSys";
+import { SecureCacheAdapter } from "../../integrations/express/cache";
 
 /**
  * @fileoverview FortifyJS Unified Cache System - Enterprise-Grade Caching Solution
@@ -165,7 +166,6 @@ import { FileCache } from "./cacheSys";
  * @since 4.2.2
  */
 export const Cache = new SecureInMemoryCache();
-
 /**
  * SecureInMemoryCache class for creating custom cache instances
  *
@@ -875,3 +875,5 @@ export default {
     CACHE_VERSION,
     CACHE_BUILD_DATE,
 };
+
+export const FastCache = SecureCacheAdapter;

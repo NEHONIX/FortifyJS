@@ -23,7 +23,13 @@
 // This replaces the previous wildcard exports that caused AlertConfig conflicts
 
 // Legacy imports for backward compatibility
-import { type Express, NextFunction, RequestHandler } from "express";
+import {
+    type Express,
+    Request,
+    Response,
+    NextFunction,
+    RequestHandler,
+} from "express";
 import { SecureCacheAdapter } from "../cache";
 import { Server as HttpServer } from "http";
 import { ClusterConfig } from "./cluster";
@@ -529,7 +535,6 @@ export interface ServerOptions {
     cluster?: {
         enabled?: boolean;
         config?: Omit<ClusterConfig, "enabled">;
-        workers?: number;
     };
 
     // File watcher configuration for auto-reload
@@ -537,7 +542,7 @@ export interface ServerOptions {
         enabled?: boolean;
         watchPaths?: string[];
         ignorePaths?: string[];
-        extensions?: string[];  
+        extensions?: string[];
         debounceMs?: number;
         restartDelay?: number;
         maxRestarts?: number;
@@ -650,32 +655,6 @@ export interface ServerOptions {
             enabled?: boolean; // Enable route caching (default: true)
             defaultTTL?: number; // Default cache TTL in ms (default: 60000)
             maxCacheSize?: number; // Maximum cached responses (default: 1000)
-        };
-    };
-
-    // Go FastCore integration for ultra-high performance
-    golang?: {
-        enabled?: boolean; // Enable Go backend integration (default: false)
-        goPort?: number; // Port for Go service (default: 9001)
-        workers?: number; // Number of Go workers (default: CPU count)
-        cacheSize?: number; // Go cache size in MB (default: 100)
-        timeout?: number; // Request timeout in ms (default: 1000)
-        autoStart?: boolean; // Auto-start Go service (default: true)
-        binaryPath?: string; // Custom path to Go binary
-        logLevel?: "debug" | "info" | "warn" | "error"; // Go service log level (default: 'info')
-
-        features?: {
-            fastRouting?: boolean; // Enable ultra-fast routing (default: true)
-            jsonOptimization?: boolean; // Enable JSON optimization (default: true)
-            memoryPooling?: boolean; // Enable memory pooling (default: true)
-            zeroAllocation?: boolean; // Enable zero-allocation mode (default: true)
-        };
-
-        routingStrategy?: {
-            useForApiRoutes?: boolean; // Route /api/* to Go (default: true)
-            useForGetRequests?: boolean; // Route GET requests to Go (default: true)
-            useForFastRoutes?: boolean; // Route x-fast-route headers to Go (default: true)
-            customMatcher?: (req: any) => boolean; // Custom routing logic
         };
     };
 }
@@ -816,7 +795,18 @@ export interface RedirectServerInstance {
  * await app.start(3000);
  * ```
  */
-export interface UltraFastApp extends Express {
+export interface UltraFastApp extends Omit<Express, "engine"> {
+    // Express methods are inherited from Express interface
+    // Omit 'engine' to avoid the return type conflict and redeclare it
+    engine(
+        ext: string,
+        fn: (
+            path: string,
+            options: object,
+            callback: (e: any, rendered?: string) => void
+        ) => void
+    ): UltraFastApp;
+
     /**
      * Secure cache adapter for ultra-fast data access.
      *
@@ -1571,4 +1561,7 @@ export interface UltraFastMiddlewareHandler {
         classification: any
     ): Promise<void>;
 }
+
+// Re-export Express types for convenience
+export type { Request, Response, NextFunction, RequestHandler };
 

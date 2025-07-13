@@ -12,10 +12,11 @@ import {
 } from "./hash-types";
 import { HashUtils } from "./hash-utils";
 import { HashAlgorithms } from "../../algorithms/hash-algorithms";
+import { cpus } from "os";
 
 export class HashAdvanced {
     private static readonly CHUNK_SIZE = 64 * 1024; // 64KB
-    private static readonly MAX_WORKERS = require("os").cpus().length;
+    private static readonly MAX_WORKERS = cpus().length;
 
     /**
      * Cryptographic agility - support for algorithm migration
@@ -499,7 +500,7 @@ export class HashAdvanced {
 
         return results;
     }
- 
+
     /**
      * Memory-efficient hash verification
      * @param input - Input to verify
@@ -526,3 +527,4 @@ export class HashAdvanced {
         return crypto.timingSafeEqual(computedHash, expectedBuffer);
     }
 }
+

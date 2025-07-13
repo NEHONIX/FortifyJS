@@ -33,8 +33,8 @@
  * Zero-async initialization for immediate use
  */
 
-import express, {  
-    Express, 
+import express, {
+    Express,
     Request,
     NextFunction,
     RequestHandler,
@@ -45,14 +45,38 @@ import compression from "compression";
 import { CacheUtils } from "./cache/CacheFactory";
 import { SecureCacheAdapter } from "./cache/SecureCacheAdapter";
 import {
-    RouteOptions, 
+    RouteOptions,
     ServerConfig,
     ServerOptions,
     UltraFastApp,
 } from "./types/types";
 
 // Re-export types for external use
-export type { ServerOptions, ServerConfig, RouteOptions, UltraFastApp };
+export type {
+    ServerOptions,
+    ServerConfig,
+    RouteOptions,
+    UltraFastApp,
+    Request,
+    Response,
+    NextFunction,
+    RequestHandler,
+} from "./types/types";
+
+// Re-export safe JSON utilities
+export {
+    createSafeJsonMiddleware,
+    setupSafeJson,
+    safeJsonStringify,
+    sendSafeJson,
+    createCircularRefDebugger,
+} from "./middleware/safe-json-middleware";
+
+export {
+    expressStringify,
+    safeStringify,
+    fastStringify,
+} from "../../components/fortified-function/serializer/safe-serializer";
 import { UltraFastServer } from "./server/FastServer";
 
 /**
@@ -117,7 +141,6 @@ export function createCacheMiddleware(
         if (options.cache?.enabled === false) {
             return next();
         }
-
         // Only cache GET requests by default
         if (req.method !== "GET") {
             return next();
@@ -227,4 +250,7 @@ export async function UFSMiddleware(app: UltraFastApp, options: ServerOptions) {
 
     // Performance tracking middleware
 }
+
+export { Router } from "express";
+
 

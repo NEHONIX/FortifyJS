@@ -45,7 +45,6 @@ import {
 import { SECURITY_DEFAULTS } from "../utils/constants";
 import { bufferToBase32, stringToBuffer } from "../utils/encoding";
 import { StatsTracker } from "../utils/stats";
-import { runSecurityTests } from "../utils/testing";
 import { Hash } from "./hash";
 import { Keys } from "./keys";
 import { SecureRandom, RandomTokens, RandomGenerationOptions } from "./random";
@@ -89,7 +88,6 @@ import {
     TamperEvidentLogger,
     LogLevel,
 } from "../components/tamper-evident-logging";
-import { middleware } from "../integrations/express.middleware";
 import { bufferDataConverter } from "../utils/dataConverter";
 import SecureString from "../components/secure-string";
 import SecureObject from "../components/secure-object";

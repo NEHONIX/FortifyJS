@@ -40,7 +40,7 @@ export class PerformanceMonitor {
         this.analyticsEngine = new AnalyticsEngine();
     }
 
-    /** 
+    /**
      * Update execution statistics
      */
     public updateStats(
@@ -216,16 +216,27 @@ export class PerformanceMonitor {
         const patterns = this.analyticsEngine.getExecutionPatterns();
         const predictions = this.analyticsEngine.predictNextExecutions();
 
-        // Warm cache with high-value patterns
+        // Warm cache with high-value patterns that have actual cached values
         const warmingData = patterns
             .slice(0, 10) // Top 10 patterns
-            .map((pattern) => ({
-                key: pattern.parametersHash,
-                value: null, // Would need actual cached values
-                priority: pattern.cacheWorthiness,
-            }));
+            .map((pattern) => {
+                // Try to get existing cached value for this pattern
+                const existingValue = this.smartCache.get(
+                    pattern.parametersHash
+                );
 
-        this.smartCache.warmCache(warmingData);
+                return {
+                    key: pattern.parametersHash,
+                    value: existingValue, // Use actual cached value if available
+                    priority: pattern.cacheWorthiness,
+                };
+            })
+            .filter((item) => item.value !== null); // Only warm with actual values
+
+        // Only warm cache if we have actual values to cache
+        if (warmingData.length > 0) {
+            this.smartCache.warmCache(warmingData);
+        }
 
         // Map predictions to the correct format
         const mappedPredictions = predictions.map((p) => ({

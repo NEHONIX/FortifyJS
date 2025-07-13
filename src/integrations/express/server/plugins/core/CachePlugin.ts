@@ -56,6 +56,47 @@ export abstract class CachePlugin implements ICachePlugin {
         lastOperation: new Date(),
     };
 
+    // Post-response cache operations queue
+    private postResponseQueue: Array<{
+        operation: "set" | "invalidate" | "analyze";
+        context: PluginExecutionContext;
+        data: any;
+        timestamp: number;
+        priority: number;
+    }> = [];
+    private postResponseWorkerActive = false;
+
+    // Response body capture system
+    private responseBodyCapture = new Map<
+        string,
+        {
+            body: any;
+            headers: Record<string, any>;
+            statusCode: number;
+            timestamp: number;
+        }
+    >();
+
+    // Analysis data storage
+    private analysisStorage: Array<{
+        timestamp: number;
+        cacheKey: string;
+        cacheHit: boolean;
+        responseTime: number;
+        shouldCache: boolean;
+        route: string;
+        method: string;
+        statusCode: number;
+        contentSize: number;
+        userId?: string;
+        cacheEfficiency: number;
+        hitRate: number;
+        averageResponseTime: number;
+        memoryUsage: { used: number; total: number; percentage: number };
+        performanceScore: number;
+        optimizationSuggestions: string[];
+    }> = [];
+
     // cache instances
     protected memoryCache?: any;
     protected fileCache?: any;
@@ -1361,8 +1402,18 @@ export abstract class CachePlugin implements ICachePlugin {
         const cacheKey = this.generateCacheKey(context);
         const ttl = this.getCacheTTL(context);
 
-        // This would typically be called after the response is generated
-        // For now, we return the cache data to be set later
+        // Queue for post-response processing instead of immediate caching
+        this.queuePostResponseOperation(
+            "set",
+            context,
+            {
+                key: cacheKey,
+                ttl,
+                responseData: null, // Will be populated after response
+            },
+            1.0
+        ); // High priority for cache sets
+
         this.cacheStats.sets++;
         this.cacheStats.totalOperations++;
 
@@ -1372,7 +1423,717 @@ export abstract class CachePlugin implements ICachePlugin {
                 value: null, // Will be set by the response handler
                 ttl,
             },
+            postResponseQueued: true,
         };
+    }
+
+    /**
+     * Queue operation for post-response processing
+     */
+    private queuePostResponseOperation(
+        operation: "set" | "invalidate" | "analyze",
+        context: PluginExecutionContext,
+        data: any,
+        priority: number = 0.5
+    ): void {
+        // Avoid duplicate operations for the same request
+        const existingIndex = this.postResponseQueue.findIndex(
+            (item) =>
+                item.context.executionId === context.executionId &&
+                item.operation === operation
+        );
+
+        if (existingIndex >= 0) {
+            // Update existing operation with higher priority if needed
+            if (this.postResponseQueue[existingIndex].priority < priority) {
+                this.postResponseQueue[existingIndex].priority = priority;
+                this.postResponseQueue[existingIndex].data = {
+                    ...this.postResponseQueue[existingIndex].data,
+                    ...data,
+                };
+                this.postResponseQueue[existingIndex].timestamp = Date.now();
+            }
+            return;
+        }
+
+        // Add new operation to queue
+        this.postResponseQueue.push({
+            operation,
+            context,
+            data,
+            timestamp: Date.now(),
+            priority,
+        });
+
+        // Sort by priority (highest first)
+        this.postResponseQueue.sort((a, b) => b.priority - a.priority);
+
+        // Limit queue size to prevent memory issues
+        if (this.postResponseQueue.length > 500) {
+            this.postResponseQueue = this.postResponseQueue.slice(0, 500);
+        }
+
+        // Start post-response worker if not already active
+        if (!this.postResponseWorkerActive) {
+            this.startPostResponseWorker();
+        }
+    }
+
+    /**
+     * Start the post-response worker for background cache operations
+     */
+    private async startPostResponseWorker(): Promise<void> {
+        if (this.postResponseWorkerActive) return;
+
+        this.postResponseWorkerActive = true;
+
+        try {
+            while (this.postResponseQueue.length > 0) {
+                const operation = this.postResponseQueue.shift();
+                if (!operation) break;
+
+                // Skip operations that are too old (older than 10 minutes)
+                if (Date.now() - operation.timestamp > 600000) {
+                    continue;
+                }
+
+                await this.executePostResponseOperation(operation);
+
+                // Small delay to prevent overwhelming the system
+                await new Promise((resolve) => setTimeout(resolve, 5));
+            }
+        } catch (error) {
+            console.error("Post-response worker error:", error);
+        } finally {
+            this.postResponseWorkerActive = false;
+        }
+    }
+
+    /**
+     * Execute a post-response cache operation
+     */
+    private async executePostResponseOperation(operation: {
+        operation: "set" | "invalidate" | "analyze";
+        context: PluginExecutionContext;
+        data: any;
+        timestamp: number;
+        priority: number;
+    }): Promise<void> {
+        try {
+            switch (operation.operation) {
+                case "set":
+                    await this.performPostResponseCacheSet(operation);
+                    break;
+                case "invalidate":
+                    await this.performPostResponseInvalidation(operation);
+                    break;
+                case "analyze":
+                    await this.performPostResponseAnalysis(operation);
+                    break;
+            }
+        } catch (error) {
+            console.error(
+                `Post-response ${operation.operation} operation failed:`,
+                error
+            );
+            this.cacheStats.errors++;
+        }
+    }
+
+    /**
+     * Perform post-response cache set operation
+     */
+    private async performPostResponseCacheSet(operation: {
+        context: PluginExecutionContext;
+        data: any;
+        timestamp: number;
+    }): Promise<void> {
+        const { context, data } = operation;
+        const { res } = context;
+
+        // Check if response is cacheable
+        if (!this.isResponseCacheable(res)) {
+            return;
+        }
+
+        // Get response data from the response object
+        const responseData = this.extractResponseData(res);
+        if (!responseData) {
+            return;
+        }
+
+        // Perform the actual cache set operation
+        await this.fortifiedCache(async () => {
+            await this.cache!.set(data.key, responseData, {
+                ttl: data.ttl,
+                tags: this.generateCacheTags(context),
+            });
+        });
+
+        // Update cache statistics
+        this.updatePostResponseStats("set", Date.now() - operation.timestamp);
+    }
+
+    /**
+     * Perform post-response cache invalidation
+     */
+    private async performPostResponseInvalidation(operation: {
+        context: PluginExecutionContext;
+        data: any;
+        timestamp: number;
+    }): Promise<void> {
+        const { data } = operation;
+
+        // Invalidate cache patterns
+        for (const pattern of data.patterns || []) {
+            await this.invalidateCache(pattern);
+        }
+
+        // Update cache statistics
+        this.updatePostResponseStats(
+            "invalidate",
+            Date.now() - operation.timestamp
+        );
+    }
+
+    /**
+     * Perform post-response cache analysis
+     */
+    private async performPostResponseAnalysis(operation: {
+        context: PluginExecutionContext;
+        data: any;
+        timestamp: number;
+    }): Promise<void> {
+        const { context } = operation;
+
+        // Analyze cache performance for this request
+        const analysis = {
+            cacheHit: context.metrics.cacheHits > 0,
+            responseTime: Date.now() - context.startTime,
+            cacheKey: this.generateCacheKey(context),
+            shouldCache: this.shouldCache(context),
+        };
+
+        // Store analysis data for future optimization
+        await this.storeCacheAnalysis(analysis);
+
+        // Update cache statistics
+        this.updatePostResponseStats(
+            "analyze",
+            Date.now() - operation.timestamp
+        );
+    }
+
+    /**
+     * Check if response is cacheable
+     */
+    private isResponseCacheable(res: any): boolean {
+        // Don't cache error responses
+        if (res.statusCode >= 400) {
+            return false;
+        }
+
+        // Don't cache responses with cache-control: no-cache
+        const cacheControl = res.getHeader("cache-control");
+        if (cacheControl && cacheControl.includes("no-cache")) {
+            return false;
+        }
+
+        // Don't cache responses that are too large (>1MB)
+        const contentLength = res.getHeader("content-length");
+        if (contentLength && parseInt(contentLength) > 1024 * 1024) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Extract response data for caching
+     */
+    private extractResponseData(res: any): any {
+        // Extract actual response body and metadata
+        const responseId = this.generateResponseId(res);
+        const capturedResponse = this.responseBodyCapture.get(responseId);
+
+        let responseBody = null;
+        let contentSize = 0;
+
+        if (capturedResponse) {
+            responseBody = capturedResponse.body;
+            contentSize = this.calculateContentSize(responseBody);
+        } else {
+            // Fallback: try to extract from response object directly
+            responseBody = this.extractBodyFromResponse(res);
+            contentSize = this.calculateContentSize(responseBody);
+        }
+
+        const responseData = {
+            statusCode: res.statusCode,
+            headers: res.getHeaders ? res.getHeaders() : res.headers || {},
+            body: responseBody,
+            contentSize,
+            timestamp: Date.now(),
+            encoding: res.getHeader ? res.getHeader("content-encoding") : null,
+            contentType: res.getHeader ? res.getHeader("content-type") : null,
+        };
+
+        // Clean up captured response data
+        if (capturedResponse) {
+            this.responseBodyCapture.delete(responseId);
+        }
+
+        return responseData;
+    }
+
+    /**
+     * Generate unique response ID for tracking
+     */
+    private generateResponseId(res: any): string {
+        // Use a combination of timestamp and response object properties
+        const timestamp = Date.now();
+        const statusCode = res.statusCode || 200;
+        const random = Math.random().toString(36).substring(2, 8);
+        return `res_${timestamp}_${statusCode}_${random}`;
+    }
+
+    /**
+     * Extract body from response object using various methods
+     */
+    private extractBodyFromResponse(res: any): any {
+        // Try different methods to extract response body
+
+        // Method 1: Check if body is directly available
+        if (res.body !== undefined) {
+            return res.body;
+        }
+
+        // Method 2: Check for _body property (some frameworks use this)
+        if (res._body !== undefined) {
+            return res._body;
+        }
+
+        // Method 3: Check for locals.responseBody (Express pattern)
+        if (res.locals && res.locals.responseBody !== undefined) {
+            return res.locals.responseBody;
+        }
+
+        // Method 4: Check for custom fortify response data
+        if (res.fortifyResponseData !== undefined) {
+            return res.fortifyResponseData;
+        }
+
+        // Method 5: Try to read from write method interception
+        if (res._fortifyWriteBuffer) {
+            return res._fortifyWriteBuffer;
+        }
+
+        // Method 6: Check for JSON response data
+        if (res.json && typeof res.json === "object") {
+            return res.json;
+        }
+
+        return null;
+    }
+
+    /**
+     * Calculate content size in bytes
+     */
+    private calculateContentSize(content: any): number {
+        if (!content) return 0;
+
+        if (typeof content === "string") {
+            return Buffer.byteLength(content, "utf8");
+        }
+
+        if (Buffer.isBuffer(content)) {
+            return content.length;
+        }
+
+        if (content instanceof Uint8Array) {
+            return content.byteLength;
+        }
+
+        if (typeof content === "object") {
+            try {
+                return Buffer.byteLength(JSON.stringify(content), "utf8");
+            } catch {
+                return 0;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Capture response body for later extraction
+     */
+    public captureResponseBody(
+        responseId: string,
+        body: any,
+        headers: Record<string, any>,
+        statusCode: number
+    ): void {
+        this.responseBodyCapture.set(responseId, {
+            body,
+            headers,
+            statusCode,
+            timestamp: Date.now(),
+        });
+
+        // Clean up old captures (older than 5 minutes)
+        const fiveMinutesAgo = Date.now() - 300000;
+        for (const [id, capture] of this.responseBodyCapture.entries()) {
+            if (capture.timestamp < fiveMinutesAgo) {
+                this.responseBodyCapture.delete(id);
+            }
+        }
+    }
+
+    /**
+     * Generate cache tags for the request
+     */
+    private generateCacheTags(context: PluginExecutionContext): string[] {
+        const { req } = context;
+        const tags = [];
+
+        // Add route-based tags
+        tags.push(`route:${req.path}`);
+        tags.push(`method:${req.method}`);
+
+        // Add user-based tags if authenticated
+        if (context.security.isAuthenticated && context.security.userId) {
+            tags.push(`user:${context.security.userId}`);
+        }
+
+        // Add custom tags based on request characteristics
+        if (req.path.startsWith("/api/")) {
+            tags.push("api");
+        }
+
+        return tags;
+    }
+
+    /**
+     * Store cache analysis data for performance monitoring and optimization
+     */
+    private async storeCacheAnalysis(analysis: any): Promise<void> {
+        try {
+            // Extract comprehensive analysis data
+            const analysisEntry = {
+                timestamp: Date.now(),
+                cacheKey: analysis.cacheKey || "unknown",
+                cacheHit: analysis.cacheHit || false,
+                responseTime: analysis.responseTime || 0,
+                shouldCache: analysis.shouldCache || false,
+                route: analysis.route || "unknown",
+                method: analysis.method || "GET",
+                statusCode: analysis.statusCode || 200,
+                contentSize: analysis.contentSize || 0,
+                userId: analysis.userId || undefined,
+                // Additional metrics
+                cacheEfficiency: this.calculateCacheEfficiency(),
+                hitRate: this.calculateHitRate(),
+                averageResponseTime: this.cacheStats.averageResponseTime,
+                memoryUsage: this.getMemoryUsage(),
+                // Performance indicators
+                performanceScore: this.calculatePerformanceScore(analysis),
+                optimizationSuggestions:
+                    this.generateOptimizationSuggestions(analysis),
+            };
+
+            // Store in memory (with size limit)
+            this.analysisStorage.push(analysisEntry);
+
+            // Limit storage size to prevent memory issues (keep last 1000 entries)
+            if (this.analysisStorage.length > 1000) {
+                this.analysisStorage = this.analysisStorage.slice(-1000);
+            }
+
+            // Persist to external storage if configured
+            await this.persistAnalysisData(analysisEntry);
+
+            // Trigger real-time optimization if needed
+            if (this.shouldTriggerOptimization(analysisEntry)) {
+                await this.triggerCacheOptimization(analysisEntry);
+            }
+
+            console.debug("Cache analysis stored:", {
+                cacheKey: analysisEntry.cacheKey,
+                cacheHit: analysisEntry.cacheHit,
+                responseTime: analysisEntry.responseTime,
+                performanceScore: analysisEntry.performanceScore,
+            });
+        } catch (error) {
+            console.error("Failed to store cache analysis:", error);
+        }
+    }
+
+    /**
+     * Calculate cache efficiency percentage
+     */
+    private calculateCacheEfficiency(): number {
+        const totalOperations = this.cacheStats.hits + this.cacheStats.misses;
+        if (totalOperations === 0) return 0;
+
+        return (this.cacheStats.hits / totalOperations) * 100;
+    }
+
+    /**
+     * Calculate current hit rate
+     */
+    private calculateHitRate(): number {
+        const totalRequests = this.cacheStats.hits + this.cacheStats.misses;
+        return totalRequests > 0 ? this.cacheStats.hits / totalRequests : 0;
+    }
+
+    /**
+     * Get current memory usage information
+     */
+    private getMemoryUsage(): {
+        used: number;
+        total: number;
+        percentage: number;
+    } {
+        if (typeof process !== "undefined" && process.memoryUsage) {
+            const memUsage = process.memoryUsage();
+            return {
+                used: memUsage.heapUsed,
+                total: memUsage.heapTotal,
+                percentage: (memUsage.heapUsed / memUsage.heapTotal) * 100,
+            };
+        }
+
+        return { used: 0, total: 0, percentage: 0 };
+    }
+
+    /**
+     * Calculate performance score based on various metrics
+     */
+    private calculatePerformanceScore(analysis: any): number {
+        let score = 100; // Start with perfect score
+
+        // Penalize for cache misses
+        if (!analysis.cacheHit) {
+            score -= 20;
+        }
+
+        // Penalize for slow response times
+        if (analysis.responseTime > 1000) {
+            score -= 30;
+        } else if (analysis.responseTime > 500) {
+            score -= 15;
+        }
+
+        // Penalize for large content that should be cached but isn't
+        if (
+            !analysis.cacheHit &&
+            analysis.shouldCache &&
+            analysis.contentSize > 10000
+        ) {
+            score -= 25;
+        }
+
+        // Bonus for efficient caching
+        const hitRate = this.calculateHitRate();
+        if (hitRate > 0.8) {
+            score += 10;
+        }
+
+        return Math.max(0, Math.min(100, score));
+    }
+
+    /**
+     * Generate optimization suggestions based on analysis
+     */
+    private generateOptimizationSuggestions(analysis: any): string[] {
+        const suggestions: string[] = [];
+
+        if (!analysis.cacheHit && analysis.shouldCache) {
+            suggestions.push("Consider increasing cache TTL for this route");
+        }
+
+        if (analysis.responseTime > 1000) {
+            suggestions.push(
+                "Response time is high, consider caching or optimization"
+            );
+        }
+
+        if (analysis.contentSize > 100000) {
+            suggestions.push("Large response detected, consider compression");
+        }
+
+        const hitRate = this.calculateHitRate();
+        if (hitRate < 0.5) {
+            suggestions.push("Low cache hit rate, review caching strategy");
+        }
+
+        return suggestions;
+    }
+
+    /**
+     * Persist analysis data to external storage
+     */
+    private async persistAnalysisData(analysisEntry: any): Promise<void> {
+        // We would persist to:
+        // - Database (MongoDB, PostgreSQL, etc.)
+        // - Time-series database (InfluxDB, TimescaleDB)
+        // - Analytics service (Google Analytics, Mixpanel)
+        // - Logging service (ELK stack, Splunk)
+    }
+
+    /**
+     * Check if optimization should be triggered
+     */
+    private shouldTriggerOptimization(analysisEntry: any): boolean {
+        // Trigger optimization if performance score is low
+        if (analysisEntry.performanceScore < 50) {
+            return true;
+        }
+
+        // Trigger if hit rate is very low
+        if (analysisEntry.hitRate < 0.3) {
+            return true;
+        }
+
+        // Trigger if memory usage is high
+        if (analysisEntry.memoryUsage.percentage > 85) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Trigger cache optimization based on analysis
+     */
+    private async triggerCacheOptimization(analysisEntry: any): Promise<void> {
+        console.info("Triggering cache optimization based on analysis:", {
+            performanceScore: analysisEntry.performanceScore,
+            suggestions: analysisEntry.optimizationSuggestions,
+        });
+
+        // Implement optimization strategies:
+        // 1. Adjust cache TTL
+        // 2. Preload frequently accessed content
+        // 3. Clear underperforming cache entries
+        // 4. Adjust cache size limits
+
+        // For now, log the optimization trigger
+        console.debug(
+            "Cache optimization triggered for route:",
+            analysisEntry.route
+        );
+    }
+
+    /**
+     * Get analysis statistics and insights
+     */
+    public getAnalysisInsights(): {
+        totalAnalyses: number;
+        averagePerformanceScore: number;
+        topOptimizationSuggestions: Array<{
+            suggestion: string;
+            count: number;
+        }>;
+        performanceTrends: Array<{ timestamp: number; score: number }>;
+        routePerformance: Map<string, { averageScore: number; count: number }>;
+    } {
+        const totalAnalyses = this.analysisStorage.length;
+
+        if (totalAnalyses === 0) {
+            return {
+                totalAnalyses: 0,
+                averagePerformanceScore: 0,
+                topOptimizationSuggestions: [],
+                performanceTrends: [],
+                routePerformance: new Map(),
+            };
+        }
+
+        // Calculate average performance score
+        const averagePerformanceScore =
+            this.analysisStorage.reduce(
+                (sum, entry) => sum + (entry.performanceScore || 0),
+                0
+            ) / totalAnalyses;
+
+        // Aggregate optimization suggestions
+        const suggestionCounts = new Map<string, number>();
+        this.analysisStorage.forEach((entry) => {
+            entry.optimizationSuggestions?.forEach((suggestion: string) => {
+                suggestionCounts.set(
+                    suggestion,
+                    (suggestionCounts.get(suggestion) || 0) + 1
+                );
+            });
+        });
+
+        const topOptimizationSuggestions = Array.from(
+            suggestionCounts.entries()
+        )
+            .map(([suggestion, count]) => ({ suggestion, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        // Performance trends (last 50 entries)
+        const performanceTrends = this.analysisStorage
+            .slice(-50)
+            .map((entry) => ({
+                timestamp: entry.timestamp,
+                score: entry.performanceScore || 0,
+            }));
+
+        // Route performance analysis
+        const routePerformance = new Map<
+            string,
+            { averageScore: number; count: number }
+        >();
+        const routeData = new Map<
+            string,
+            { totalScore: number; count: number }
+        >();
+
+        this.analysisStorage.forEach((entry) => {
+            const route = entry.route;
+            const existing = routeData.get(route) || {
+                totalScore: 0,
+                count: 0,
+            };
+            existing.totalScore += entry.performanceScore || 0;
+            existing.count += 1;
+            routeData.set(route, existing);
+        });
+
+        for (const [route, data] of routeData.entries()) {
+            routePerformance.set(route, {
+                averageScore: data.totalScore / data.count,
+                count: data.count,
+            });
+        }
+
+        return {
+            totalAnalyses,
+            averagePerformanceScore,
+            topOptimizationSuggestions,
+            performanceTrends,
+            routePerformance,
+        };
+    }
+
+    /**
+     * Update post-response cache statistics
+     */
+    private updatePostResponseStats(operation: string, duration: number): void {
+        this.cacheStats.lastOperation = new Date();
+        this.cacheStats.averageResponseTime =
+            (this.cacheStats.averageResponseTime *
+                this.cacheStats.totalOperations +
+                duration) /
+            (this.cacheStats.totalOperations + 1);
+
+        // Log operation for debugging
+        console.debug(`Post-response ${operation} completed in ${duration}ms`);
     }
 
     /**

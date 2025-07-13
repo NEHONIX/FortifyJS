@@ -2,7 +2,7 @@
  * FortifyJS - Secure Array Types
  *
  * This file contains type definitions for the SecureArray modular architecture
- *
+ * 
  * @author Nehonix
  *
  * @license MIT

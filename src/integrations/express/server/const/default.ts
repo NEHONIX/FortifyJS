@@ -68,7 +68,7 @@ export const DEFAULT_OPTIONS: ServerOptions = {
         jsonLimit: "10mb",
         urlEncodedLimit: "10mb",
         autoPortSwitch: {
-            enabled: false,
+            enabled: true,
             maxAttempts: 10,
             strategy: "random",
         },

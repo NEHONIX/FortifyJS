@@ -54,7 +54,7 @@ export class CryptoOperations {
         if (!CryptoAlgorithmUtils.isSupported(algorithm)) {
             throw new Error(`Unsupported HMAC algorithm: ${algorithm}`);
         }
- 
+
         // Prepare key
         let keyData: Uint8Array;
         if (typeof key === "string") {
@@ -172,25 +172,128 @@ export class CryptoOperations {
     }
 
     /**
-     * Derives a key using Argon2 (requires external library)
+     * Derives a key using Argon2 (with fallback to PBKDF2)
      */
     static async deriveKeyArgon2(
-        _content: string,
-        _salt: string | Uint8Array,
-        _keyLength: number = 32,
-        _options: {
+        content: string,
+        salt: string | Uint8Array,
+        keyLength: number = 32,
+        options: {
             type?: "argon2d" | "argon2i" | "argon2id";
             memoryCost?: number;
             timeCost?: number;
             parallelism?: number;
         } = {},
-        _format: HashOutputFormat = "hex"
+        format: HashOutputFormat = "hex"
     ): Promise<string | Uint8Array> {
-        // Note: This would require an external Argon2 library
-        // For now, we'll throw an error indicating it's not implemented
-        throw new Error(
-            "Argon2 key derivation requires an external library. Use PBKDF2 or scrypt instead."
-        );
+        const {
+            type = "argon2id",
+            memoryCost = 65536,
+            timeCost = 3,
+            parallelism = 1,
+        } = options;
+
+        // Try to use Argon2 library if available
+        try {
+            // Check if argon2 is available (common library names)
+            let argon2: any;
+            try {
+                argon2 = require("argon2");
+            } catch {
+                try {
+                    argon2 = require("@node-rs/argon2");
+                } catch {
+                    try {
+                        argon2 = require("argon2-browser");
+                    } catch {
+                        // No Argon2 library found, fall back to PBKDF2
+                        console.warn(
+                            "Argon2 library not found, falling back to PBKDF2"
+                        );
+                        return this.deriveKeyPBKDF2(
+                            content,
+                            {
+                                salt,
+                                iterations: 100000,
+                                keyLength,
+                                hash: "SHA-256",
+                            },
+                            format
+                        );
+                    }
+                }
+            }
+
+            // Use the Argon2 library
+            const saltBuffer =
+                typeof salt === "string"
+                    ? Buffer.from(salt, "utf8")
+                    : Buffer.from(salt);
+
+            let hashResult: Buffer;
+
+            if (argon2.hash) {
+                // Standard argon2 library
+                const hashOptions = {
+                    type: argon2[type.toUpperCase()] || argon2.argon2id,
+                    memoryCost,
+                    timeCost,
+                    parallelism,
+                    hashLength: keyLength,
+                    salt: saltBuffer,
+                    raw: true,
+                };
+
+                hashResult = await argon2.hash(content, hashOptions);
+            } else if (argon2.argon2id || argon2.argon2i || argon2.argon2d) {
+                // @node-rs/argon2 library
+                const hashFunction = argon2[type] || argon2.argon2id;
+                hashResult = await hashFunction(
+                    Buffer.from(content, "utf8"),
+                    saltBuffer,
+                    {
+                        memoryCost,
+                        timeCost,
+                        parallelism,
+                        outputLen: keyLength,
+                    }
+                );
+            } else {
+                // Fallback to PBKDF2 if Argon2 interface is not recognized
+                console.warn(
+                    "Unrecognized Argon2 library interface, falling back to PBKDF2"
+                );
+                return this.deriveKeyPBKDF2(
+                    content,
+                    {
+                        salt,
+                        iterations: 100000,
+                        keyLength,
+                        hash: "SHA-256",
+                    },
+                    format
+                );
+            }
+
+            const derivedArray = new Uint8Array(hashResult);
+            return this.formatHash(derivedArray, format);
+        } catch (error) {
+            // If Argon2 fails for any reason, fall back to PBKDF2
+            console.warn(
+                "Argon2 operation failed, falling back to PBKDF2:",
+                error
+            );
+            return this.deriveKeyPBKDF2(
+                content,
+                {
+                    salt,
+                    iterations: 100000,
+                    keyLength,
+                    hash: "SHA-256",
+                },
+                format
+            );
+        }
     }
 
     /**

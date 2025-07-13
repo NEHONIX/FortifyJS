@@ -121,6 +121,15 @@ export class Logger {
         component: LogComponent,
         message: string
     ): string {
+        const colors = {
+            error: "\x1b[31m", // Red
+            warn: "\x1b[33m", // Yellow
+            info: "\x1b[36m", // Cyan
+            debug: "\x1b[35m", // Magenta
+            verbose: "\x1b[37m", // White
+            reset: "\x1b[0m", // Reset
+            sys: "\x1b[32m",
+        };
         let formatted = message;
 
         if (this.config?.format?.prefix && !this.config?.format?.compact) {
@@ -129,7 +138,16 @@ export class Logger {
                     ? "SYSTEM".toUpperCase()
                     : component.toUpperCase()
             }]`;
-            formatted = `${prefix} ${message}`;
+            if (level === "silent") {
+                formatted = `${prefix} ${message}`;
+            } else {
+                if (component === "server") {
+                    const color = colors[level] || colors.info;
+                    formatted = `${colors.sys}${prefix}${colors.reset} ${color}${message}${colors.reset}`;
+                } else {
+                    formatted = `${prefix} ${message}`;
+                }
+            }
         }
 
         if (this.config?.format?.timestamps) {
@@ -143,15 +161,6 @@ export class Logger {
             typeof process !== "undefined" &&
             process.stdout?.isTTY
         ) {
-            const colors = {
-                error: "\x1b[31m", // Red
-                warn: "\x1b[33m", // Yellow
-                info: "\x1b[36m", // Cyan
-                debug: "\x1b[35m", // Magenta
-                verbose: "\x1b[37m", // White
-                reset: "\x1b[0m", // Reset
-            };
-
             const color = colors[level] || colors.info;
             formatted = `${color}${formatted}${colors.reset}`;
         }

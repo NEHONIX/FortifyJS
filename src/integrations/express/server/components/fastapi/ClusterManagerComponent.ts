@@ -7,6 +7,24 @@ import {
 import { logger } from "../../utils/Logger";
 
 /**
+ * Check if the current runtime supports clustering
+ */
+function isClusteringSupported(): boolean {
+    // Bun doesn't fully support Node.js cluster module
+    if (process.versions.bun) {
+        return false;
+    }
+
+    // Check if cluster module is available
+    try {
+        const cluster = require("cluster");
+        return typeof cluster.fork === "function";
+    } catch {
+        return false;
+    }
+}
+
+/**
  * ClusterManagerComponent - Handles all cluster-related operations for FastApi.ts
  * Manages cluster configuration, scaling, worker management, and IPC
  */
@@ -32,6 +50,15 @@ export class ClusterManagerComponent {
      */
     private initializeCluster(): void {
         if (!this.options.cluster?.enabled) return;
+
+        // Check if clustering is supported in current runtime
+        if (!isClusteringSupported()) {
+            logger.warn(
+                "cluster",
+                "Clustering not supported in current runtime (Bun detected). Disabling cluster functionality."
+            );
+            return;
+        }
 
         logger.debug("cluster", "Initializing cluster manager...");
 
@@ -278,7 +305,9 @@ export class ClusterManagerComponent {
         this.cluster.on("health:status", (status: any) => {
             if (status.status === "critical") {
                 logger.warn(
-                        "cluster",`Cluster health critical: ${status.message}`);
+                    "cluster",
+                    `Cluster health critical: ${status.message}`
+                );
             }
         });
     }

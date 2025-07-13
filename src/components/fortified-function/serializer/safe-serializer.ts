@@ -12,18 +12,22 @@ export interface SafeSerializationOptions {
 }
 
 export class SafeSerializer {
-    private static readonly DEFAULT_OPTIONS: Required<SafeSerializationOptions> = {
-        maxDepth: 10,
-        maxLength: 10000,
-        includeNonEnumerable: false,
-        truncateStrings: 1000,
-        fastMode: false
-    };
+    private static readonly DEFAULT_OPTIONS: Required<SafeSerializationOptions> =
+        {
+            maxDepth: 10,
+            maxLength: 10000,
+            includeNonEnumerable: false,
+            truncateStrings: 1000,
+            fastMode: false,
+        };
 
     /**
      * **ULTRA-FAST: Primary serialization method with performance optimization**
      */
-    public static stringify(obj: any, options: SafeSerializationOptions = {}): string {
+    public static stringify(
+        obj: any,
+        options: SafeSerializationOptions = {}
+    ): string {
         const opts = { ...this.DEFAULT_OPTIONS, ...options };
 
         // **ULTRA-FAST PATH: Try simple JSON.stringify first**
@@ -43,17 +47,151 @@ export class SafeSerializer {
     }
 
     /**
+     * **EXPRESS-SAFE: Enhanced JSON.stringify for Express objects**
+     */
+    public static expressStringify(
+        obj: any,
+        options: SafeSerializationOptions = {}
+    ): string {
+        const opts = { ...this.DEFAULT_OPTIONS, ...options };
+
+        try {
+            return JSON.stringify(obj, this.createExpressReplacer(opts));
+        } catch (error) {
+            // Fallback to safe serialization
+            return this.safeStringify(obj, opts);
+        }
+    }
+
+    /**
+     * **EXPRESS REPLACER: Handles Express req/res objects and circular references**
+     */
+    private static createExpressReplacer(
+        options: Required<SafeSerializationOptions>
+    ) {
+        const seen = new WeakSet();
+        let depth = 0;
+
+        return function (this: any, key: string, value: any): any {
+            // Track depth
+            if (key === "") depth = 0;
+            else depth++;
+
+            if (depth > options.maxDepth) {
+                return "[Max Depth Exceeded]";
+            }
+
+            // Handle null/undefined
+            if (value === null || value === undefined) {
+                return value;
+            }
+
+            // Handle circular references
+            if (typeof value === "object" && value !== null) {
+                if (seen.has(value)) {
+                    return "[Circular Reference]";
+                }
+                seen.add(value);
+            }
+
+            // Handle Express Request objects
+            if (
+                value &&
+                typeof value === "object" &&
+                value.constructor &&
+                value.constructor.name === "IncomingMessage"
+            ) {
+                return {
+                    method: value.method,
+                    url: value.url,
+                    headers: value.headers,
+                    query: value.query,
+                    params: value.params,
+                    body: value.body,
+                    ip: value.ip,
+                    _type: "[Express Request]",
+                };
+            }
+
+            // Handle Express Response objects
+            if (
+                value &&
+                typeof value === "object" &&
+                value.constructor &&
+                value.constructor.name === "ServerResponse"
+            ) {
+                return {
+                    statusCode: value.statusCode,
+                    statusMessage: value.statusMessage,
+                    headersSent: value.headersSent,
+                    _type: "[Express Response]",
+                };
+            }
+
+            // Handle functions
+            if (typeof value === "function") {
+                return `[Function: ${value.name || "anonymous"}]`;
+            }
+
+            // Handle large strings
+            if (
+                typeof value === "string" &&
+                value.length > options.truncateStrings
+            ) {
+                return (
+                    value.substring(0, options.truncateStrings) +
+                    "...[truncated]"
+                );
+            }
+
+            // Handle Buffers
+            if (value instanceof Buffer) {
+                return `[Buffer: ${value.length} bytes]`;
+            }
+
+            // Handle other special objects
+            if (value instanceof Date) {
+                return value.toISOString();
+            }
+
+            if (value instanceof RegExp) {
+                return value.toString();
+            }
+
+            if (value instanceof Error) {
+                return {
+                    name: value.name,
+                    message: value.message,
+                    stack: value.stack,
+                    _type: "[Error]",
+                };
+            }
+
+            return value;
+        };
+    }
+
+    /**
      * **SAFE SERIALIZATION: Handles all edge cases**
      */
-    private static safeStringify(obj: any, options: Required<SafeSerializationOptions>): string {
+    private static safeStringify(
+        obj: any,
+        options: Required<SafeSerializationOptions>
+    ): string {
         const seen = new WeakSet();
         let depth = 0;
 
         const replacer = (_key: string, value: any): any => {
             // Handle primitive values
             if (value === null || typeof value !== "object") {
-                if (typeof value === "string" && value.length > options.truncateStrings) {
-                    return value.substring(0, options.truncateStrings) + "...[truncated]";
+                if (
+                    typeof value === "string" &&
+                    value.length > options.truncateStrings
+                ) {
+                    return (
+                        value.substring(0, options.truncateStrings) +
+                        "...[truncated]"
+                    );
                 }
                 return value;
             }
@@ -67,50 +205,60 @@ export class SafeSerializer {
 
             // Handle cyclic references
             if (seen.has(value)) {
-                return `[Circular:${value.constructor?.name || 'Object'}]`;
+                return `[Circular:${value.constructor?.name || "Object"}]`;
             }
             seen.add(value);
 
             // Handle special Express objects
             if (value.constructor) {
                 const constructorName = value.constructor.name;
-                
+
                 // Express Request object
-                if (constructorName === 'IncomingMessage' || constructorName === 'Request') {
+                if (
+                    constructorName === "IncomingMessage" ||
+                    constructorName === "Request"
+                ) {
                     const result = {
                         method: value.method,
                         url: value.url,
                         headers: this.sanitizeHeaders(value.headers),
                         params: value.params,
                         query: value.query,
-                        body: value.body ? "[Request Body]" : undefined
+                        body: value.body ? "[Request Body]" : undefined,
                     };
                     depth--;
                     return result;
                 }
 
                 // Express Response object
-                if (constructorName === 'ServerResponse' || constructorName === 'Response') {
+                if (
+                    constructorName === "ServerResponse" ||
+                    constructorName === "Response"
+                ) {
                     const result = {
                         statusCode: value.statusCode,
                         statusMessage: value.statusMessage,
-                        headersSent: value.headersSent
+                        headersSent: value.headersSent,
                     };
                     depth--;
                     return result;
                 }
 
                 // Other problematic objects
-                if (['Socket', 'Server', 'Agent', 'TLSSocket'].includes(constructorName)) {
+                if (
+                    ["Socket", "Server", "Agent", "TLSSocket"].includes(
+                        constructorName
+                    )
+                ) {
                     depth--;
                     return `[${constructorName}:${value.constructor.name}]`;
                 }
             }
 
             // Handle functions
-            if (typeof value === 'function') {
+            if (typeof value === "function") {
                 depth--;
-                return `[Function:${value.name || 'anonymous'}]`;
+                return `[Function:${value.name || "anonymous"}]`;
             }
 
             // Handle Buffers
@@ -131,7 +279,7 @@ export class SafeSerializer {
                 return {
                     name: value.name,
                     message: value.message,
-                    stack: value.stack ? "[Stack Trace]" : undefined
+                    stack: value.stack ? "[Stack Trace]" : undefined,
                 };
             }
 
@@ -141,17 +289,20 @@ export class SafeSerializer {
 
         try {
             const result = JSON.stringify(obj, replacer);
-            
+
             // Check length limit
             if (result.length > options.maxLength) {
-                return result.substring(0, options.maxLength) + "...[truncated]";
+                return (
+                    result.substring(0, options.maxLength) + "...[truncated]"
+                );
             }
-            
+
             return result;
         } catch (error) {
-            
             // Ultimate fallback
-            return `[Serialization Error: ${error instanceof Error ? error.message : 'Unknown'}]`;
+            return `[Serialization Error: ${
+                error instanceof Error ? error.message : "Unknown"
+            }]`;
         }
     }
 
@@ -159,17 +310,22 @@ export class SafeSerializer {
      * **UTILITY: Sanitize HTTP headers for safe logging**
      */
     private static sanitizeHeaders(headers: any): any {
-        if (!headers || typeof headers !== 'object') {
+        if (!headers || typeof headers !== "object") {
             return headers;
         }
 
         const sanitized: any = {};
-        const sensitiveHeaders = ['authorization', 'cookie', 'x-api-key', 'x-auth-token'];
+        const sensitiveHeaders = [
+            "authorization",
+            "cookie",
+            "x-api-key",
+            "x-auth-token",
+        ];
 
         for (const [key, value] of Object.entries(headers)) {
             const lowerKey = key.toLowerCase();
             if (sensitiveHeaders.includes(lowerKey)) {
-                sanitized[key] = '[REDACTED]';
+                sanitized[key] = "[REDACTED]";
             } else {
                 sanitized[key] = value;
             }
@@ -181,7 +337,10 @@ export class SafeSerializer {
     /**
      * **ULTRA-FAST: Generate cache key with safe serialization**
      */
-    public static generateCacheKey(args: any[], prefix: string = 'cache'): string {
+    public static generateCacheKey(
+        args: any[],
+        prefix: string = "cache"
+    ): string {
         try {
             // **ULTRA-FAST PATH: Try simple approach first**
             const simple = JSON.stringify(args);
@@ -197,7 +356,7 @@ export class SafeSerializer {
             fastMode: false,
             maxDepth: 5,
             maxLength: 500,
-            truncateStrings: 100
+            truncateStrings: 100,
         });
 
         return `${prefix}:${safe}`;
@@ -206,12 +365,16 @@ export class SafeSerializer {
     /**
      * **DEBUG: Safe debug logging**
      */
-    public static debugLog(label: string, obj: any, maxLength: number = 200): void {
+    public static debugLog(
+        label: string,
+        obj: any,
+        maxLength: number = 200
+    ): void {
         const serialized = this.stringify(obj, {
             fastMode: true,
             maxLength,
             maxDepth: 3,
-            truncateStrings: 50
+            truncateStrings: 50,
         });
 
         console.log(`[DEBUG] ${label}: ${serialized}`);
@@ -226,7 +389,7 @@ export class SafeSerializer {
             maxDepth: 8,
             maxLength: 5000,
             truncateStrings: 500,
-            includeNonEnumerable: false
+            includeNonEnumerable: false,
         });
     }
 }
@@ -236,21 +399,26 @@ export class SafeSerializer {
  */
 
 // Ultra-fast serialization for performance-critical paths
-export const fastStringify = (obj: any): string => 
+export const fastStringify = (obj: any): string =>
     SafeSerializer.stringify(obj, { fastMode: true, maxLength: 1000 });
 
 // Safe serialization for complex objects
-export const safeStringify = (obj: any): string => 
+export const safeStringify = (obj: any): string =>
     SafeSerializer.stringify(obj, { fastMode: false });
 
+// Express-safe serialization for req/res objects
+export const expressStringify = (obj: any): string =>
+    SafeSerializer.expressStringify(obj, { fastMode: false });
+
 // Cache key generation
-export const generateSafeCacheKey = (args: any[], prefix?: string): string => 
+export const generateSafeCacheKey = (args: any[], prefix?: string): string =>
     SafeSerializer.generateCacheKey(args, prefix);
 
 // Debug logging
-export const debugLog = (label: string, obj: any): void => 
+export const debugLog = (label: string, obj: any): void =>
     SafeSerializer.debugLog(label, obj);
 
 // Audit logging
-export const auditStringify = (obj: any): string => 
+export const auditStringify = (obj: any): string =>
     SafeSerializer.auditLog(obj);
+

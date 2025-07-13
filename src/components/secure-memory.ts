@@ -25,15 +25,20 @@ import {
     BufferState,
     SecureBufferOptions,
 } from "../types/secure-memory";
-import { BUFFER_SECURITY_CONSTANTS  as SECURITY_CONSTANTS } from "../const/buffer.const";
-import { ensureLibrariesInitialized , sodium, libraryStatus, nobleHashes} from "../types/secure-mem.type";
-
+import { BUFFER_SECURITY_CONSTANTS as SECURITY_CONSTANTS } from "../const/buffer.const";
+import {
+    ensureLibrariesInitialized,
+    sodium,
+    libraryStatus,
+    nobleHashes,
+} from "../types/secure-mem.type";
 
 export class SecureBuffer {
     private fragments: Uint8Array[] = [];
     private encryptionKey: Uint8Array | null = null;
     private nonce: Uint8Array | null = null;
     private canaryTokens: Uint8Array[] = [];
+    private canaryPositions: number[] = []; // Track where canaries are embedded
     private obfuscationMask: Uint8Array | null = null;
     private state: BufferState = BufferState.UNINITIALIZED;
     private protectionLevel: MemoryProtectionLevel;
@@ -206,7 +211,7 @@ export class SecureBuffer {
     }
 
     /**
-     * Generate canary tokens for tamper detection
+     * Generate canary tokens for tamper detection and embed them in memory
      */
     private generateCanaryTokens(): void {
         const canaryCount = Math.max(
@@ -214,32 +219,115 @@ export class SecureBuffer {
             Math.min(8, Math.ceil(this.fragments.length / 4))
         );
         this.canaryTokens = [];
+        this.canaryPositions = [];
 
         for (let i = 0; i < canaryCount; i++) {
-            this.canaryTokens.push(
-                this.generateSecureKey(SECURITY_CONSTANTS.CANARY_SIZE)
+            const canary = this.generateSecureKey(
+                SECURITY_CONSTANTS.CANARY_SIZE
             );
+            this.canaryTokens.push(canary);
+
+            // Embed canary in memory around fragments
+            this.embedCanaryInMemory(canary, i);
         }
     }
 
     /**
-     * Get the unencrypted buffer by combining fragments
+     * Embed canary tokens in memory around buffer fragments
+     */
+    private embedCanaryInMemory(canary: Uint8Array, index: number): void {
+        if (this.fragments.length === 0) return;
+
+        // Calculate position to embed canary
+        // Distribute canaries evenly around fragments
+        const fragmentIndex = index % this.fragments.length;
+        const fragment = this.fragments[fragmentIndex];
+
+        // Create a new fragment with canary embedded
+        // Format: [canary_prefix][original_data][canary_suffix]
+        const canaryPrefix = canary.slice(0, Math.floor(canary.length / 2));
+        const canarySuffix = canary.slice(Math.floor(canary.length / 2));
+
+        const newFragment = new Uint8Array(
+            canaryPrefix.length + fragment.length + canarySuffix.length
+        );
+
+        // Embed canary around the data
+        newFragment.set(canaryPrefix, 0);
+        newFragment.set(fragment, canaryPrefix.length);
+        newFragment.set(canarySuffix, canaryPrefix.length + fragment.length);
+
+        // Replace the original fragment
+        this.fragments[fragmentIndex] = newFragment;
+
+        // Track the position for verification
+        this.canaryPositions.push(fragmentIndex);
+    }
+
+    /**
+     * Helper method to compare two Uint8Arrays for equality
+     */
+    private arraysEqual(a: Uint8Array, b: Uint8Array): boolean {
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) {
+            if (a[i] !== b[i]) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Get the unencrypted buffer by combining fragments (extracting data from canary-embedded fragments)
      */
     private getUnencryptedBuffer(): Uint8Array {
         if (this.fragments.length === 0) {
             return new Uint8Array(0);
         }
 
-        // Calculate total size
-        const totalSize = this.fragments.reduce(
+        const extractedFragments: Uint8Array[] = [];
+
+        // Extract actual data from fragments, removing embedded canaries
+        for (let i = 0; i < this.fragments.length; i++) {
+            const fragment = this.fragments[i];
+
+            // Check if this fragment has embedded canaries
+            const canaryIndex = this.canaryPositions.indexOf(i);
+
+            if (canaryIndex >= 0 && canaryIndex < this.canaryTokens.length) {
+                // This fragment has embedded canaries, extract the original data
+                const canary = this.canaryTokens[canaryIndex];
+                const canaryPrefix = canary.slice(
+                    0,
+                    Math.floor(canary.length / 2)
+                );
+                const canarySuffix = canary.slice(
+                    Math.floor(canary.length / 2)
+                );
+
+                // Extract the original data between the canaries
+                const originalDataStart = canaryPrefix.length;
+                const originalDataEnd = fragment.length - canarySuffix.length;
+                const originalData = fragment.slice(
+                    originalDataStart,
+                    originalDataEnd
+                );
+
+                extractedFragments.push(originalData);
+            } else {
+                // No canaries in this fragment, use as-is
+                extractedFragments.push(fragment);
+            }
+        }
+
+        // Calculate total size of extracted data
+        const totalSize = extractedFragments.reduce(
             (sum, fragment) => sum + fragment.length,
             0
         );
         const result = new Uint8Array(totalSize);
 
-        // Combine fragments
+        // Combine extracted fragments
         let offset = 0;
-        for (const fragment of this.fragments) {
+        for (const fragment of extractedFragments) {
             result.set(fragment, offset);
             offset += fragment.length;
         }
@@ -304,10 +392,37 @@ export class SecureBuffer {
 
         // Verify canary tokens
         if (this.options.enableCanaries && this.canaryTokens.length > 0) {
-            // Simple canary verification - in real implementation,
-            // canaries would be embedded in memory around the buffer
-            for (const canary of this.canaryTokens) {
-                if (canary.every((byte) => byte === 0)) {
+            // Verify embedded canaries in memory fragments
+            for (let i = 0; i < this.canaryTokens.length; i++) {
+                const canary = this.canaryTokens[i];
+                const fragmentIndex = this.canaryPositions[i];
+
+                if (fragmentIndex >= this.fragments.length) {
+                    this.state = BufferState.CORRUPTED;
+                    return false;
+                }
+
+                const fragment = this.fragments[fragmentIndex];
+                const canaryPrefix = canary.slice(
+                    0,
+                    Math.floor(canary.length / 2)
+                );
+                const canarySuffix = canary.slice(
+                    Math.floor(canary.length / 2)
+                );
+
+                // Verify prefix canary
+                const fragmentPrefix = fragment.slice(0, canaryPrefix.length);
+                if (!this.arraysEqual(fragmentPrefix, canaryPrefix)) {
+                    this.state = BufferState.CORRUPTED;
+                    return false;
+                }
+
+                // Verify suffix canary
+                const fragmentSuffix = fragment.slice(
+                    fragment.length - canarySuffix.length
+                );
+                if (!this.arraysEqual(fragmentSuffix, canarySuffix)) {
                     this.state = BufferState.CORRUPTED;
                     return false;
                 }
@@ -1037,3 +1152,4 @@ export function secureWipe(
         buffer[i] = 0x00;
     }
 }
+

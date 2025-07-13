@@ -4,7 +4,7 @@ import {
     MiddlewarePriority,
     CustomMiddleware,
     MiddlewareInfo,
-    MiddlewareStats, 
+    MiddlewareStats,
     UltraFastApp,
     MiddlewareAPIInterface,
 } from "../../../../types/types";
@@ -12,7 +12,7 @@ import { MiddlewareManager } from "./middlewareManager";
 import { middleware as fortifyMiddleware } from "../../../../../express.middleware";
 import { logger } from "../../../utils/Logger";
 
-/** 
+/**
  * MiddlewareAPI - User-friendly middleware interface that follows the specified pattern
  * Returns a middleware object with register() method for custom middleware
  */
@@ -20,18 +20,29 @@ export class MiddlewareAPI implements MiddlewareAPIInterface {
     private Manager: MiddlewareManager;
     private app: UltraFastApp;
     private config: MiddlewareConfiguration;
+    private nameToIdMap = new Map<string, string>(); // Track middleware names to IDs
 
     constructor(
         Manager: MiddlewareManager,
         app: UltraFastApp,
         config: MiddlewareConfiguration = {}
     ) {
+        // Use process.stdout.write to ensure immediate output
+        process.stdout.write("🔧 [DEBUG] MiddlewareAPI constructor called\n");
+        process.stdout.write(
+            `🔧 [DEBUG] Config: ${JSON.stringify(config, null, 2)}\n`
+        );
+
         this.Manager = Manager;
         this.app = app;
         this.config = config;
 
         // Apply default middleware based on configuration
+        process.stdout.write(
+            "🔧 [DEBUG] About to call applyDefaultMiddleware\n"
+        );
         this.applyDefaultMiddleware();
+        process.stdout.write("🔧 [DEBUG] applyDefaultMiddleware completed\n");
     }
 
     /**
@@ -48,10 +59,15 @@ export class MiddlewareAPI implements MiddlewareAPIInterface {
         }
     ): MiddlewareAPI {
         try {
-            this.Manager.register(middleware, options);
+            const id = this.Manager.register(middleware, options);
+            const name = options?.name || `middleware-${id.slice(0, 8)}`;
+
+            // Track the name-to-ID mapping for easier removal
+            this.nameToIdMap.set(name, id);
+
             logger.debug(
                 "middleware",
-                `Custom middleware registered: ${options?.name || "anonymous"}`
+                `Custom middleware registered: ${name} (${id})`
             );
         } catch (error) {
             logger.error(
@@ -108,6 +124,32 @@ export class MiddlewareAPI implements MiddlewareAPIInterface {
     }
 
     /**
+     * Remove middleware by name
+     */
+    public removeByName(name: string): boolean {
+        try {
+            const id = this.nameToIdMap.get(name);
+            if (id) {
+                const success = this.Manager.unregister(id);
+                if (success) {
+                    this.nameToIdMap.delete(name);
+                    logger.debug(
+                        "middleware",
+                        `Middleware removed: ${name} (${id})`
+                    );
+                    return true;
+                }
+            }
+
+            logger.warn("middleware", `Middleware not found: ${name}`);
+            return false;
+        } catch (error) {
+            logger.error("middleware", `Failed to remove middleware: ${error}`);
+            return false;
+        }
+    }
+
+    /**
      * Get middleware information
      */
     public getInfo(id?: string): MiddlewareInfo | MiddlewareInfo[] {
@@ -126,13 +168,44 @@ export class MiddlewareAPI implements MiddlewareAPIInterface {
      */
     public clear(): MiddlewareAPI {
         try {
-            // Get all middleware IDs and unregister them
+            // Get all tracked middleware IDs and unregister them
+            const idsToRemove: string[] = [];
+
+            // Collect all IDs from our name-to-ID mapping
+            for (const [, id] of this.nameToIdMap.entries()) {
+                idsToRemove.push(id);
+            }
+
+            // Also get any middleware that might not be in our mapping
             const allMiddleware = this.Manager.getInfo() as MiddlewareInfo[];
-            allMiddleware.forEach((middleware) => {
-                // Find the ID from the registry (this is a simplified approach)
-                // In a real implementation, we'd need to track IDs better
-            });
-            logger.debug("middleware", "All custom middleware cleared");
+            for (const middleware of allMiddleware) {
+                // Try to find the ID by looking up the middleware in the manager's registry
+                // Since MiddlewareInfo doesn't include ID, we need to use the name mapping
+                const mappedId = this.nameToIdMap.get(middleware.name);
+                if (mappedId && !idsToRemove.includes(mappedId)) {
+                    idsToRemove.push(mappedId);
+                }
+            }
+
+            // Unregister all found middleware
+            let removedCount = 0;
+            for (const id of idsToRemove) {
+                if (this.Manager.unregister(id)) {
+                    removedCount++;
+                    // Remove from our tracking map
+                    for (const [name, mappedId] of this.nameToIdMap.entries()) {
+                        if (mappedId === id) {
+                            this.nameToIdMap.delete(name);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            logger.debug(
+                "middleware",
+                `Cleared ${removedCount} custom middleware`
+            );
         } catch (error) {
             logger.error("middleware", `Failed to clear middleware: ${error}`);
         }
@@ -159,6 +232,13 @@ export class MiddlewareAPI implements MiddlewareAPIInterface {
      * Apply default middleware based on configuration
      */
     private applyDefaultMiddleware(): void {
+        process.stdout.write(
+            "🔧 [DEBUG] applyDefaultMiddleware method entered\n"
+        );
+        process.stdout.write(
+            `🔧 [DEBUG] this.config: ${JSON.stringify(this.config, null, 2)}\n`
+        );
+
         logger.debug(
             "middleware",
             "Applying default middleware configuration..."

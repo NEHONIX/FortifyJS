@@ -765,35 +765,6 @@ function encryptWithAesGcm(
 }
 
 /**
- * Computes a GHASH for AES-GCM
- *
- * @param data - Data to hash
- * @param key - Key for hashing
- * @param iv - Initialization vector
- * @returns GHASH value
- */
-function computeGHash(
-    data: Uint8Array,
-    key: Uint8Array,
-    iv: Uint8Array
-): Uint8Array {
-    // Compute a secure hash using our Hash module
-    const combinedData = new Uint8Array(data.length + key.length + iv.length);
-    combinedData.set(data, 0);
-    combinedData.set(key, data.length);
-    combinedData.set(iv, data.length + key.length);
-
-    // Use SHA-256 for the hash
-    const hash = Hash.create(combinedData, {
-        algorithm: "sha256",
-        outputFormat: "buffer",
-    }) as unknown as Uint8Array;
-
-    // Return the first 16 bytes as the GHASH
-    return hash.slice(0, 16);
-}
-
-/**
  * Encrypts a single AES block
  *
  * @param block - 16-byte block to encrypt
@@ -871,38 +842,146 @@ function incrementCounter(counter: Uint8Array): void {
 function computeGCMTag(
     ciphertext: Uint8Array,
     key: Uint8Array,
-    iv: Uint8Array
+    iv: Uint8Array,
+    aad: Uint8Array = new Uint8Array(0)
 ): Uint8Array {
-    // In a full GCM implementation, this would involve:
-    // 1. Computing the GHASH of the ciphertext and AAD
-    // 2. Encrypting the GHASH with the GCTR function
+    // Full GCM implementation with proper GHASH computation and authentication
 
-    // For our implementation, we'll use a secure hash function
+    // Step 1: Generate the hash subkey H by encrypting a zero block with AES
+    const zeroBlock = new Uint8Array(16);
+    const hashSubkey = aesEncryptBlock(zeroBlock, key);
 
-    // Create a buffer with all the data needed for authentication
-    const authData = new Uint8Array(
-        ciphertext.length + key.length + iv.length + 8
-    );
-    authData.set(ciphertext, 0);
-    authData.set(key, ciphertext.length);
-    authData.set(iv, ciphertext.length + key.length);
+    // Step 2: Compute GHASH of AAD and ciphertext
+    const ghashResult = computeGHash(ciphertext, hashSubkey, aad);
 
-    // Add the lengths of ciphertext and AAD (we don't have AAD here)
-    const view = new DataView(authData.buffer);
-    view.setBigUint64(
-        ciphertext.length + key.length + iv.length,
-        BigInt(ciphertext.length * 8),
-        false
-    );
+    // Step 3: Generate the initial counter block for GCTR
+    let j0: Uint8Array;
+    if (iv.length === 12) {
+        // Standard 96-bit IV
+        j0 = new Uint8Array(16);
+        j0.set(iv, 0);
+        j0[15] = 1; // Set the counter to 1
+    } else {
+        // Non-standard IV length, hash it
+        j0 = computeGHash(iv, hashSubkey);
+    }
 
-    // Compute the hash
-    const hash = Hash.create(authData, {
-        algorithm: "sha256",
-        outputFormat: "buffer",
-    }) as unknown as Uint8Array;
+    // Step 4: Encrypt the GHASH result with GCTR using J0
+    const tag = new Uint8Array(16);
+    const j0Encrypted = aesEncryptBlock(j0, key);
 
-    // Use the first 16 bytes as the tag
-    return hash.slice(0, 16);
+    // XOR the GHASH result with the encrypted J0 to get the authentication tag
+    for (let i = 0; i < 16; i++) {
+        tag[i] = ghashResult[i] ^ j0Encrypted[i];
+    }
+
+    return tag;
+}
+
+/**
+ * Compute GHASH function for GCM authentication
+ */
+function computeGHash(
+    data: Uint8Array,
+    hashSubkey: Uint8Array,
+    aad: Uint8Array = new Uint8Array(0)
+): Uint8Array {
+    // Initialize the hash to zero
+    let hash = new Uint8Array(16);
+
+    // Process AAD first
+    if (aad.length > 0) {
+        hash = processGHashBlocks(aad, hash, hashSubkey);
+    }
+
+    // Process ciphertext
+    if (data.length > 0) {
+        hash = processGHashBlocks(data, hash, hashSubkey);
+    }
+
+    // Process the length block (AAD length || ciphertext length)
+    const lengthBlock = new Uint8Array(16);
+    const view = new DataView(lengthBlock.buffer);
+    view.setBigUint64(0, BigInt(aad.length * 8), false); // AAD length in bits
+    view.setBigUint64(8, BigInt(data.length * 8), false); // Ciphertext length in bits
+
+    // Final GHASH operation with length block
+    hash = gfMultiply(xorBlocks(hash, lengthBlock), hashSubkey);
+
+    return hash;
+}
+
+/**
+ * Process blocks for GHASH computation
+ */
+function processGHashBlocks(
+    data: Uint8Array,
+    initialHash: Uint8Array,
+    hashSubkey: Uint8Array
+): Uint8Array {
+    let hash = new Uint8Array(initialHash);
+
+    // Process complete 16-byte blocks
+    for (let i = 0; i < data.length; i += 16) {
+        const block = new Uint8Array(16);
+        const remainingBytes = Math.min(16, data.length - i);
+        block.set(data.slice(i, i + remainingBytes), 0);
+
+        // GHASH operation: hash = (hash XOR block) * H
+        hash = gfMultiply(xorBlocks(hash, block), hashSubkey);
+    }
+
+    return hash;
+}
+
+/**
+ * Galois Field multiplication for GHASH
+ */
+function gfMultiply(a: Uint8Array, b: Uint8Array): Uint8Array {
+    const result = new Uint8Array(16);
+    const v = new Uint8Array(b);
+
+    for (let i = 0; i < 16; i++) {
+        for (let j = 0; j < 8; j++) {
+            if ((a[i] & (1 << (7 - j))) !== 0) {
+                xorInPlace(result, v);
+            }
+
+            // Shift v right by 1 bit
+            const carry = v[15] & 1;
+            for (let k = 15; k > 0; k--) {
+                v[k] = (v[k] >>> 1) | ((v[k - 1] & 1) << 7);
+            }
+            v[0] = v[0] >>> 1;
+
+            // If there was a carry, XOR with the reduction polynomial
+            if (carry) {
+                v[0] ^= 0xe1; // Reduction polynomial for GF(2^128)
+            }
+        }
+    }
+
+    return result;
+}
+
+/**
+ * XOR two blocks in place
+ */
+function xorInPlace(a: Uint8Array, b: Uint8Array): void {
+    for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        a[i] ^= b[i];
+    }
+}
+
+/**
+ * XOR two blocks and return result
+ */
+function xorBlocks(a: Uint8Array, b: Uint8Array): Uint8Array {
+    const result = new Uint8Array(Math.max(a.length, b.length));
+    for (let i = 0; i < result.length; i++) {
+        result[i] = (a[i] || 0) ^ (b[i] || 0);
+    }
+    return result;
 }
 
 // Note: The generateKeyStream and generateAuthTag functions have been replaced
@@ -1096,3 +1175,4 @@ function decryptWithAesGcm(
 
     return decrypted;
 }
+

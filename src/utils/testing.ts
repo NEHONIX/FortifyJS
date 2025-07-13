@@ -227,7 +227,7 @@ export function runSecurityTests(options: {
  */
 function chiSquaredCDF(x: number, k: number): number {
     // This is a simple approximation of the chi-squared CDF
-    // For production use, a more accurate implementation would be needed
+    // TODO: a more accurate implementation would be needed
     if (x <= 0) {
         return 0;
     }

@@ -265,7 +265,7 @@ export class FortifiedLogger {
             return;
         }
 
-        // In a real implementation, you might send logs to a service
+        // Wemight send logs to a service
         // For now, we'll just output to console for non-error levels
         this.logBuffer
             .filter((entry) => entry.level < LogLevel.ERROR)

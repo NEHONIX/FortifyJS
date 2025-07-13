@@ -194,7 +194,8 @@ export async function argon2Derive(
 }
 
 /**
- * Real implementation of Argon2 for environments where the argon2 library is not available
+ * 
+ * Implements a simplified version of Argon2 for environments where the argon2 library is not available
  * This uses the argon2-browser library or a Node.js child process approach as fallbacks
  *
  * @param password - Password to derive key from

@@ -280,6 +280,101 @@ export class MiddlewareManager implements IMiddlewareManager {
     }
 
     /**
+     * Apply immediate middleware configuration during server initialization
+     * This method provides basic middleware functionality before the full system is initialized
+     */
+    public applyImmediateMiddleware(config: MiddlewareConfiguration): void {
+        logger.debug(
+            "middleware",
+            "Applying immediate middleware configuration..."
+        );
+
+        // Apply rate limiting if configured
+        if (config?.rateLimit && config.rateLimit !== true) {
+            try {
+                const rateLimitConfig = config.rateLimit;
+                const limiter = rateLimit({
+                    windowMs: rateLimitConfig.windowMs || 15 * 60 * 1000,
+                    max: rateLimitConfig.max || 100,
+                    message:
+                        "Too many requests from this IP, please try again later.",
+                    standardHeaders: true,
+                    legacyHeaders: false,
+                });
+                this.dependencies.app.use(limiter);
+                logger.debug("middleware", "Rate limiting applied immediately");
+            } catch (error) {
+                logger.warn(
+                    "middleware",
+                    "Failed to apply rate limiting:",
+                    error
+                );
+            }
+        }
+
+        // Apply CORS if configured
+        if (config?.cors && config.cors !== true) {
+            try {
+                const corsConfig = config.cors;
+                const corsOptions = {
+                    origin: (corsConfig.origin as string) || "*",
+                    methods: corsConfig.methods || [
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE",
+                        "OPTIONS",
+                    ],
+                    allowedHeaders: corsConfig.allowedHeaders || [
+                        "Origin",
+                        "X-Requested-With",
+                        "Content-Type",
+                        "Accept",
+                        "Authorization",
+                    ],
+                    credentials: corsConfig.credentials !== false,
+                };
+                this.dependencies.app.use(cors(corsOptions));
+                logger.debug("middleware", "CORS applied immediately");
+            } catch (error) {
+                logger.warn("middleware", "Failed to apply CORS:", error);
+            }
+        }
+
+        // Apply security headers if configured
+        if (config?.security && config.security !== true) {
+            try {
+                this.dependencies.app.use(helmet());
+                logger.debug(
+                    "middleware",
+                    "Helmet security headers applied immediately"
+                );
+            } catch (error) {
+                logger.warn("middleware", "Failed to apply helmet:", error);
+            }
+        }
+
+        // Apply compression if configured
+        if (config?.compression && config.compression !== true) {
+            try {
+                this.dependencies.app.use(compression());
+                logger.debug("middleware", "Compression applied immediately");
+            } catch (error) {
+                logger.warn(
+                    "middleware",
+                    "Failed to apply compression:",
+                    error
+                );
+            }
+        }
+
+        logger.debug(
+            "middleware",
+            "Immediate middleware configuration completed"
+        );
+    }
+
+    /**
      * Enable CORS middleware
      */
     public enableCors(options?: any): void {

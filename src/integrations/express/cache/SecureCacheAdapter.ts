@@ -23,6 +23,7 @@ import { EncryptionService } from "../encryption";
 
 import { FortifyJS } from "../../../core/crypto";
 import * as CacheTypes from "./type";
+import { initializeLogger, Logger } from "../server/utils/Logger";
 
 /**
  * UF secure cache adapter
@@ -37,9 +38,11 @@ export class SecureCacheAdapter extends EventEmitter {
     private healthMonitor?: NodeJS.Timeout;
     private metricsCollector?: NodeJS.Timeout;
     private masterEncryptionKey!: string; // Consistent encryption key for all operations
+    private logger: Logger;
 
     constructor(config: CacheTypes.SecureCacheConfig = {}) {
         super();
+        this.logger = initializeLogger();
 
         this.config = {
             strategy: "hybrid",
@@ -240,7 +243,7 @@ export class SecureCacheAdapter extends EventEmitter {
                     ...redisConfig.cluster.options,
                 });
 
-                console.log(" Redis Cluster initialized");
+                this.logger.startup("server", " Redis Cluster initialized");
             } else if (redisConfig.sentinel?.enabled) {
                 // Redis Sentinel mode
                 this.redisClient = new Redis({
@@ -251,8 +254,8 @@ export class SecureCacheAdapter extends EventEmitter {
                     lazyConnect: true,
                 });
 
-                console.log(" Redis Sentinel initialized");
-            } else { 
+                this.logger.info("server", " Redis Sentinel initialized");
+            } else {
                 // Single Redis instance
                 this.redisClient = new Redis({
                     host: redisConfig.host,
@@ -262,11 +265,14 @@ export class SecureCacheAdapter extends EventEmitter {
                     lazyConnect: true,
                     connectTimeout: 5000, // 5 second timeout
                     commandTimeout: 5000, // 5 second command timeout
-                    retryDelayOnFailover: 100,
+                    retryDelayOnFailover: 100, // This property exists in ioredis
                     maxRetriesPerRequest: 2,
-                });
+                } as any); // Use type assertion to bypass strict typing
 
-                console.log(" Redis single instance initialized");
+                this.logger.info(
+                    "server",
+                    " Redis single instance initialized"
+                );
             }
 
             // Setup Redis event handlers
@@ -295,12 +301,12 @@ export class SecureCacheAdapter extends EventEmitter {
         if (!this.redisClient) return;
 
         this.redisClient.on("connect", () => {
-            console.log(" Redis connected");
+            (" Redis connected");
             this.emit("redis_connected");
         });
 
         this.redisClient.on("ready", () => {
-            console.log(" Redis ready");
+            this.logger.info("server", "Connected to Redis");
             this.emit("redis_ready");
         });
 
@@ -315,7 +321,7 @@ export class SecureCacheAdapter extends EventEmitter {
         });
 
         this.redisClient.on("reconnecting", () => {
-            console.log(" Redis reconnecting...");
+            this.logger.warn("server", " Redis reconnecting...");
             this.emit("redis_reconnecting");
         });
 
@@ -330,14 +336,16 @@ export class SecureCacheAdapter extends EventEmitter {
             });
 
             this.redisClient.on("+node", (node) => {
-                console.log(
+                this.logger.info(
+                    "server",
                     ` Redis cluster node added: ${node.options.host}:${node.options.port}`
                 );
                 this.emit("cluster_node_added", node);
             });
 
             this.redisClient.on("-node", (node) => {
-                console.warn(
+                this.logger.warn(
+                    "server",
                     ` Redis cluster node removed: ${node.options.host}:${node.options.port}`
                 );
                 this.emit("cluster_node_removed", node);

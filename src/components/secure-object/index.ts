@@ -4,7 +4,7 @@
  * This file contains type definitions for the SecureArray modular architecture
  *
  * @author Nehonix
- *
+ * 
  * @license MIT
  *
  * Copyright (c) 2025 Nehonix. All rights reserved.

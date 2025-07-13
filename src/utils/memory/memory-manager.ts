@@ -28,8 +28,6 @@
  * SOFTWARE.
  ***************************************************************************** */
 
-
-
 import { initializePolyfills } from "../../types/global";
 import {
     MemoryStats,
@@ -70,6 +68,26 @@ export class AdvancedMemoryManager {
     private state: MemoryManagerState;
     private stats: MemoryStats;
     private performanceMetrics: PerformanceMetrics;
+
+    // Object collection tracking
+    private objectTracker = new Map<
+        string,
+        {
+            count: number;
+            totalSize: number;
+            lastSeen: number;
+            type: string;
+            weakRefs: WeakRef<any>[];
+        }
+    >();
+    private collectionHistory: Array<{
+        timestamp: number;
+        objectsCollected: number;
+        typesCollected: Map<string, number>;
+        memoryFreed: number;
+        gcDuration: number;
+    }> = [];
+    private finalizationRegistry?: FinalizationRegistry<string>;
 
     // Monitoring intervals
     private gcInterval?: NodeJS.Timeout;
@@ -122,6 +140,9 @@ export class AdvancedMemoryManager {
             this.eventManager,
             this.configManager.getConfig()
         );
+
+        // Initialize object collection tracking
+        this.initializeObjectTracking();
 
         // Start the memory manager
         this.start();
@@ -388,12 +409,18 @@ export class AdvancedMemoryManager {
                     duration) /
                 this.stats.gcCount;
 
+            // Perform sophisticated object collection tracking
+            const objectsCollected = this.trackObjectCollection(
+                beforeUsage,
+                afterUsage
+            );
+
             const result: GCResult = {
                 beforeUsage,
                 afterUsage,
                 freedMemory,
                 duration,
-                objectsCollected: 0, // Would need more sophisticated tracking
+                objectsCollected,
                 poolsCleanedUp,
                 success: true,
             };
@@ -845,7 +872,7 @@ State:
         this.stop();
 
         // Destroy all pools
-        for (const [name, pool] of this.pools.entries()) {
+        for (const [, pool] of this.pools.entries()) {
             if ("destroy" in pool && typeof pool.destroy === "function") {
                 (pool as any).destroy();
             }
@@ -859,4 +886,221 @@ State:
         // Reset singleton instance
         AdvancedMemoryManager.instance = null as any;
     }
+
+    /**
+     * Initialize object collection tracking system
+     */
+    private initializeObjectTracking(): void {
+        // Initialize FinalizationRegistry if available
+        if (typeof FinalizationRegistry !== "undefined") {
+            this.finalizationRegistry = new FinalizationRegistry(
+                (objectId: string) => {
+                    this.handleObjectFinalization(objectId);
+                }
+            );
+        }
+
+        // Set up periodic object tracking cleanup
+        setInterval(() => {
+            this.cleanupObjectTracker();
+        }, 60000); // Every minute
+    }
+
+    /**
+     * Track object collection during garbage collection
+     */
+    private trackObjectCollection(
+        beforeUsage: number,
+        afterUsage: number
+    ): number {
+        const memoryFreed = beforeUsage - afterUsage;
+        const gcStartTime = Date.now();
+
+        // Count objects that are no longer reachable
+        let objectsCollected = 0;
+        const typesCollected = new Map<string, number>();
+
+        // Check weak references to see which objects were collected
+        for (const [objectId, tracker] of this.objectTracker.entries()) {
+            let collectedCount = 0;
+
+            // Filter out collected weak references
+            tracker.weakRefs = tracker.weakRefs.filter((weakRef) => {
+                const obj = weakRef.deref();
+                if (obj === undefined) {
+                    collectedCount++;
+                    return false;
+                }
+                return true;
+            });
+
+            if (collectedCount > 0) {
+                objectsCollected += collectedCount;
+                tracker.count -= collectedCount;
+
+                // Track by type
+                const currentTypeCount = typesCollected.get(tracker.type) || 0;
+                typesCollected.set(
+                    tracker.type,
+                    currentTypeCount + collectedCount
+                );
+
+                // Remove tracker if no objects remain
+                if (tracker.count <= 0) {
+                    this.objectTracker.delete(objectId);
+                }
+            }
+        }
+
+        // Estimate objects collected based on memory freed if no direct tracking
+        if (objectsCollected === 0 && memoryFreed > 0) {
+            // Rough estimate: assume average object size of 1KB
+            objectsCollected = Math.floor(memoryFreed / 1024);
+        }
+
+        // Record collection history
+        const gcDuration = Date.now() - gcStartTime;
+        this.collectionHistory.push({
+            timestamp: Date.now(),
+            objectsCollected,
+            typesCollected,
+            memoryFreed,
+            gcDuration,
+        });
+
+        // Limit history size
+        if (this.collectionHistory.length > 100) {
+            this.collectionHistory.shift();
+        }
+
+        return objectsCollected;
+    }
+
+    /**
+     * Register an object for tracking
+     */
+    public trackObject(
+        obj: any,
+        type: string = "unknown",
+        estimatedSize: number = 0
+    ): string {
+        const objectId = this.generateObjectId();
+
+        let tracker = this.objectTracker.get(type);
+        if (!tracker) {
+            tracker = {
+                count: 0,
+                totalSize: 0,
+                lastSeen: Date.now(),
+                type,
+                weakRefs: [],
+            };
+            this.objectTracker.set(type, tracker);
+        }
+
+        // Create weak reference to track the object
+        const weakRef = new WeakRef(obj);
+        tracker.weakRefs.push(weakRef);
+        tracker.count++;
+        tracker.totalSize += estimatedSize;
+        tracker.lastSeen = Date.now();
+
+        // Register with FinalizationRegistry if available
+        if (this.finalizationRegistry) {
+            this.finalizationRegistry.register(obj, objectId);
+        }
+
+        return objectId;
+    }
+
+    /**
+     * Handle object finalization
+     */
+    private handleObjectFinalization(objectId: string): void {
+        // This is called when an object is finalized by the garbage collector
+        // We can use this to get more accurate collection statistics
+        console.debug(`Object finalized: ${objectId}`);
+    }
+
+    /**
+     * Clean up object tracker by removing stale entries
+     */
+    private cleanupObjectTracker(): void {
+        const now = Date.now();
+        const staleThreshold = 300000; // 5 minutes
+
+        for (const [type, tracker] of this.objectTracker.entries()) {
+            // Remove stale weak references
+            tracker.weakRefs = tracker.weakRefs.filter((weakRef) => {
+                return weakRef.deref() !== undefined;
+            });
+
+            // Update count based on remaining weak references
+            tracker.count = tracker.weakRefs.length;
+
+            // Remove tracker if no objects remain and it's stale
+            if (
+                tracker.count === 0 &&
+                now - tracker.lastSeen > staleThreshold
+            ) {
+                this.objectTracker.delete(type);
+            }
+        }
+    }
+
+    /**
+     * Generate unique object ID
+     */
+    private generateObjectId(): string {
+        return `obj_${Date.now()}_${Math.random()
+            .toString(36)
+            .substring(2, 11)}`;
+    }
+
+    /**
+     * Get object collection statistics
+     */
+    public getObjectCollectionStats(): {
+        totalTracked: number;
+        byType: Map<string, { count: number; totalSize: number }>;
+        recentCollections: Array<{
+            timestamp: number;
+            objectsCollected: number;
+            typesCollected: Map<string, number>;
+            memoryFreed: number;
+            gcDuration: number;
+        }>;
+        averageCollectionRate: number;
+    } {
+        const totalTracked = Array.from(this.objectTracker.values()).reduce(
+            (sum, tracker) => sum + tracker.count,
+            0
+        );
+
+        const byType = new Map();
+        for (const [type, tracker] of this.objectTracker.entries()) {
+            byType.set(type, {
+                count: tracker.count,
+                totalSize: tracker.totalSize,
+            });
+        }
+
+        // Calculate average collection rate from recent history
+        const recentCollections = this.collectionHistory.slice(-10);
+        const averageCollectionRate =
+            recentCollections.length > 0
+                ? recentCollections.reduce(
+                      (sum, entry) => sum + entry.objectsCollected,
+                      0
+                  ) / recentCollections.length
+                : 0;
+
+        return {
+            totalTracked,
+            byType,
+            recentCollections: this.collectionHistory.slice(-20), // Last 20 collections
+            averageCollectionRate,
+        };
+    }
 }
+

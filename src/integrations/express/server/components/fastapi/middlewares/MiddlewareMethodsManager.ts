@@ -42,6 +42,7 @@ export class MiddlewareMethodsManager {
         );
 
         this.addMiddlewareMethod();
+
         this.addSecureMiddlewareMethods();
         this.addPerformanceMiddlewareMethods();
         this.addCachedMiddlewareMethods();
@@ -49,6 +50,10 @@ export class MiddlewareMethodsManager {
         this.addConvenienceMethods();
 
         logger.debug("middleware", "Middleware methods added successfully");
+        logger.debug(
+            "middleware",
+            "All middleware methods added successfully\n"
+        );
     }
 
     /**
@@ -58,12 +63,17 @@ export class MiddlewareMethodsManager {
         this.dependencies.app.middleware = (
             config?: MiddlewareConfiguration
         ) => {
-            return new MiddlewareAPI(
+            const api = new MiddlewareAPI(
                 this.dependencies.middlewareManager,
                 this.dependencies.app,
                 config || {}
             );
+
+            return api;
         };
+
+        // Add a marker to identify this is the real implementation
+        (this.dependencies.app.middleware as any).__isRealImplementation = true;
     }
 
     /**
@@ -162,28 +172,94 @@ export class MiddlewareMethodsManager {
 
         // Remove middleware
         this.dependencies.app.removeMiddleware = (name: string): boolean => {
-            // Find middleware by name and remove it
-            const allMiddleware =
-                this.dependencies.middlewareManager.getInfo() as MiddlewareInfo[];
-            const targetMiddleware = allMiddleware.find(
-                (mw) => mw.name === name
-            );
+            try {
+                // Find middleware by name and get its ID from the manager's registry
+                const middlewareId = this.findMiddlewareIdByName(name);
 
-            if (targetMiddleware) {
-                // In a real implementation, we'd need to track IDs better
-                // For now, this is a simplified approach
-                logger.debug("middleware", `Middleware removed: ${name}`);
-                return true;
+                if (middlewareId) {
+                    const success =
+                        this.dependencies.middlewareManager.unregister(
+                            middlewareId
+                        );
+                    if (success) {
+                        logger.debug(
+                            "middleware",
+                            `Middleware removed: ${name} (${middlewareId})`
+                        );
+                        return true;
+                    }
+                }
+
+                logger.warn("middleware", `Middleware not found: ${name}`);
+                return false;
+            } catch (error) {
+                logger.error(
+                    "middleware",
+                    `Failed to remove middleware: ${error}`
+                );
+                return false;
             }
-
-            logger.warn("middleware", `Middleware not found: ${name}`);
-            return false;
         };
 
         // Get middleware statistics
         this.dependencies.app.getMiddlewareStats = (): MiddlewareStats => {
             return this.dependencies.middlewareManager.getStats();
         };
+    }
+
+    /**
+     * Find middleware ID by name from the manager's registry
+     * This method accesses the internal registry to get the ID
+     */
+    private findMiddlewareIdByName(name: string): string | null {
+        try {
+            // Access the middleware manager's internal registry
+            // Since we need to access private members, we'll use a workaround
+            const manager = this.dependencies.middlewareManager as any;
+
+            if (
+                manager.middlewareRegistry &&
+                manager.middlewareRegistry instanceof Map
+            ) {
+                // Iterate through the registry to find middleware by name
+                for (const [
+                    id,
+                    entry,
+                ] of manager.middlewareRegistry.entries()) {
+                    if (entry.name === name) {
+                        return id;
+                    }
+                }
+            }
+
+            // Alternative approach: try to use reflection to access the registry
+            const registryKeys = Object.getOwnPropertyNames(manager);
+            for (const key of registryKeys) {
+                if (key.includes("registry") || key.includes("Registry")) {
+                    const registry = manager[key];
+                    if (registry instanceof Map) {
+                        for (const [id, entry] of registry.entries()) {
+                            if (
+                                entry &&
+                                typeof entry === "object" &&
+                                entry.name === name
+                            ) {
+                                return id;
+                            }
+                        }
+                    }
+                }
+            }
+
+            logger.warn(
+                "middleware",
+                `Could not find ID for middleware: ${name}`
+            );
+            return null;
+        } catch (error) {
+            logger.error("middleware", `Error finding middleware ID: ${error}`);
+            return null;
+        }
     }
 
     /**
@@ -240,4 +316,3 @@ export class MiddlewareMethodsManager {
     }
 }
 
- 

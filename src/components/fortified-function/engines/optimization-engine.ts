@@ -22,6 +22,28 @@ export class OptimizationEngine {
         improvement: number;
     }> = [];
 
+    // Call frequency tracking
+    private callFrequencyMap = new Map<
+        string,
+        {
+            count: number;
+            firstCall: number;
+            lastCall: number;
+            intervals: number[];
+        }
+    >();
+
+    // Parameter pattern tracking
+    private parameterPatterns = new Map<
+        string,
+        {
+            frequency: number;
+            lastSeen: number;
+            variations: Set<string>;
+            suspiciousCount: number;
+        }
+    >();
+
     /**
      * Optimize function options based on performance data
      */
@@ -436,15 +458,134 @@ export class OptimizationEngine {
     }
 
     private detectRapidCalls(executionContext: any): boolean {
-        // Implementation would track call frequency
-        // For now, return false as placeholder
+        // Track call frequency for rapid call detection
+        const functionId = executionContext?.functionId || "unknown";
+        const now = Date.now();
+
+        let callData = this.callFrequencyMap.get(functionId);
+
+        if (!callData) {
+            // First call for this function
+            callData = {
+                count: 1,
+                firstCall: now,
+                lastCall: now,
+                intervals: [],
+            };
+            this.callFrequencyMap.set(functionId, callData);
+            return false;
+        }
+
+        // Update call data
+        const interval = now - callData.lastCall;
+        callData.intervals.push(interval);
+        callData.count++;
+        callData.lastCall = now;
+
+        // Keep only recent intervals (last 10)
+        if (callData.intervals.length > 10) {
+            callData.intervals.shift();
+        }
+
+        // Detect rapid calls: more than 5 calls in last 1 second
+        const recentCalls = callData.intervals.filter(
+            (interval) => interval < 1000
+        ).length;
+        if (recentCalls >= 5) {
+            return true;
+        }
+
+        // Detect sustained rapid calls: average interval < 200ms over last 5 calls
+        if (callData.intervals.length >= 5) {
+            const recentIntervals = callData.intervals.slice(-5);
+            const avgInterval =
+                recentIntervals.reduce((sum, interval) => sum + interval, 0) /
+                recentIntervals.length;
+            if (avgInterval < 200) {
+                return true;
+            }
+        }
+
         return false;
     }
 
     private detectSuspiciousParameters(executionContext: any): boolean {
-        // Implementation would analyze parameter patterns
-        // For now, return false as placeholder
-        return false;
+        // Analyze parameter patterns for suspicious behavior
+        const parametersHash = executionContext?.parametersHash || "unknown";
+        const parameters = executionContext?.parameters;
+
+        if (!parameters) return false;
+
+        const now = Date.now();
+        let patternData = this.parameterPatterns.get(parametersHash);
+
+        if (!patternData) {
+            // First time seeing this parameter pattern
+            patternData = {
+                frequency: 1,
+                lastSeen: now,
+                variations: new Set([JSON.stringify(parameters)]),
+                suspiciousCount: 0,
+            };
+            this.parameterPatterns.set(parametersHash, patternData);
+            return false;
+        }
+
+        // Update pattern data
+        patternData.frequency++;
+        patternData.lastSeen = now;
+        patternData.variations.add(JSON.stringify(parameters));
+
+        // Detect suspicious patterns
+        let suspicious = false;
+
+        // 1. Too many variations for the same hash (hash collision or manipulation)
+        if (patternData.variations.size > 10) {
+            suspicious = true;
+        }
+
+        // 2. Extremely high frequency (potential DoS)
+        if (patternData.frequency > 1000) {
+            suspicious = true;
+        }
+
+        // 3. Check for common injection patterns in string parameters
+        const paramString = JSON.stringify(parameters).toLowerCase();
+        const injectionPatterns = [
+            "script",
+            "javascript:",
+            "eval(",
+            "function(",
+            "select * from",
+            "union select",
+            "drop table",
+            "../",
+            "..\\",
+            "file://",
+            "http://",
+            "https://",
+        ];
+
+        for (const pattern of injectionPatterns) {
+            if (paramString.includes(pattern)) {
+                suspicious = true;
+                break;
+            }
+        }
+
+        if (suspicious) {
+            patternData.suspiciousCount++;
+        }
+
+        // Clean up old patterns (keep only patterns seen in last hour)
+        const oneHourAgo = now - 3600000;
+        for (const [hash, data] of this.parameterPatterns.entries()) {
+            if (data.lastSeen < oneHourAgo) {
+                this.parameterPatterns.delete(hash);
+            }
+        }
+
+        return suspicious;
     }
 
     private calculateAverage(
@@ -482,3 +623,4 @@ export class OptimizationEngine {
         this.adaptiveSettings.clear();
     }
 }
+
