@@ -103,7 +103,7 @@ export function middleware(options: MiddlewareOptions = {}): any {
                             count: entry.count,
                             limit: opts.maxRequestsPerMinute,
                         });
-                    }
+                    } 
                     res.status(429).json({
                         error: "Too many requests",
                         retryAfter: Math.ceil((entry.resetTime - now) / 1000),

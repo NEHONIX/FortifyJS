@@ -532,6 +532,158 @@ export interface ServerOptions {
             onPortSwitch?: (originalPort: number, newPort: number) => void; // Callback when port is switched
         };
     };
+
+    /**
+     * Request management configuration for handling timeouts, network quality, and request lifecycle
+     *
+     * @example
+     * ```typescript
+     * requestManagement: {
+     *   timeout: {
+     *     enabled: true,
+     *     defaultTimeout: 30000, // 30 seconds
+     *     routes: {
+     *       "/api/upload": 300000, // 5 minutes for uploads
+     *       "/api/quick": 5000     // 5 seconds for quick endpoints
+     *     }
+     *   },
+     *   networkQuality: {
+     *     enabled: true,
+     *     rejectOnPoorConnection: true,
+     *     minBandwidth: 1000, // 1KB/s minimum
+     *     maxLatency: 2000    // 2 seconds max latency
+     *   },
+     *   concurrency: {
+     *     maxConcurrentRequests: 1000,
+     *     maxPerIP: 50,
+     *     queueTimeout: 10000
+     *   }
+     * }
+     * ```
+     */
+    requestManagement?: {
+        /** Request timeout configuration */
+        timeout?: {
+            /** Enable request timeout management */
+            enabled?: boolean;
+
+            /** Default timeout for all requests in milliseconds */
+            defaultTimeout?: number;
+
+            /** Route-specific timeout overrides */
+            routes?: Record<string, number>;
+
+            /** Timeout for static file serving */
+            staticTimeout?: number;
+
+            /** Custom timeout handler */
+            onTimeout?: (req: any, res: any) => void;
+
+            /** Include stack trace in timeout errors */
+            includeStackTrace?: boolean;
+        };
+
+        /** Network quality detection and management */
+        networkQuality?: {
+            /** Enable network quality monitoring */
+            enabled?: boolean;
+
+            /** Reject requests on poor network conditions */
+            rejectOnPoorConnection?: boolean;
+
+            /** Minimum bandwidth requirement in bytes/second */
+            minBandwidth?: number;
+
+            /** Maximum acceptable latency in milliseconds */
+            maxLatency?: number;
+
+            /** Network quality check interval in milliseconds */
+            checkInterval?: number;
+
+            /** Custom network quality handler */
+            onPoorNetwork?: (req: any, res: any, metrics: any) => void;
+        };
+
+        /** Request concurrency management */
+        concurrency?: {
+            /** Maximum concurrent requests server-wide */
+            maxConcurrentRequests?: number;
+
+            /** Maximum concurrent requests per IP */
+            maxPerIP?: number;
+
+            /** Maximum time to wait in queue in milliseconds */
+            queueTimeout?: number;
+
+            /** Priority queue for different request types */
+            priorityQueue?: {
+                enabled?: boolean;
+                priorities?: Record<string, number>; // route patterns to priority levels
+            };
+
+            /** Custom queue overflow handler */
+            onQueueOverflow?: (req: any, res: any) => void;
+        };
+
+        /** Request lifecycle monitoring */
+        lifecycle?: {
+            /** Enable request lifecycle tracking */
+            enabled?: boolean;
+
+            /** Track request start time */
+            trackStartTime?: boolean;
+
+            /** Track request processing stages */
+            trackStages?: boolean;
+
+            /** Maximum request processing time before warning */
+            warnAfter?: number;
+
+            /** Custom lifecycle event handler */
+            onLifecycleEvent?: (event: string, req: any, data: any) => void;
+        };
+
+        /** Request retry and circuit breaker */
+        resilience?: {
+            /** Enable request retry mechanism */
+            retryEnabled?: boolean;
+
+            /** Maximum retry attempts */
+            maxRetries?: number;
+
+            /** Retry delay in milliseconds */
+            retryDelay?: number;
+
+            /** Circuit breaker configuration */
+            circuitBreaker?: {
+                enabled?: boolean;
+                failureThreshold?: number; // failures before opening circuit
+                resetTimeout?: number; // time before attempting to close circuit
+                monitoringPeriod?: number; // time window for failure counting
+            };
+        };
+
+        /** Request size and payload management */
+        payload?: {
+            /** Maximum request body size in bytes */
+            maxBodySize?: number;
+
+            /** Maximum URL length */
+            maxUrlLength?: number;
+
+            /** Maximum number of form fields */
+            maxFields?: number;
+
+            /** Maximum file upload size */
+            maxFileSize?: number;
+
+            /** Allowed MIME types for uploads */
+            allowedMimeTypes?: string[];
+
+            /** Custom payload validation */
+            customValidator?: (req: any) => boolean | Promise<boolean>;
+        };
+    };
     cluster?: {
         enabled?: boolean;
         config?: Omit<ClusterConfig, "enabled">;

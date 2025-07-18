@@ -1027,6 +1027,26 @@ export interface CacheHealth {
 }
 
 /**
+ * Fortified function interface for public API to avoid TypeScript issues with private members
+ */
+export interface IFortifiedFunction<T extends any[], R> {
+    (...args: T): R;
+    getStats(): any;
+    getAnalyticsData(): any;
+    getOptimizationSuggestions(): any[];
+    getPerformanceTrends(): any;
+    detectAnomalies(): any[];
+    getDetailedMetrics(): any;
+    clearCache(): void;
+    getCacheStats(): { hits: number; misses: number; size: number };
+    warmCache(args: T[]): Promise<void>;
+    handleMemoryPressure(level: "low" | "medium" | "high"): void;
+    optimizePerformance(): void;
+    updateOptions(newOptions: any): void;
+    getConfiguration(): any;
+}
+
+/**
  * Cache interface for public API to avoid TypeScript issues with private members
  */
 export interface ICacheAdapter {
@@ -1052,6 +1072,11 @@ export interface ICacheAdapter {
     expire(key: string, ttl: number): Promise<boolean>;
     keys(pattern?: string): Promise<string[]>;
     getHealth(): CacheHealth;
+    memoize<TArgs extends any[], TResult>(
+        keyGenerator: (...args: TArgs) => string,
+        computeFunction: (...args: TArgs) => TResult | Promise<TResult>,
+        options?: CacheSetOptions
+    ): (...args: TArgs) => Promise<TResult>;
 }
 
 /**
@@ -1159,7 +1184,7 @@ export interface ICacheAdapter {
  * @see {@link ICacheAdapter} for the complete interface definition
  * @see {@link https://lab.nehonix.space/nehonix_viewer/_doc/Nehonix%20FortifyJs} for detailed documentation
  */
-export class SecureCacheClient implements ICacheAdapter {
+export class SecureCacheClient {
     private adapter: SecureCacheAdapterType | null = null;
     private config: CacheConfig;
 
@@ -1220,16 +1245,31 @@ export class SecureCacheClient implements ICacheAdapter {
      *
      * @example
      * ```typescript
-     * const user = await cache.get<User>("user:123");
+     * const user = await cache.read<User>("user:123");
      * if (user) {
      *   console.log("Found user:", user.name);
      * }
      * ```
      */
-    async get<T = any>(key: string): Promise<T | null> {
+    async read<T = any>(key: string): Promise<T | null> {
         const adapter = await this.ensureAdapter();
         return adapter.get(key);
     }
+
+    /**
+     * Retrieves a value from the cache (alias for get method)
+     *
+     * @param key - The cache key to retrieve
+     * @returns Promise resolving to the cached value, or null if not found
+     *
+     * @example
+     * ```typescript
+     * const user = await cache.read<User>("user:123");
+     * if (user) {
+     *   console.log("Found user:", user.name);
+     * }
+     * ```
+     */
 
     /**
      * Stores a value in the cache with optional TTL and tags
@@ -1244,19 +1284,19 @@ export class SecureCacheClient implements ICacheAdapter {
      * @example
      * ```typescript
      * // Basic usage
-     * await cache.set("user:123", { name: "John", role: "admin" });
+     * await cache.write("user:123", { name: "John", role: "admin" });
      *
      * // With TTL (1 hour)
-     * await cache.set("session:abc", sessionData, { ttl: 3600 });
+     * await cache.write("session:abc", sessionData, { ttl: 3600 });
      *
      * // With tags for bulk invalidation
-     * await cache.set("product:456", productData, {
+     * await cache.write("product:456", productData, {
      *   ttl: 1800,
      *   tags: ["products", "category:electronics"]
      * });
      * ```
      */
-    async set<T = any>(
+    async write<T = any>(
         key: string,
         value: T,
         options?: CacheSetOptions
@@ -1264,6 +1304,32 @@ export class SecureCacheClient implements ICacheAdapter {
         const adapter = await this.ensureAdapter();
         return adapter.set(key, value, options);
     }
+
+    /**
+     * Stores a value in the cache (alias for set method)
+     *
+     * @param key - The cache key to store the value under
+     * @param value - The value to cache (will be automatically serialized)
+     * @param options - Optional caching options
+     * @param options.ttl - Time to live in seconds (default: configured TTL)
+     * @param options.tags - Array of tags for bulk invalidation
+     * @returns Promise resolving to true if successful, false otherwise
+     *
+     * @example
+     * ```typescript
+     * // Basic usage
+     * await cache.write("user:123", { name: "John", role: "admin" });
+     *
+     * // With TTL (1 hour)
+     * await cache.write("session:abc", sessionData, { ttl: 3600 });
+     *
+     * // With tags for bulk invalidation
+     * await cache.write("product:456", productData, {
+     *   ttl: 1800,
+     *   tags: ["products", "category:electronics"]
+     * });
+     * ```
+     */
 
     /**
      * Deletes a value from the cache
@@ -1406,7 +1472,7 @@ export class SecureCacheClient implements ICacheAdapter {
             operations: {
                 total: stats.operations?.total || stats.total || 0,
                 gets: stats.operations?.gets || stats.gets || 0,
-                sets: stats.operations?.sets || stats.sets || 0, 
+                sets: stats.operations?.sets || stats.sets || 0,
                 deletes: stats.operations?.deletes || stats.deletes || 0,
                 errors: stats.operations?.errors || stats.errors || 0,
             },
@@ -1435,11 +1501,11 @@ export class SecureCacheClient implements ICacheAdapter {
      *
      * @example
      * ```typescript
-     * const users = await cache.mget<User>(["user:1", "user:2", "user:3"]);
+     * const users = await cache.mread<User>(["user:1", "user:2", "user:3"]);
      * console.log(users); // { "user:1": {...}, "user:2": {...} }
      * ```
      */
-    async mget<T = any>(keys: string[]): Promise<Record<string, T>> {
+    async mread<T = any>(keys: string[]): Promise<Record<string, T>> {
         const adapter = await this.ensureAdapter();
         return adapter.mget(keys);
     }
@@ -1456,19 +1522,19 @@ export class SecureCacheClient implements ICacheAdapter {
      * @example
      * ```typescript
      * // Using object notation
-     * await cache.mset({
+     * await cache.mwrite({
      *   "user:1": { name: "Alice" },
      *   "user:2": { name: "Bob" }
      * }, { ttl: 3600 });
      *
      * // Using array notation
-     * await cache.mset([
+     * await cache.mwrite([
      *   ["session:abc", sessionData1],
      *   ["session:def", sessionData2]
      * ], { ttl: 1800, tags: ["sessions"] });
      * ```
      */
-    async mset<T = any>(
+    async mwrite<T = any>(
         entries: Record<string, T> | Array<[string, T]>,
         options?: CacheSetOptions
     ): Promise<boolean> {
@@ -1598,6 +1664,107 @@ export class SecureCacheClient implements ICacheAdapter {
         }
         return this.adapter.getHealth();
     }
+
+    /**
+     * Memoizes a function with intelligent caching
+     *
+     * This method implements memoization - caching function results based on their inputs.
+     * It simplifies the common pattern of:
+     * 1. Generate a cache key from function parameters
+     * 2. Check if result exists in cache
+     * 3. If not, execute the function and cache the result
+     * 4. Return the cached or computed result
+     *
+     * @param keyGenerator - Function that generates a cache key from the parameters
+     * @param computeFunction - Function to execute if cache miss occurs
+     * @param options - Optional caching options
+     * @returns A memoized version of the function
+     *
+     * @example
+     * ```typescript
+     * import { Hash } from "fortify2-js";
+     *
+     * // Simple memoization with automatic key generation
+     * const memoizedSum = cache.memoize(
+     *   (a: number, b: number) => Hash.create(String(a + b)).toString("hex"),
+     *   (a: number, b: number) => a + b,
+     *   { ttl: 3600 }
+     * );
+     *
+     * const result = await memoizedSum(1, 2); // Computes and caches
+     * const cached = await memoizedSum(1, 2); // Returns from cache
+     *
+     * // Advanced usage with async function
+     * const fetchUser = cache.memoize(
+     *   (userId: string) => `user:${userId}`,
+     *   async (userId: string) => {
+     *     const response = await fetch(`/api/users/${userId}`);
+     *     return response.json();
+     *   },
+     *   { ttl: 1800, tags: ["users"] }
+     * );
+     *
+     * const user = await fetchUser("123");
+     * ```
+     */
+    memoize<TArgs extends any[], TResult>(
+        keyGenerator: (...args: TArgs) => string,
+        computeFunction: (...args: TArgs) => TResult | Promise<TResult>,
+        options?: CacheSetOptions
+    ) {
+        return async (...args: TArgs): Promise<TResult> => {
+            // Ensure cache is connected
+            await this.ensureAdapter();
+
+            // Generate cache key
+            const cacheKey = keyGenerator(...args);
+
+            // Try to get from cache first
+            const cachedResult = await this.read<TResult>(cacheKey);
+
+            if (cachedResult !== null && cachedResult !== undefined) {
+                return cachedResult;
+            }
+
+            // Cache miss - compute the result
+            const result = await computeFunction(...args);
+
+            // Store in cache
+            await this.write(cacheKey, result, options);
+
+            return result;
+        };
+    }
+}
+
+/**
+ * Creates a type-safe fortified function wrapper
+ *
+ * This function wraps the `func` utility to provide proper TypeScript types
+ * for export scenarios, avoiding the "cannot be named" error.
+ *
+ * @param fn - The function to fortify
+ * @param options - Optional fortification options
+ * @returns A type-safe fortified function
+ *
+ * @example
+ * ```typescript
+ * import { createTypedFortifiedFunction } from "fortify2-js";
+ *
+ * const somme = createTypedFortifiedFunction((a: number, b: number): number => {
+ *   return a + b;
+ * });
+ *
+ * export const mathOps = { somme }; // ✅ No TypeScript errors
+ * ```
+ */
+export function createTypedFortifiedFunction<T extends any[], R>(
+    fn: (...args: T) => R,
+    options?: any
+): IFortifiedFunction<T, R> {
+    // Import func dynamically to avoid circular dependencies
+    const { func } = require("../fortified-function");
+    return func(fn, options) as IFortifiedFunction<T, R>;
 }
 
 /**

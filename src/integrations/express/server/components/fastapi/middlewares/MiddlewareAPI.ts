@@ -28,9 +28,9 @@ export class MiddlewareAPI implements MiddlewareAPIInterface {
         config: MiddlewareConfiguration = {}
     ) {
         // Use process.stdout.write to ensure immediate output
-        process.stdout.write("🔧 [DEBUG] MiddlewareAPI constructor called\n");
-        process.stdout.write(
-            `🔧 [DEBUG] Config: ${JSON.stringify(config, null, 2)}\n`
+        logger.debug("middleware","MiddlewareAPI constructor called\n");
+        logger.debug("middleware",
+            `Config: ${JSON.stringify(config, null, 2)}\n`
         );
 
         this.Manager = Manager;
@@ -38,11 +38,11 @@ export class MiddlewareAPI implements MiddlewareAPIInterface {
         this.config = config;
 
         // Apply default middleware based on configuration
-        process.stdout.write(
-            "🔧 [DEBUG] About to call applyDefaultMiddleware\n"
+        logger.debug("middleware",
+            "About to call applyDefaultMiddleware\n"
         );
         this.applyDefaultMiddleware();
-        process.stdout.write("🔧 [DEBUG] applyDefaultMiddleware completed\n");
+        logger.debug("middleware","applyDefaultMiddleware completed\n");
     }
 
     /**
@@ -232,11 +232,11 @@ export class MiddlewareAPI implements MiddlewareAPIInterface {
      * Apply default middleware based on configuration
      */
     private applyDefaultMiddleware(): void {
-        process.stdout.write(
-            "🔧 [DEBUG] applyDefaultMiddleware method entered\n"
+        logger.debug("middleware",
+            "applyDefaultMiddleware method entered\n"
         );
-        process.stdout.write(
-            `🔧 [DEBUG] this.config: ${JSON.stringify(this.config, null, 2)}\n`
+        logger.debug("middleware",
+            `this.config: ${JSON.stringify(this.config, null, 2)}\n`
         );
 
         logger.debug(

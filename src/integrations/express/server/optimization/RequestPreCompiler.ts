@@ -22,6 +22,7 @@ import {
     RequestPattern,
     ResponseTemplate,
 } from "../../types/ReqPreCompiler.type";
+import { Logger } from "../utils/Logger";
 
 export class RequestPreCompiler {
     private patterns: Map<string, RequestPattern> = new Map();
@@ -29,6 +30,7 @@ export class RequestPreCompiler {
     private cache: SecureCacheAdapter;
     private config: PreCompilerConfig;
     private learningMode = true;
+    private logger: Logger;
     private optimizationStats = {
         totalRequests: 0,
         optimizedRequests: 0,
@@ -72,6 +74,8 @@ export class RequestPreCompiler {
         // Initialize configurable components
         this.initializeCustomGenerators();
         this.initializeResponseTemplates();
+
+        this.logger = new Logger();
 
         // Start learning period
         setTimeout(() => {
@@ -128,7 +132,7 @@ export class RequestPreCompiler {
      * Pre-compile optimized execution paths for hot routes
      */
     private async compileOptimizedRoutes(): Promise<void> {
-        console.log("Starting route pre-compilation...");
+        this.logger.debug("server", "Starting route pre-compilation...");
         const compilationStart = performance.now();
 
         // Sort patterns by optimization potential - AGGRESSIVE MODE
@@ -170,7 +174,8 @@ export class RequestPreCompiler {
         const compilationTime = performance.now() - compilationStart;
         this.optimizationStats.compilationTime = compilationTime;
 
-        console.log(
+        this.logger.info(
+            "server",
             `✔ Pre-compiled ${
                 sortedPatterns.length
             } routes in ${compilationTime.toFixed(2)}ms`

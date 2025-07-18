@@ -1,7 +1,7 @@
 /***************************************************************************
- * FortifyJS - Secure Array Types
+ * FortifyJS - Advanced JavaScript Security Library
  *
- * This file contains type definitions for the SecureArray architecture
+ * This file contains the main entry point for the FortifyJS library.
  *
  * @author Nehonix
  * @license MIT
@@ -1783,7 +1783,7 @@ export type {
  *         rateLimit: true,
  *         cors: true,
  *         helmet: true
- *     }, 
+ *     },
  *     monitoring: {
  *         metrics: true,
  *         logging: true
@@ -1792,3 +1792,4 @@ export type {
  * ```
  */
 export * from "./integrations/express/ServerFactory";
+

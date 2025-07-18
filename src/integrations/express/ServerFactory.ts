@@ -1,7 +1,5 @@
 /***************************************************************************
- * FortifyJS - Secure Array Types
- *
- * This file contains type definitions for the SecureArray modular architecture
+ * FortifyJS - Advanced JavaScript Security Library
  *
  * @author Nehonix
  * @license MIT
@@ -49,18 +47,6 @@ import {
     ServerConfig,
     ServerOptions,
     UltraFastApp,
-} from "./types/types";
-
-// Re-export types for external use
-export type {
-    ServerOptions,
-    ServerConfig,
-    RouteOptions,
-    UltraFastApp,
-    Request,
-    Response,
-    NextFunction,
-    RequestHandler,
 } from "./types/types";
 
 // Re-export safe JSON utilities
@@ -252,5 +238,14 @@ export async function UFSMiddleware(app: UltraFastApp, options: ServerOptions) {
 }
 
 export { Router } from "express";
-
+export type {
+    ServerOptions,
+    ServerConfig,
+    RouteOptions,
+    UltraFastApp,
+    Request,
+    Response,
+    NextFunction,
+    RequestHandler,
+} from "./types/types";
 

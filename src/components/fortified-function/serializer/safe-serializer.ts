@@ -341,8 +341,38 @@ export class SafeSerializer {
         args: any[],
         prefix: string = "cache"
     ): string {
+        if (!args || args.length === 0) {
+            return `${prefix}:empty`;
+        }
+
+        // **EXPRESS DETECTION: Check if arguments contain Express req/res objects**
+        const hasExpressObjects = args.some(
+            (arg) =>
+                arg &&
+                typeof arg === "object" &&
+                arg.constructor &&
+                (arg.constructor.name === "IncomingMessage" ||
+                    arg.constructor.name === "ServerResponse" ||
+                    arg.constructor.name === "Request" ||
+                    arg.constructor.name === "Response" ||
+                    (arg.method && arg.url && arg.headers) || // Express Request-like
+                    (arg.statusCode !== undefined &&
+                        arg.headersSent !== undefined)) // Express Response-like
+        );
+
+        if (hasExpressObjects) {
+            // **EXPRESS-SAFE PATH: Use Express-safe serialization**
+            const safe = this.expressStringify(args, {
+                fastMode: false,
+                maxDepth: 3,
+                maxLength: 300,
+                truncateStrings: 50,
+            });
+            return `${prefix}:express:${safe}`;
+        }
+
         try {
-            // **ULTRA-FAST PATH: Try simple approach first**
+            // **ULTRA-FAST PATH: Try simple approach first for non-Express objects**
             const simple = JSON.stringify(args);
             if (simple.length <= 500) {
                 return `${prefix}:${simple}`;

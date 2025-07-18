@@ -284,10 +284,12 @@ export class MiddlewareManager implements IMiddlewareManager {
      * This method provides basic middleware functionality before the full system is initialized
      */
     public applyImmediateMiddleware(config: MiddlewareConfiguration): void {
+        // console.log("Applying immediate middleware configuration...");
         logger.debug(
             "middleware",
             "Applying immediate middleware configuration..."
         );
+        // console.log("conf: ", config);
 
         // Apply rate limiting if configured
         if (config?.rateLimit && config.rateLimit !== true) {
@@ -297,7 +299,7 @@ export class MiddlewareManager implements IMiddlewareManager {
                     windowMs: rateLimitConfig.windowMs || 15 * 60 * 1000,
                     max: rateLimitConfig.max || 100,
                     message:
-                        "Too many requests from this IP, please try again later.",
+                        "Too many requests from this IP, please try again later (msg2).",
                     standardHeaders: true,
                     legacyHeaders: false,
                 });

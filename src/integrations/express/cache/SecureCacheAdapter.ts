@@ -609,8 +609,20 @@ export class SecureCacheAdapter extends EventEmitter {
 
     /**
      * Get value from cache with ultra-fast hybrid strategy
+     *
+     * @param key - The cache key to retrieve
+     * @returns Promise resolving to the cached value with proper typing, or null if not found
+     *
+     * @example
+     * ```typescript
+     * interface User { id: number; name: string; }
+     * const user = await cache.get<User>("user:123");
+     * if (user) {
+     *   console.log(user.name); // TypeScript knows this is a string
+     * }
+     * ```
      */
-    public async get(key: string): Promise<any> {
+    public async get<T = any>(key: string): Promise<T | null> {
         const startTime = Date.now();
 
         try {
@@ -668,10 +680,28 @@ export class SecureCacheAdapter extends EventEmitter {
 
     /**
      * Set value in cache with intelligent placement
+     *
+     * @param key - The cache key to store the value under
+     * @param value - The value to cache with proper typing
+     * @param options - Optional caching options
+     * @param options.ttl - Time to live in milliseconds
+     * @param options.tags - Array of tags for bulk invalidation
+     * @returns Promise resolving to true if successful, false otherwise
+     *
+     * @example
+     * ```typescript
+     * interface User { id: number; name: string; email: string; }
+     *
+     * const user: User = { id: 123, name: "John", email: "john@example.com" };
+     * const success = await cache.set<User>("user:123", user, {
+     *   ttl: 3600000, // 1 hour
+     *   tags: ["users", "active"]
+     * });
+     * ```
      */
-    public async set(
+    public async set<T = any>(
         key: string,
-        value: any,
+        value: T,
         options: { ttl?: number; tags?: string[] } = {}
     ): Promise<boolean> {
         const startTime = Date.now();
@@ -964,8 +994,23 @@ export class SecureCacheAdapter extends EventEmitter {
 
     /**
      * Get multiple values at once (batch operation)
+     *
+     * @param keys - Array of cache keys to retrieve
+     * @returns Promise resolving to an object with key-value pairs (missing keys are omitted)
+     *
+     * @example
+     * ```typescript
+     * interface User { id: number; name: string; }
+     *
+     * const users = await cache.mget<User>(["user:1", "user:2", "user:3"]);
+     * // users is Record<string, User>
+     *
+     * for (const [key, user] of Object.entries(users)) {
+     *   console.log(`${key}: ${user.name}`); // TypeScript knows user.name is string
+     * }
+     * ```
      */
-    public async mget(keys: string[]): Promise<Record<string, any>> {
+    public async mget<T = any>(keys: string[]): Promise<Record<string, T>> {
         const results: Record<string, any> = {};
 
         try {
@@ -992,9 +1037,32 @@ export class SecureCacheAdapter extends EventEmitter {
 
     /**
      * Set multiple values at once (batch operation)
+     *
+     * @param entries - Object with key-value pairs or array of [key, value] tuples
+     * @param options - Optional caching options applied to all entries
+     * @param options.ttl - Time to live in milliseconds for all entries
+     * @param options.tags - Array of tags applied to all entries
+     * @returns Promise resolving to true if all operations successful, false otherwise
+     *
+     * @example
+     * ```typescript
+     * interface User { id: number; name: string; }
+     *
+     * // Using object notation
+     * const success1 = await cache.mset<User>({
+     *   "user:1": { id: 1, name: "Alice" },
+     *   "user:2": { id: 2, name: "Bob" }
+     * }, { ttl: 3600000, tags: ["users"] });
+     *
+     * // Using array notation
+     * const success2 = await cache.mset<User>([
+     *   ["user:3", { id: 3, name: "Charlie" }],
+     *   ["user:4", { id: 4, name: "Diana" }]
+     * ], { ttl: 3600000 });
+     * ```
      */
-    public async mset(
-        entries: Record<string, any> | Array<[string, any]>,
+    public async mset<T = any>(
+        entries: Record<string, T> | Array<[string, T]>,
         options: { ttl?: number; tags?: string[] } = {}
     ): Promise<boolean> {
         try {
@@ -1018,6 +1086,58 @@ export class SecureCacheAdapter extends EventEmitter {
             });
             return false;
         }
+    }
+
+    // ========================================
+    // TYPE-SAFE ALIAS METHODS
+    // ========================================
+
+    /**
+     * Read value from cache (alias for get method)
+     *
+     * @param key - The cache key to retrieve
+     * @returns Promise resolving to the cached value with proper typing, or null if not found
+     *
+     * @example
+     * ```typescript
+     * interface User { id: number; name: string; }
+     * const user = await cache.read<User>("user:123");
+     * if (user) {
+     *   console.log(user.name); // TypeScript knows this is a string
+     * }
+     * ```
+     */
+    public async read<T = any>(key: string): Promise<T | null> {
+        return this.get<T>(key);
+    }
+
+    /**
+     * Write value to cache (alias for set method)
+     *
+     * @param key - The cache key to store the value under
+     * @param value - The value to cache with proper typing
+     * @param options - Optional caching options
+     * @param options.ttl - Time to live in milliseconds
+     * @param options.tags - Array of tags for bulk invalidation
+     * @returns Promise resolving to true if successful, false otherwise
+     *
+     * @example
+     * ```typescript
+     * interface User { id: number; name: string; email: string; }
+     *
+     * const user: User = { id: 123, name: "John", email: "john@example.com" };
+     * const success = await cache.write<User>("user:123", user, {
+     *   ttl: 3600000, // 1 hour
+     *   tags: ["users", "active"]
+     * });
+     * ```
+     */
+    public async write<T = any>(
+        key: string,
+        value: T,
+        options: { ttl?: number; tags?: string[] } = {}
+    ): Promise<boolean> {
+        return this.set<T>(key, value, options);
     }
 
     // ========================================

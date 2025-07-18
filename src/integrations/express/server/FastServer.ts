@@ -4,6 +4,7 @@
  */
 
 import express, { Request, Response, NextFunction } from "express";
+import rateLimit from "express-rate-limit";
 
 // Import types
 import type {
@@ -37,6 +38,7 @@ import { RedirectManager } from "./components/fastapi/RedirectManager";
 import { ConsoleInterceptor } from "./components/fastapi/console/ConsoleInterceptor";
 import { UltraFastRequestProcessor } from "./components/fastapi/UltraFastRequestProcessor"; // UFRP
 import { createSafeJsonMiddleware } from "../middleware/safe-json-middleware";
+import { RateLimitConfig } from "../types/mod/security";
 
 /**
  * Ultra-Fast Express Server with Advanced Performance Optimization
@@ -256,6 +258,25 @@ export class UltraFastServer {
         // Process any middleware that was queued during immediate usage
         this.processQueuedMiddleware();
 
+        // Process any configs queued before middlewareManager was ready
+        const appAny = this.app as any;
+        if (
+            appAny._immediateMiddlewareConfigs &&
+            Array.isArray(appAny._immediateMiddlewareConfigs)
+        ) {
+            appAny._immediateMiddlewareConfigs.forEach((config: any) => {
+                try {
+                    this.middlewareManager.applyImmediateMiddleware(config);
+                } catch (error) {
+                    this.logger.warn(
+                        "middleware",
+                        `Failed to apply queued middleware config: ${error}`
+                    );
+                }
+            });
+            appAny._immediateMiddlewareConfigs = [];
+        }
+
         this.routeManager = new RouteManager({
             app: this.app,
             cacheManager: this.cacheManager,
@@ -273,6 +294,9 @@ export class UltraFastServer {
                 performanceManager: this.performanceManager,
             }
         );
+
+        // Initialize request management middleware
+        this.initializeRequestManagement();
 
         this.redirectManager = new RedirectManager(this.logger);
         this.consoleInterceptor = new ConsoleInterceptor(
@@ -524,24 +548,23 @@ export class UltraFastServer {
      * Fallback method for immediate middleware application
      */
     private applyMiddlewareDirectly(config: any): void {
-
         // Apply rate limiting if configured
         if (config?.rateLimit && config.rateLimit !== true) {
             try {
-                const rateLimit = require("express-rate-limit");
-                const rateLimitConfig = config.rateLimit;
+                // const rateLimit = require("express-rate-limit");
+                const rateLimitConfig = config.rateLimit as RateLimitConfig;
                 const limiter = rateLimit({
                     windowMs: rateLimitConfig.windowMs || 15 * 60 * 1000,
                     max: rateLimitConfig.max || 100,
                     message:
+                        rateLimitConfig.message ||
                         "Too many requests from this IP, please try again later.",
-                    standardHeaders: true,
-                    legacyHeaders: false,
+                    standardHeaders: rateLimitConfig.standardHeaders || true,
+                    legacyHeaders: rateLimitConfig.legacyHeaders || false,
+                    handler: (rateLimitConfig as any).onLimitReached,
                 });
                 this.app.use(limiter);
-            } catch (error) {
-
-            }
+            } catch (error) {}
         }
 
         // Apply CORS if configured
@@ -568,8 +591,7 @@ export class UltraFastServer {
                     credentials: corsConfig.credentials !== false,
                 };
                 this.app.use(cors(corsOptions));
-            } catch (error) {
-            }
+            } catch (error) {}
         }
 
         // Apply security headers if configured
@@ -577,8 +599,7 @@ export class UltraFastServer {
             try {
                 const helmet = require("helmet");
                 this.app.use(helmet());
-            } catch (error) {
-            }
+            } catch (error) {}
         }
 
         // Apply compression if configured
@@ -594,7 +615,6 @@ export class UltraFastServer {
                 );
             }
         }
-
     }
 
     /**
@@ -610,15 +630,24 @@ export class UltraFastServer {
 
         // Add immediate middleware() method that implements MiddlewareAPIInterface
         this.app.middleware = (config?: any): any => {
-            // Delegate to MiddlewareManager for proper modular handling
+            // Always queue or apply middleware depending on initialization state
             if (config) {
                 if (this.middlewareManager) {
+                    // MiddlewareManager is ready, apply immediately
+                    // console.log("using builtin class");
                     this.middlewareManager.applyImmediateMiddleware(config);
                 } else {
+                    // console.log("using dirrect msg");
+                    // MiddlewareManager not ready, queue for later processing
                     this.logger.debug(
                         "server",
-                        "MiddlewareManager not available, applying directly"
+                        "MiddlewareManager not available, queuing for later processing"
                     );
+                    // Store config for later application
+                    if (!(this.app as any)._immediateMiddlewareConfigs) {
+                        (this.app as any)._immediateMiddlewareConfigs = [];
+                    }
+                    (this.app as any)._immediateMiddlewareConfigs.push(config);
                     this.applyMiddlewareDirectly(config);
                 }
             }
@@ -688,6 +717,109 @@ export class UltraFastServer {
     }
 
     /**
+     * Initialize request management middleware for timeouts, network quality, and concurrency control
+     */
+    private initializeRequestManagement(): void {
+        const requestConfig = this.options.requestManagement;
+        if (!requestConfig) return;
+
+        // Request timeout middleware
+        if (requestConfig.timeout?.enabled) {
+            this.app.use((req: any, res: any, next: any) => {
+                const route = req.route?.path || req.path;
+                const timeout =
+                    requestConfig.timeout?.routes?.[route] ||
+                    requestConfig.timeout?.defaultTimeout ||
+                    30000;
+
+                const timeoutId = setTimeout(() => {
+                    if (!res.headersSent) {
+                        if (requestConfig.timeout?.onTimeout) {
+                            requestConfig.timeout.onTimeout(req, res);
+                        } else {
+                            res.status(408).json({
+                                error: "Request timeout",
+                                timeout: timeout,
+                                path: req.path,
+                                ...(requestConfig.timeout
+                                    ?.includeStackTrace && {
+                                    stack: new Error().stack,
+                                }),
+                            });
+                        }
+                    }
+                }, timeout);
+
+                // Clear timeout when response finishes
+                res.on("finish", () => clearTimeout(timeoutId));
+                res.on("close", () => clearTimeout(timeoutId));
+
+                next();
+            });
+        }
+
+        // Concurrency control middleware
+        if (
+            requestConfig.concurrency?.maxConcurrentRequests ||
+            requestConfig.concurrency?.maxPerIP
+        ) {
+            const activeRequests = new Map<string, number>();
+            let totalActiveRequests = 0;
+
+            this.app.use((req: any, res: any, next: any) => {
+                const clientIP = req.ip || req.connection.remoteAddress;
+                const maxTotal =
+                    requestConfig.concurrency?.maxConcurrentRequests ||
+                    Infinity;
+                const maxPerIP =
+                    requestConfig.concurrency?.maxPerIP || Infinity;
+                const currentPerIP = activeRequests.get(clientIP) || 0;
+
+                // Check limits
+                if (
+                    totalActiveRequests >= maxTotal ||
+                    currentPerIP >= maxPerIP
+                ) {
+                    if (requestConfig.concurrency?.onQueueOverflow) {
+                        requestConfig.concurrency.onQueueOverflow(req, res);
+                    } else {
+                        res.status(429).json({
+                            error: "Too many concurrent requests",
+                            totalActive: totalActiveRequests,
+                            maxTotal,
+                            perIPActive: currentPerIP,
+                            maxPerIP,
+                        });
+                    }
+                    return;
+                }
+
+                // Track request
+                totalActiveRequests++;
+                activeRequests.set(clientIP, currentPerIP + 1);
+
+                // Clean up when request finishes
+                const cleanup = () => {
+                    totalActiveRequests--;
+                    const current = activeRequests.get(clientIP) || 0;
+                    if (current <= 1) {
+                        activeRequests.delete(clientIP);
+                    } else {
+                        activeRequests.set(clientIP, current - 1);
+                    }
+                };
+
+                res.on("finish", cleanup);
+                res.on("close", cleanup);
+
+                next();
+            });
+        }
+
+        this.logger.info("server", "Request management middleware initialized");
+    }
+
+    /**
      * Process middleware that was queued during immediate usage
      */
     private processQueuedMiddleware(): void {
@@ -709,7 +841,7 @@ export class UltraFastServer {
             (this.app as any)._middlewareQueue = [];
         }
     }
- 
+
     /**
      * Add start method to app with cluster support (full version)
      */
