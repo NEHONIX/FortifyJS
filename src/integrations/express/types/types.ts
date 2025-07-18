@@ -729,6 +729,116 @@ export interface ServerOptions {
     // Middleware configuration
     middleware?: MiddlewareConfiguration;
 
+    /**
+     * Plugin system configuration for automatic optimization and maintenance
+     *
+     * @example
+     * ```typescript
+     * plugins: {
+     *   routeOptimization: {
+     *     enabled: true,
+     *     optimizationThreshold: 100,
+     *     autoOptimization: true,
+     *     customRules: [
+     *       {
+     *         pattern: "/api/*",
+     *         minHits: 50,
+     *         maxResponseTime: 500,
+     *         cacheStrategy: "aggressive"
+     *       }
+     *     ]
+     *   },
+     *   serverMaintenance: {
+     *     enabled: true,
+     *     errorThreshold: 5,
+     *     memoryThreshold: 80,
+     *     autoCleanup: true,
+     *     logRetentionDays: 7
+     *   }
+     * }
+     * ```
+     */
+    plugins?: {
+        /** Route optimization plugin configuration */
+        routeOptimization?: {
+            /** Enable route optimization plugin */
+            enabled?: boolean;
+
+            /** How often to analyze routes in milliseconds */
+            analysisInterval?: number;
+
+            /** Minimum hits before optimization */
+            optimizationThreshold?: number;
+
+            /** Time window for popularity calculation in milliseconds */
+            popularityWindow?: number;
+
+            /** Maximum routes to track */
+            maxTrackedRoutes?: number;
+
+            /** Enable automatic optimization */
+            autoOptimization?: boolean;
+
+            /** Custom optimization rules */
+            customRules?: Array<{
+                pattern: string;
+                minHits: number;
+                maxResponseTime: number;
+                cacheStrategy: "aggressive" | "moderate" | "conservative";
+                preloadEnabled?: boolean;
+            }>;
+
+            /** Callback when route is optimized */
+            onOptimization?: (route: string, optimization: string) => void;
+
+            /** Callback when analysis is complete */
+            onAnalysis?: (stats: any[]) => void;
+        };
+
+        /** Server maintenance plugin configuration */
+        serverMaintenance?: {
+            /** Enable server maintenance plugin */
+            enabled?: boolean;
+
+            /** How often to check health in milliseconds */
+            checkInterval?: number;
+
+            /** Error rate threshold percentage */
+            errorThreshold?: number;
+
+            /** Memory usage threshold percentage */
+            memoryThreshold?: number;
+
+            /** Response time threshold in milliseconds */
+            responseTimeThreshold?: number;
+
+            /** Log retention period in days */
+            logRetentionDays?: number;
+
+            /** Maximum log file size in bytes */
+            maxLogFileSize?: number;
+
+            /** Enable automatic cleanup */
+            autoCleanup?: boolean;
+
+            /** Enable automatic restart on critical issues */
+            autoRestart?: boolean;
+
+            /** Callback when issue is detected */
+            onIssueDetected?: (issue: any) => void;
+
+            /** Callback when maintenance is complete */
+            onMaintenanceComplete?: (actions: string[]) => void;
+        };
+
+        /** Custom plugins */
+        customPlugins?: Array<{
+            name: string;
+            plugin: any;
+            config?: any;
+        }>;
+    };
+
     // Logging configuration
     logging?: {
         enabled?: boolean; // Master switch for all logging (default: true)
@@ -1180,6 +1290,28 @@ export interface UltraFastApp extends Omit<Express, "engine"> {
      * ```
      */
     getRedirectInstance: (fromPort: number) => RedirectServerInstance | null;
+
+    /**
+     * Get the server plugin manager for route optimization and maintenance.
+     *
+     * @returns Server plugin manager instance or undefined if not initialized
+     *
+     * @example
+     * ```typescript
+     * const pluginManager = app.getServerPluginManager();
+     * if (pluginManager) {
+     *   const routeStats = pluginManager.getRouteOptimizationPlugin()?.getRouteStats();
+     *   const healthMetrics = pluginManager.getServerMaintenancePlugin()?.getHealthMetrics();
+     * }
+     * ```
+     */
+    getServerPluginManager?: () => any;
+
+    /**
+     * Server plugin manager instance (for internal use).
+     * Provides access to route optimization and server maintenance plugins.
+     */
+    serverPluginManager?: any;
 
     /**
      * Get all active redirect instances.

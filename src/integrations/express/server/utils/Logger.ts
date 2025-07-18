@@ -10,9 +10,9 @@ export class Logger {
     private static instance: Logger;
 
     constructor(config?: ServerOptions["logging"]) {
-        this.config = {
+        const defaultConfig = {
             enabled: true,
-            level: "info",
+            level: "info" as const,
             components: {
                 server: true,
                 cache: true,
@@ -41,8 +41,9 @@ export class Logger {
                 prefix: true,
                 compact: false,
             },
-            ...config,
         };
+
+        this.config = this.deepMerge(defaultConfig, config || {});
     }
 
     /**
@@ -58,10 +59,38 @@ export class Logger {
     }
 
     /**
+     * Deep merge two objects
+     */
+    private deepMerge(target: any, source: any): any {
+        const result = { ...target };
+
+        for (const key in source) {
+            if (
+                source[key] &&
+                typeof source[key] === "object" &&
+                !Array.isArray(source[key])
+            ) {
+                result[key] = this.deepMerge(target[key] || {}, source[key]);
+            } else {
+                result[key] = source[key];
+            }
+        }
+
+        return result;
+    }
+
+    /**
      * Update logger configuration
      */
     public updateConfig(config: ServerOptions["logging"]): void {
-        this.config = { ...this.config, ...config };
+        this.config = this.deepMerge(this.config, config || {});
+    }
+
+    /**
+     * Get current logger configuration (for debugging)
+     */
+    public getConfig(): ServerOptions["logging"] {
+        return this.config;
     }
 
     /**

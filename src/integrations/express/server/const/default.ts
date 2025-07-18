@@ -95,10 +95,10 @@ export const DEFAULT_OPTIONS: ServerOptions = {
         },
         types: {
             startup: true,
-            warnings: false, // No UFSIMC warnings!
+            warnings: true,
             errors: true,
-            performance: false,
-            debug: false,
+            performance: true,
+            debug: true,
             hotReload: true,
             portSwitching: true,
         },

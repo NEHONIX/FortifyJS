@@ -16,6 +16,7 @@ import type { PluginType } from "./plugins/types/PluginTypes";
 
 // Import plugin classes
 import { PluginManager } from "./components/fastapi/PluginManager";
+import { PluginManager as ServerPluginManager } from "../plugins/plugin-manager";
 
 // Import utils
 import { Logger, initializeLogger } from "./utils/Logger";
@@ -67,6 +68,7 @@ export class UltraFastServer {
     private redirectManager!: RedirectManager;
     private consoleInterceptor!: ConsoleInterceptor;
     private ultraFastProcessor!: UltraFastRequestProcessor;
+    private serverPluginManager!: ServerPluginManager;
 
     constructor(
         userOptions: ServerOptions = {
@@ -88,6 +90,9 @@ export class UltraFastServer {
 
         // Create Express app immediately
         this.app = express() as unknown as UltraFastApp;
+
+        // Expose logger on app object for debugging
+        (this.app as any).logger = this.logger;
 
         // Add start method immediately so it's available right away
         this.addStartMethod();
@@ -298,6 +303,9 @@ export class UltraFastServer {
         // Initialize request management middleware
         this.initializeRequestManagement();
 
+        // Initialize server plugins
+        this.initializeServerPlugins();
+
         this.redirectManager = new RedirectManager(this.logger);
         this.consoleInterceptor = new ConsoleInterceptor(
             this.logger,
@@ -324,6 +332,13 @@ export class UltraFastServer {
      */
     public getApp(): UltraFastApp {
         return this.app;
+    }
+
+    /**
+     * Get the server plugin manager
+     */
+    public getServerPluginManager(): ServerPluginManager | undefined {
+        return this.serverPluginManager;
     }
 
     /**
@@ -817,6 +832,41 @@ export class UltraFastServer {
         }
 
         this.logger.info("server", "Request management middleware initialized");
+    }
+
+    /**
+     * Initialize server plugins for optimization and maintenance
+     */
+    private initializeServerPlugins(): void {
+        if (!this.options.plugins) return;
+
+        this.serverPluginManager = new ServerPluginManager(
+            this.options.plugins
+        );
+        this.serverPluginManager.initialize(this.app, this.logger);
+
+        // Expose plugin manager on app object
+        (this.app as any).serverPluginManager = this.serverPluginManager;
+        (this.app as any).getServerPluginManager = () =>
+            this.serverPluginManager;
+
+        // Setup plugin event handlers
+        this.serverPluginManager.on("route_optimized", (data) => {
+            this.logger.info("plugins", `Route optimized: ${data.routeKey}`);
+        });
+
+        this.serverPluginManager.on("maintenance_issue", (issue) => {
+            this.logger.warn("plugins", `Maintenance issue: ${issue.message}`);
+        });
+
+        this.serverPluginManager.on("critical_issue", (issue) => {
+            this.logger.error(
+                "plugins",
+                `Critical issue detected: ${issue.message}`
+            );
+        });
+
+        this.logger.info("server", "Server plugins initialized");
     }
 
     /**
