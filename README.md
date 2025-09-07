@@ -1,5 +1,5 @@
 # Nehonix FortifyJS - Advanced JavaScript Security Library 
->Deprecated
+>Deprecated - use [XyPriss](https://github.com/Nehonix-Team/XyPriss) instead.
 
 FortifyJS is a robust JavaScript security library designed to enhance data structures with advanced cryptographic features, real-time security, and type safety. It provides a comprehensive set of tools for secure data handling, featuring the world's most advanced SecureArray implementation with military-grade encryption and real-time monitoring.
 
